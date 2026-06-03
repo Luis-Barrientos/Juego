@@ -453,6 +453,19 @@ canvas#game {
     top: 6px;
     right: 6px;
   }
+  /* Pausa: debajo del minimapa para no solaparse con él. */
+  .pauseBtn {
+    top: 94px;
+    right: 6px;
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+  /* Joystick algo más transparente para no tapar el mapa. */
+  #joystick {
+    background: radial-gradient(circle, rgba(60, 30, 80, 0.32) 0%, rgba(20, 10, 30, 0.22) 70%, transparent 100%);
+    border-color: rgba(180, 120, 220, 0.3);
+  }
   .overlay { padding: 16px; gap: 12px; }
   .overlay h1 { font-size: 36px; letter-spacing: 4px; }
   .overlay h2 { font-size: 26px; letter-spacing: 3px; }
