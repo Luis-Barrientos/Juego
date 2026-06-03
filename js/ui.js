@@ -59,22 +59,32 @@ export function hideAllOverlays() {
   dom.gameOver.classList.add('hidden');
   dom.win.classList.add('hidden');
   dom.upgrade.classList.add('hidden');
+  document.body.classList.remove('overlay-active');
 }
 
-export function showMenu()      { dom.menu.classList.remove('hidden'); }
-export function showPause()     { dom.pause.classList.remove('hidden'); }
-export function hidePause()     { dom.pause.classList.add('hidden'); }
+function markOverlayActive() {
+  document.body.classList.add('overlay-active');
+}
+
+export function showMenu()      { markOverlayActive(); dom.menu.classList.remove('hidden'); }
+export function showPause()     { markOverlayActive(); dom.pause.classList.remove('hidden'); }
+export function hidePause()     {
+  dom.pause.classList.add('hidden');
+  document.body.classList.remove('overlay-active');
+}
 export function showGameOver(stats) {
   document.getElementById('goFloor').textContent = stats.floor;
   document.getElementById('goKills').textContent = stats.kills;
   document.getElementById('goGold').textContent  = stats.gold;
   document.getElementById('goScore').textContent = stats.score;
+  markOverlayActive();
   dom.gameOver.classList.remove('hidden');
 }
 export function showWinScreen(stats) {
   document.getElementById('winKills').textContent = stats.kills;
   document.getElementById('winGold').textContent  = stats.gold;
   document.getElementById('winScore').textContent = stats.score;
+  markOverlayActive();
   dom.win.classList.remove('hidden');
 }
 
@@ -95,6 +105,7 @@ export const UPGRADES = [
  * @param {(id:string) => void} onPick
  */
 export function showUpgradePicker(onPick) {
+  markOverlayActive();
   dom.upgrade.classList.remove('hidden');
   const pool = UPGRADES.slice().sort(() => Math.random() - 0.5).slice(0, 3);
   dom.upgradeOpts.innerHTML = '';
@@ -112,4 +123,5 @@ export function showUpgradePicker(onPick) {
 
 export function hideUpgradePicker() {
   dom.upgrade.classList.add('hidden');
+  document.body.classList.remove('overlay-active');
 }

@@ -292,4 +292,5 @@ document.getElementById('winBtn').addEventListener('click', () => {
 });
 
 state.lastTime = performance.now();
+document.body.classList.add('overlay-active');
 requestAnimationFrame(loop);
