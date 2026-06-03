@@ -22,7 +22,7 @@ import {
 } from './config.js';
 import { state }                          from './state.js';
 import { Audio }                          from './audio.js';
-import { initInput }                      from './input.js';
+import { initInput, updateTouchAim }      from './input.js';
 import { clamp, lerp, rand }              from './utils.js';
 import {
   generateDungeon, getRoomAt,
@@ -191,6 +191,7 @@ function update(dt) {
   if (state.state !== STATE_PLAY) return;
   state.time += dt;
 
+  updateTouchAim();
   playerUpdate(state.player, dt, playerHooks);
   state.currentRoom = getRoomAt(state.rooms, state.player);
 

@@ -20,8 +20,9 @@ body {
 
 #gameWrap {
   position: relative;
-  width: 800px;
-  height: 600px;
+  width: min(100vw, calc(100vh * 4 / 3), 800px);
+  aspect-ratio: 4 / 3;
+  max-height: 100vh;
   box-shadow:
     0 0 40px rgba(120, 40, 200, 0.25),
     0 0 80px rgba(60, 20, 100, 0.15),
@@ -30,12 +31,13 @@ body {
 
 canvas#game {
   display: block;
-  width: 800px;
-  height: 600px;
+  width: 100%;
+  height: 100%;
   background: #000;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   cursor: crosshair;
+  touch-action: none;
 }
 
 /* ─── HUD ─── */
@@ -341,4 +343,153 @@ canvas#game {
   font-size: 12px;
   color: #a08070;
   line-height: 1.4;
+}
+
+/* ─── Controles táctiles ─── */
+#touchUI {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+}
+
+#touchUI.hidden { display: none; }
+
+#joystick {
+  position: absolute;
+  left: 4%;
+  bottom: 6%;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(60, 30, 80, 0.45) 0%, rgba(20, 10, 30, 0.35) 70%, transparent 100%);
+  border: 2px solid rgba(180, 120, 220, 0.35);
+  pointer-events: auto;
+  touch-action: none;
+}
+
+#joystickKnob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #c08040 0%, #6a3018 70%);
+  border: 2px solid #ffc870;
+  box-shadow: 0 0 18px rgba(255, 160, 60, 0.5);
+  pointer-events: none;
+  transition: transform 0.05s linear;
+}
+
+#touchActions {
+  position: absolute;
+  right: 4%;
+  bottom: 6%;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.touchBtn {
+  pointer-events: auto;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 2px solid #6a4020;
+  background: radial-gradient(circle, rgba(70, 35, 20, 0.85) 0%, rgba(30, 15, 10, 0.85) 100%);
+  color: #ffc870;
+  font-family: inherit;
+  font-size: 28px;
+  font-weight: bold;
+  text-shadow: 0 0 8px #000;
+  box-shadow: 0 0 14px rgba(0, 0, 0, 0.7);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.touchBtn:active {
+  background: radial-gradient(circle, #c08040 0%, #6a3018 100%);
+  color: #fff;
+  transform: scale(0.94);
+}
+
+.touchBtn.big   { width: 88px; height: 88px; font-size: 36px; }
+.touchBtn.small { width: 56px; height: 56px; font-size: 20px; }
+
+#btnMagic { color: #b070ff; border-color: #6030a0; }
+#btnMagic:active { background: radial-gradient(circle, #b070ff 0%, #4a1880 100%); }
+
+.pauseBtn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+  letter-spacing: -2px;
+}
+
+/* ─── Responsive escalado HUD ─── */
+@media (max-width: 720px) {
+  #hud {
+    font-size: 11px;
+    gap: 4px;
+  }
+  .bar { width: 130px; height: 13px; }
+  .bar-label { width: 22px; }
+  .bar span { font-size: 10px; }
+  .hud-stats { font-size: 11px; gap: 8px; }
+  #minimap {
+    width: 96px;
+    height: 96px;
+    top: 6px;
+    right: 6px;
+  }
+  .overlay h1 { font-size: 38px; letter-spacing: 5px; }
+  .overlay h2 { font-size: 28px; letter-spacing: 4px; }
+  .overlay p  { font-size: 13px; }
+  .overlay .tagline { font-size: 14px; }
+  .overlay button {
+    font-size: 15px;
+    padding: 12px 30px;
+    letter-spacing: 3px;
+  }
+  .controls { font-size: 11px; padding: 8px 14px; line-height: 1.6; }
+  .results  { font-size: 13px; padding: 10px 18px; }
+  #upgradeOptions { gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .upgrade-card { width: 140px; padding: 12px 8px; }
+  .upgrade-card .icon { font-size: 28px; }
+  .upgrade-card .name { font-size: 13px; }
+  .upgrade-card .desc { font-size: 11px; }
+}
+
+@media (max-width: 480px) {
+  #joystick { width: 110px; height: 110px; }
+  #joystickKnob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
+  .touchBtn { width: 58px; height: 58px; font-size: 24px; }
+  .touchBtn.big { width: 72px; height: 72px; font-size: 30px; }
+  .touchBtn.small { width: 46px; height: 46px; font-size: 16px; }
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+  body::before {
+    content: "Para una mejor experiencia gira el dispositivo →";
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    background: rgba(10, 6, 18, 0.96);
+    color: #ffc870;
+    font-size: 18px;
+    letter-spacing: 2px;
+    z-index: 100;
+    pointer-events: none;
+  }
 }
