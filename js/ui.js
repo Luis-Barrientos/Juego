@@ -3,6 +3,8 @@
  */
 
 import { state } from './state.js';
+import { PLAYER_BASE } from './config.js';
+import { load } from './storage.js';
 
 const dom = {
   hpBar:   document.getElementById('hpBar'),
@@ -42,12 +44,22 @@ export function updateHUD() {
   dom.score.textContent = state.score;
 
   let html = '';
-  if (p.upgrades.sword)   html += `<div class="buff">⚔ ×${p.upgrades.sword}</div>`;
-  if (p.upgrades.magic)   html += `<div class="buff">✦ ×${p.upgrades.magic}</div>`;
-  if (p.upgrades.speed)   html += `<div class="buff">⚡ ×${p.upgrades.speed}</div>`;
-  if (p.upgrades.vampire) html += `<div class="buff">✤ ×${p.upgrades.vampire}</div>`;
-  if (p.upgrades.regen)   html += `<div class="buff">✚ ×${p.upgrades.regen}</div>`;
-  if (p.upgrades.crit)    html += `<div class="buff">✸ ×${p.upgrades.crit}</div>`;
+  // Counter-based upgrades (from the picker).
+  if (p.upgrades.sword)   html += `<div class="buff" title="Filo agudo">⚔ ×${p.upgrades.sword}</div>`;
+  if (p.upgrades.magic)   html += `<div class="buff" title="Poder arcano">✦ ×${p.upgrades.magic}</div>`;
+  if (p.upgrades.speed)   html += `<div class="buff" title="Pies ligeros">⚡ ×${p.upgrades.speed}</div>`;
+  if (p.upgrades.vampire) html += `<div class="buff" title="Sed de sangre">✤ ×${p.upgrades.vampire}</div>`;
+  if (p.upgrades.regen)   html += `<div class="buff" title="Regeneración">✚ ×${p.upgrades.regen}</div>`;
+  if (p.upgrades.crit)    html += `<div class="buff" title="Golpe letal">✸ ×${p.upgrades.crit}</div>`;
+  // Flag/multiplier upgrades (blessings + shop). Detected by comparing
+  // the player's current stats against the immutable PLAYER_BASE.
+  if (p.swingDur   < PLAYER_BASE.swingDur)   html += `<div class="buff" title="Brazo ágil">⟳</div>`;
+  if (p.swingRange > PLAYER_BASE.swingRange) html += `<div class="buff" title="Gran arco">➤</div>`;
+  if (p.magicCost  < PLAYER_BASE.magicCost)  html += `<div class="buff" title="Conservación">◇</div>`;
+  if (p.goldBonus)            html += `<div class="buff" title="Avaricia">✦+${Math.round(p.goldBonus * 100)}%</div>`;
+  if (p.dmgReduce)            html += `<div class="buff" title="Guardia">◈−${Math.round(p.dmgReduce * 100)}%</div>`;
+  if (p.thorns)               html += `<div class="buff" title="Espinas">✣${Math.round(p.thorns * 100)}%</div>`;
+  if (p.iframesMul && p.iframesMul > 1) html += `<div class="buff" title="Reflejos">◉</div>`;
   dom.buffs.innerHTML = html;
 }
 
@@ -73,26 +85,56 @@ function markOverlayActive() {
   document.body.classList.add('overlay-active');
 }
 
-export function showMenu()      { markOverlayActive(); dom.menu.classList.remove('hidden'); }
+export function showMenu()      { markOverlayActive(); refreshBestStats(); dom.menu.classList.remove('hidden'); }
 export function showPause()     { markOverlayActive(); dom.pause.classList.remove('hidden'); }
 export function hidePause()     {
   dom.pause.classList.add('hidden');
   document.body.classList.remove('overlay-active');
 }
-export function showGameOver(stats) {
+export function showGameOver(stats, records = {}) {
   document.getElementById('goFloor').textContent = stats.floor;
   document.getElementById('goKills').textContent = stats.kills;
   document.getElementById('goGold').textContent  = stats.gold;
   document.getElementById('goScore').textContent = stats.score;
+  toggleRecord('goFloorRec', records.floor);
+  toggleRecord('goKillsRec', records.kills);
+  toggleRecord('goGoldRec',  records.gold);
+  toggleRecord('goScoreRec', records.score);
   markOverlayActive();
   dom.gameOver.classList.remove('hidden');
 }
-export function showWinScreen(stats) {
+export function showWinScreen(stats, records = {}) {
   document.getElementById('winKills').textContent = stats.kills;
   document.getElementById('winGold').textContent  = stats.gold;
   document.getElementById('winScore').textContent = stats.score;
+  toggleRecord('winKillsRec', records.kills);
+  toggleRecord('winGoldRec',  records.gold);
+  toggleRecord('winScoreRec', records.score);
   markOverlayActive();
   dom.win.classList.remove('hidden');
+}
+
+function toggleRecord(id, on) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('hidden', !on);
+}
+
+/** Populate the "best stats" block in the main menu from storage. */
+function refreshBestStats() {
+  const box = document.getElementById('bestStats');
+  if (!box) return;
+  const best = load('best', null);
+  if (!best) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (v == null ? '\u2014' : v);
+  };
+  set('bestFloor', best.floor);
+  set('bestKills', best.kills);
+  set('bestGold',  best.gold);
+  set('bestScore', best.score);
 }
 
 /** Available upgrades. Picked from at floor transitions. */
@@ -233,6 +275,8 @@ export function showFloorIntro(biome, floorNum, onDone, duration = 2200) {
       : 'rgba(255,200,80,0.55)');
 
   el.classList.remove('hidden');
+  // Hide HUD/minimap/toast under the banner so they don't overlap.
+  markOverlayActive();
   // Force reflow so the CSS transition runs reliably.
   // eslint-disable-next-line no-unused-expressions
   el.offsetWidth;
@@ -247,6 +291,7 @@ export function showFloorIntro(biome, floorNum, onDone, duration = 2200) {
     // Restores CSS `pointer-events: none` immediately so canvas and touchUI
     // receive input again during the fade-out (400 ms).
     el.style.pointerEvents = '';
+    document.body.classList.remove('overlay-active');
     el.classList.remove('show');
     setTimeout(() => {
       el.classList.add('hidden');

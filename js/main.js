@@ -51,6 +51,7 @@ import {
   showGameOver, showWinScreen, showUpgradePicker, hideUpgradePicker,
   showFloorIntro,
 }                                         from './ui.js';
+import { save, load }                     from './storage.js';
 
 /* ─────────────────────────── DOM bootstrap ─────────────────────────── */
 const canvas  = document.getElementById('game');
@@ -193,18 +194,48 @@ function resumeGame() { if (state.state === STATE_PAUSE) { state.state = STATE_P
 function triggerDeath() {
   state.state = STATE_DEAD;
   Audio.death();
-  setTimeout(() => showGameOver({
+  const stats = {
     floor: state.floor, kills: state.kills,
     gold:  state.gold,  score: state.score,
-  }), 600);
+  };
+  const records = updateBestStats(stats, false);
+  setTimeout(() => showGameOver(stats, records), 600);
 }
 
 function triggerWin() {
   state.state = STATE_WIN;
   Audio.win();
-  setTimeout(() => showWinScreen({
-    kills: state.kills, gold: state.gold, score: state.score,
-  }), 1200);
+  const stats = {
+    floor: state.floor, kills: state.kills,
+    gold:  state.gold,  score: state.score,
+  };
+  const records = updateBestStats(stats, true);
+  setTimeout(() => showWinScreen(stats, records), 1200);
+}
+
+/**
+ * Compare current run stats against the saved best per category, persist the
+ * new maxima, and return a { floor, kills, gold, score } object whose fields
+ * are `true` for any category that was beaten this run.
+ */
+function updateBestStats(stats, won) {
+  const prev = load('best', null) || {};
+  const records = {
+    floor: stats.floor > (prev.floor || 0),
+    kills: stats.kills > (prev.kills || 0),
+    gold:  stats.gold  > (prev.gold  || 0),
+    score: stats.score > (prev.score || 0),
+  };
+  const next = {
+    floor: Math.max(prev.floor || 0, stats.floor),
+    kills: Math.max(prev.kills || 0, stats.kills),
+    gold:  Math.max(prev.gold  || 0, stats.gold),
+    score: Math.max(prev.score || 0, stats.score),
+    won:   prev.won || won,
+    date:  Date.now(),
+  };
+  save('best', next);
+  return records;
 }
 
 /* ─────────────────────────── Hooks ─────────────────────────── */

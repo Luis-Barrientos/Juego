@@ -9,7 +9,7 @@
 <meta property="og:description" content="Roguelite top-down con mazmorras proceduralmente generadas, combate y un boss final." />
 <meta property="og:type" content="website" />
 <title>Dungeon Depths</title>
-<link rel="stylesheet" href="style.css?v=2026-06-03-8" />
+<link rel="stylesheet" href="style.css?v=2026-06-03-10" />
 </head>
 <body>
 
@@ -44,6 +44,13 @@
   <div id="menu" class="overlay">
     <h1>DUNGEON<br><span class="accent">DEPTHS</span></h1>
     <p class="tagline">Desciende. Mata. Sobrevive.</p>
+    <div id="bestStats" class="best-stats hidden">
+      <div class="best-title">MEJORES MARCAS</div>
+      <div class="best-row"><span>Piso</span><span id="bestFloor">—</span></div>
+      <div class="best-row"><span>Bajas</span><span id="bestKills">—</span></div>
+      <div class="best-row"><span>Oro</span><span id="bestGold">—</span></div>
+      <div class="best-row"><span>Puntuación</span><span id="bestScore">—</span></div>
+    </div>
     <div class="controls">
       <p><b>WASD</b> / Flechas — moverse</p>
       <p><b>Click izq</b> / <b>Z</b> — espada</p>
@@ -65,10 +72,10 @@
   <div id="gameOver" class="overlay hidden">
     <h2 class="danger">HAS MUERTO</h2>
     <div class="results">
-      <p>Piso alcanzado: <span id="goFloor">-</span></p>
-      <p>Enemigos abatidos: <span id="goKills">-</span></p>
-      <p>Oro recolectado: <span id="goGold">-</span></p>
-      <p>Puntuación: <span id="goScore">-</span></p>
+      <p>Piso alcanzado: <span id="goFloor">-</span><span id="goFloorRec" class="record hidden">¡RÉCORD!</span></p>
+      <p>Enemigos abatidos: <span id="goKills">-</span><span id="goKillsRec" class="record hidden">¡RÉCORD!</span></p>
+      <p>Oro recolectado: <span id="goGold">-</span><span id="goGoldRec" class="record hidden">¡RÉCORD!</span></p>
+      <p>Puntuación: <span id="goScore">-</span><span id="goScoreRec" class="record hidden">¡RÉCORD!</span></p>
     </div>
     <button id="retryBtn">REINTENTAR</button>
   </div>
@@ -78,9 +85,9 @@
     <h2 class="accent">¡VICTORIA!</h2>
     <p>Has derrotado al Señor de las Profundidades.</p>
     <div class="results">
-      <p>Enemigos abatidos: <span id="winKills">-</span></p>
-      <p>Oro recolectado: <span id="winGold">-</span></p>
-      <p>Puntuación final: <span id="winScore">-</span></p>
+      <p>Enemigos abatidos: <span id="winKills">-</span><span id="winKillsRec" class="record hidden">¡RÉCORD!</span></p>
+      <p>Oro recolectado: <span id="winGold">-</span><span id="winGoldRec" class="record hidden">¡RÉCORD!</span></p>
+      <p>Puntuación final: <span id="winScore">-</span><span id="winScoreRec" class="record hidden">¡RÉCORD!</span></p>
     </div>
     <button id="winBtn">JUGAR DE NUEVO</button>
   </div>
@@ -118,6 +125,6 @@
   <button id="btnPause" class="touchBtn pauseBtn" aria-label="Pausa">II</button>
 </div>
 
-<script type="module" src="js/main.js?v=2026-06-03-8"></script>
+<script type="module" src="js/main.js?v=2026-06-03-10"></script>
 </body>
 </html>

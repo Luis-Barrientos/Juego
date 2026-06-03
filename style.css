@@ -675,3 +675,55 @@ body.overlay-active #toast { display: none; }
   .floor-intro-skip  { font-size: 9px; letter-spacing: 1px; margin-top: 12px; }
 }
 
+/* ─── Mejores marcas (menú principal) ─── */
+.best-stats {
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid #3a2418;
+  padding: 10px 22px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #a08070;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.best-stats.hidden { display: none; }
+.best-title {
+  text-align: center;
+  color: #ffc870;
+  font-weight: bold;
+  letter-spacing: 3px;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.best-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.best-row span:last-child {
+  color: #ffd070;
+  font-weight: bold;
+}
+
+/* Badge de récord nuevo en game-over / victoria */
+.record {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #1a0a08;
+  background: linear-gradient(180deg, #ffe080, #ffb030);
+  border: 1px solid #c08020;
+  font-weight: bold;
+  vertical-align: middle;
+  animation: recordPulse 1.2s ease-in-out infinite;
+}
+.record.hidden { display: none; }
+@keyframes recordPulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(255, 200, 80, 0.5); }
+  50%      { box-shadow: 0 0 14px rgba(255, 200, 80, 0.95); }
+}
+
