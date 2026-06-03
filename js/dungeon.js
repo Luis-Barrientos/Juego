@@ -109,8 +109,8 @@ export function generateDungeon(floor, seed, biome) {
   startRoom.isStartRoom   = true;
 
   // Place lights. Most biomes use floor torches in room corners; the
-  // 'ruins' biome instead uses wall-mounted sconces plus a few sunbeam
-  // columns falling through the broken ceiling of large rooms.
+  // 'ruins' biome instead uses wall-mounted sconces plus the occasional
+  // sunbeam falling through a crack in the ceiling.
   const lights   = [];
   const sunbeams = [];
   const isRuins  = biome && biome.id === 'ruins';
@@ -118,10 +118,16 @@ export function generateDungeon(floor, seed, biome) {
   for (const r of rooms) {
     if (isRuins) {
       placeWallSconces(map, r, rng, lights, style.torchDensity);
-      maybePlaceSunbeam(r, rng, sunbeams);
     } else {
       placeFloorTorches(r, rng, lights, style.torchDensity);
     }
+  }
+
+  // Sunbeams are rare and biased toward the largest rooms. We pick the
+  // top candidates by area and roll a low-probability per candidate, with
+  // a hard cap so the floor never feels like an open courtyard.
+  if (isRuins) {
+    placeSunbeams(rooms, rng, sunbeams);
   }
 
   return { map, rooms, lights, sunbeams, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
@@ -206,40 +212,96 @@ function placeWallSconces(map, r, rng, lights, density) {
 }
 
 /**
- * Drop one or more sunbeams in a room. Larger rooms get a higher chance and
- * may receive a second beam, spaced apart from the first. Ruins (the surface
- * floor) is the brightest biome and gets boosted odds.
+ * Place a small number of sunbeams across the floor. Only the largest rooms
+ * are eligible, each with a low independent chance, and a hard cap of 2
+ * sunbeams per floor keeps them feeling rare and atmospheric — a collapsed
+ * dungeon, not an open courtyard.
  * @private
  */
-function maybePlaceSunbeam(r, rng, sunbeams) {
-  const area = r.w * r.h;
-  if (area < 30) return;
-  // Base 50% rises with area; ruins always at least 0.65.
-  const chance = Math.min(0.95, 0.50 + area / 250);
-  if (rng() > chance) return;
+function placeSunbeams(rooms, rng, sunbeams) {
+  const HARD_CAP = 2;
+  const MIN_AREA = 80;          // ruined ceiling only collapses on big rooms
+  const PER_ROOM_CHANCE = 0.30; // independent roll per eligible room
 
-  const placeOne = (avoidX) => {
-    let cx;
-    let tries = 0;
-    do {
-      cx = r.x + 1 + Math.floor(rng() * (r.w - 2));
-      tries++;
-    } while (avoidX !== null && Math.abs(cx - avoidX) < 3 && tries < 6);
-    sunbeams.push({
+  // Sort eligible rooms by area desc and try the top few.
+  const eligible = rooms
+    .filter(r => r.w * r.h >= MIN_AREA)
+    .sort((a, b) => (b.w * b.h) - (a.w * a.h))
+    .slice(0, 4);
+
+  for (const r of eligible) {
+    if (sunbeams.length >= HARD_CAP) break;
+    if (rng() > PER_ROOM_CHANCE) continue;
+    // Position biased toward the centre two-thirds of the room so the beam
+    // doesn't hug a wall.
+    const margin = Math.max(2, Math.floor(r.w / 4));
+    const cx = r.x + margin + Math.floor(rng() * Math.max(1, r.w - margin * 2));
+    const w  = TILE * (1.6 + rng() * 0.6);
+    const h  = r.h * TILE;
+    const sb = {
       x: cx * TILE + TILE / 2,
       y: r.y * TILE,
-      h: r.h * TILE,
-      w: TILE * (1.6 + rng() * 0.8),
+      h, w,
       seed: Math.floor(rng() * 1e9),
-    });
-    return cx;
-  };
-
-  const firstX = placeOne(null);
-  // Very large rooms get a second beam, well separated.
-  if (area >= 90 && r.w >= 9 && rng() < 0.6) {
-    placeOne(firstX);
+    };
+    sb.shape = buildBeamShape(sb, rng);
+    sunbeams.push(sb);
   }
+}
+
+/**
+ * Build an irregular polygon resembling a real ceiling crack widening into a
+ * shaft of light. The top is jagged (the crack itself, narrow), the sides
+ * slope outward with a couple of kinks, and the bottom is wider with a
+ * subtle uneven edge. Coordinates are relative to (sb.x, sb.y).
+ * @private
+ */
+function buildBeamShape(sb, rng) {
+  const halfTop    = sb.w * 0.30;   // narrow opening at the ceiling
+  const halfBottom = sb.w * 0.85;   // splays outward toward the floor
+  const h          = sb.h;
+  const pts        = [];
+
+  // ── Top edge: jagged crack ─────────────────────────────────────────
+  // 5–7 zig-zag points spanning -halfTop..+halfTop, vertical jitter.
+  const nTop = 5 + Math.floor(rng() * 3);
+  for (let i = 0; i < nTop; i++) {
+    const t = i / (nTop - 1);
+    const x = -halfTop + t * (halfTop * 2) + (rng() - 0.5) * 4;
+    const y = (rng() - 0.3) * 5;       // mostly above 0, occasional dip
+    pts.push([x, y]);
+  }
+
+  // ── Right side: from top-right down to bottom-right with 1–2 kinks ─
+  const rightKinks = 1 + Math.floor(rng() * 2);
+  for (let i = 1; i <= rightKinks; i++) {
+    const t = i / (rightKinks + 1);
+    const x = halfTop + t * (halfBottom - halfTop) + (rng() - 0.5) * 6;
+    const y = t * h;
+    pts.push([x, y]);
+  }
+  // Bottom-right corner
+  pts.push([halfBottom + (rng() - 0.5) * 4, h]);
+
+  // ── Bottom edge: wide, slight unevenness ──────────────────────────
+  const nBot = 2 + Math.floor(rng() * 2);
+  for (let i = 0; i < nBot; i++) {
+    const t = (i + 1) / (nBot + 1);
+    const x = halfBottom - t * (halfBottom * 2) + (rng() - 0.5) * 6;
+    pts.push([x, h + (rng() - 0.5) * 3]);
+  }
+  // Bottom-left corner
+  pts.push([-halfBottom + (rng() - 0.5) * 4, h]);
+
+  // ── Left side: bottom up to top with 1–2 kinks ────────────────────
+  const leftKinks = 1 + Math.floor(rng() * 2);
+  for (let i = leftKinks; i >= 1; i--) {
+    const t = i / (leftKinks + 1);
+    const x = -halfTop - t * (halfBottom - halfTop) + (rng() - 0.5) * 6;
+    const y = t * h;
+    pts.push([x, y]);
+  }
+  return pts;
 }
 
 /**

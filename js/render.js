@@ -385,29 +385,33 @@ export function drawLighting(ctx) {
   }
 
   // Sunbeams cut the ambient overlay so the floor under the ceiling crack
-  // actually receives sunlight. Brighter near the top, fading toward the
-  // ground; widens like the visual trapezoid in drawSunbeams.
+  // actually receives sunlight. Each beam carries a deterministic irregular
+  // polygon (the crack shape) precomputed at level generation.
   if (state.sunbeams && state.sunbeams.length > 0) {
     for (const sb of state.sunbeams) {
       const sx = sb.x - state.cameraX;
       const sy = sb.y - state.cameraY;
       if (sx < -sb.w * 2 || sx > VIEW_W + sb.w * 2) continue;
       if (sy + sb.h < 0 || sy > VIEW_H) continue;
-      const halfTop    = sb.w * 0.6;
-      const halfBottom = sb.w * 1.4;
-      // Vertical gradient — strongest at top, fades at bottom.
+
+      lctx.save();
+      // Clip to the irregular crack shape, then fill with a vertical gradient.
+      lctx.beginPath();
+      const shape = sb.shape;
+      lctx.moveTo(sx + shape[0][0], sy + shape[0][1]);
+      for (let i = 1; i < shape.length; i++) {
+        lctx.lineTo(sx + shape[i][0], sy + shape[i][1]);
+      }
+      lctx.closePath();
+      lctx.clip();
+
       const grad = lctx.createLinearGradient(0, sy, 0, sy + sb.h);
       grad.addColorStop(0,    'rgba(255,255,255,0.95)');
       grad.addColorStop(0.55, 'rgba(255,255,255,0.55)');
       grad.addColorStop(1,    'rgba(255,255,255,0)');
       lctx.fillStyle = grad;
-      lctx.beginPath();
-      lctx.moveTo(sx - halfTop,    sy);
-      lctx.lineTo(sx + halfTop,    sy);
-      lctx.lineTo(sx + halfBottom, sy + sb.h);
-      lctx.lineTo(sx - halfBottom, sy + sb.h);
-      lctx.closePath();
-      lctx.fill();
+      lctx.fillRect(sx - sb.w * 1.5, sy, sb.w * 3, sb.h);
+      lctx.restore();
     }
   }
 
@@ -494,45 +498,51 @@ export function drawSunbeams(ctx) {
   for (const sb of state.sunbeams) {
     const sx = sb.x - state.cameraX;
     const sy = sb.y - state.cameraY;
-    if (sx < -sb.w || sx > VIEW_W + sb.w) continue;
+    if (sx < -sb.w * 2 || sx > VIEW_W + sb.w * 2) continue;
     if (sy + sb.h < 0 || sy > VIEW_H) continue;
 
-    // Body of the beam — wider at the bottom, fading from top.
-    const halfTop    = sb.w * 0.25;
-    const halfBottom = sb.w * 0.75;
+    // Outer body — clipped to the irregular crack polygon.
+    ctx.save();
+    ctx.beginPath();
+    const shape = sb.shape;
+    ctx.moveTo(sx + shape[0][0], sy + shape[0][1]);
+    for (let i = 1; i < shape.length; i++) {
+      ctx.lineTo(sx + shape[i][0], sy + shape[i][1]);
+    }
+    ctx.closePath();
+    ctx.clip();
+
     const grad = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
     grad.addColorStop(0,    'rgba(255, 240, 180, 0.22)');
     grad.addColorStop(0.6,  'rgba(255, 230, 160, 0.10)');
     grad.addColorStop(1,    'rgba(255, 220, 140, 0.00)');
     ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.moveTo(sx - halfTop,    sy);
-    ctx.lineTo(sx + halfTop,    sy);
-    ctx.lineTo(sx + halfBottom, sy + sb.h);
-    ctx.lineTo(sx - halfBottom, sy + sb.h);
-    ctx.closePath();
-    ctx.fill();
+    ctx.fillRect(sx - sb.w * 1.5, sy, sb.w * 3, sb.h);
 
-    // Inner brighter core
+    // Inner brighter core — narrow column straight down from the crack.
     const grad2 = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
-    grad2.addColorStop(0,   'rgba(255, 250, 220, 0.35)');
+    grad2.addColorStop(0,   'rgba(255, 250, 220, 0.40)');
     grad2.addColorStop(1,   'rgba(255, 240, 180, 0.00)');
     ctx.fillStyle = grad2;
+    const coreTop = sb.w * 0.10;
+    const coreBot = sb.w * 0.35;
     ctx.beginPath();
-    ctx.moveTo(sx - halfTop * 0.4,    sy);
-    ctx.lineTo(sx + halfTop * 0.4,    sy);
-    ctx.lineTo(sx + halfBottom * 0.4, sy + sb.h);
-    ctx.lineTo(sx - halfBottom * 0.4, sy + sb.h);
+    ctx.moveTo(sx - coreTop, sy);
+    ctx.lineTo(sx + coreTop, sy);
+    ctx.lineTo(sx + coreBot, sy + sb.h);
+    ctx.lineTo(sx - coreBot, sy + sb.h);
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
 
     // Dust motes (deterministic per-beam, animated by time)
     ctx.fillStyle = 'rgba(255, 245, 200, 0.7)';
+    const motesHalf = sb.w * 0.7;
     for (let i = 0; i < 7; i++) {
       const seed = sb.seed + i * 137;
       const phase = ((seed % 1000) / 1000 + t * 0.12) % 1;
       const driftX = Math.sin(t * 0.6 + seed) * 4;
-      const dx = sx - halfBottom * 0.5 + ((seed * 13) % 100) / 100 * halfBottom + driftX;
+      const dx = sx - motesHalf + ((seed * 13) % 100) / 100 * (motesHalf * 2) + driftX;
       const dy = sy + phase * sb.h;
       ctx.fillRect(dx, dy, 1.2, 1.2);
     }
