@@ -391,7 +391,8 @@ export function drawLighting(ctx) {
     for (const sb of state.sunbeams) {
       const sx = sb.x - state.cameraX;
       const sy = sb.y - state.cameraY;
-      if (sx < -sb.w * 2 || sx > VIEW_W + sb.w * 2) continue;
+      const halfBBox = sb.length * 0.5 + sb.splay + 8;
+      if (sx < -halfBBox || sx > VIEW_W + halfBBox) continue;
       if (sy + sb.h < 0 || sy > VIEW_H) continue;
 
       lctx.save();
@@ -410,7 +411,7 @@ export function drawLighting(ctx) {
       grad.addColorStop(0.55, 'rgba(255,255,255,0.55)');
       grad.addColorStop(1,    'rgba(255,255,255,0)');
       lctx.fillStyle = grad;
-      lctx.fillRect(sx - sb.w * 1.5, sy, sb.w * 3, sb.h);
+      lctx.fillRect(sx - halfBBox, sy, halfBBox * 2, sb.h);
       lctx.restore();
     }
   }
@@ -498,7 +499,8 @@ export function drawSunbeams(ctx) {
   for (const sb of state.sunbeams) {
     const sx = sb.x - state.cameraX;
     const sy = sb.y - state.cameraY;
-    if (sx < -sb.w * 2 || sx > VIEW_W + sb.w * 2) continue;
+    const halfBBox = sb.length * 0.5 + sb.splay + 8;
+    if (sx < -halfBBox || sx > VIEW_W + halfBBox) continue;
     if (sy + sb.h < 0 || sy > VIEW_H) continue;
 
     // Outer body — clipped to the irregular crack polygon.
@@ -517,28 +519,14 @@ export function drawSunbeams(ctx) {
     grad.addColorStop(0.6,  'rgba(255, 230, 160, 0.10)');
     grad.addColorStop(1,    'rgba(255, 220, 140, 0.00)');
     ctx.fillStyle = grad;
-    ctx.fillRect(sx - sb.w * 1.5, sy, sb.w * 3, sb.h);
-
-    // Inner brighter core — narrow column straight down from the crack.
-    const grad2 = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
-    grad2.addColorStop(0,   'rgba(255, 250, 220, 0.40)');
-    grad2.addColorStop(1,   'rgba(255, 240, 180, 0.00)');
-    ctx.fillStyle = grad2;
-    const coreTop = sb.w * 0.10;
-    const coreBot = sb.w * 0.35;
-    ctx.beginPath();
-    ctx.moveTo(sx - coreTop, sy);
-    ctx.lineTo(sx + coreTop, sy);
-    ctx.lineTo(sx + coreBot, sy + sb.h);
-    ctx.lineTo(sx - coreBot, sy + sb.h);
-    ctx.closePath();
-    ctx.fill();
+    ctx.fillRect(sx - halfBBox, sy, halfBBox * 2, sb.h);
     ctx.restore();
 
     // Dust motes (deterministic per-beam, animated by time)
     ctx.fillStyle = 'rgba(255, 245, 200, 0.7)';
-    const motesHalf = sb.w * 0.7;
-    for (let i = 0; i < 7; i++) {
+    const motesHalf = sb.length * 0.5;
+    const nMotes = Math.max(7, Math.floor(sb.length / 14));
+    for (let i = 0; i < nMotes; i++) {
       const seed = sb.seed + i * 137;
       const phase = ((seed % 1000) / 1000 + t * 0.12) % 1;
       const driftX = Math.sin(t * 0.6 + seed) * 4;

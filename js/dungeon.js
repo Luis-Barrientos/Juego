@@ -232,16 +232,21 @@ function placeSunbeams(rooms, rng, sunbeams) {
   for (const r of eligible) {
     if (sunbeams.length >= HARD_CAP) break;
     if (rng() > PER_ROOM_CHANCE) continue;
-    // Position biased toward the centre two-thirds of the room so the beam
-    // doesn't hug a wall.
-    const margin = Math.max(2, Math.floor(r.w / 4));
-    const cx = r.x + margin + Math.floor(rng() * Math.max(1, r.w - margin * 2));
-    const w  = TILE * (1.6 + rng() * 0.6);
-    const h  = r.h * TILE;
+    // The crack runs across most of the ceiling: 60-85% of room width.
+    const lengthRatio = 0.60 + rng() * 0.25;
+    const length      = Math.max(4, Math.floor(r.w * lengthRatio)) * TILE;
+    // Centre the crack horizontally with a small offset.
+    const slack       = (r.w * TILE - length) * 0.5;
+    const startX      = r.x * TILE + slack + (rng() - 0.5) * slack * 0.6;
+    const h           = r.h * TILE;
     const sb = {
-      x: cx * TILE + TILE / 2,
+      // Anchor at the centre of the crack so render maths stay simple.
+      x: startX + length / 2,
       y: r.y * TILE,
-      h, w,
+      h,
+      length,
+      // Beam splays outward by `splay` pixels on each side at the floor.
+      splay: TILE * (0.8 + rng() * 0.6),
       seed: Math.floor(rng() * 1e9),
     };
     sb.shape = buildBeamShape(sb, rng);
@@ -250,54 +255,52 @@ function placeSunbeams(rooms, rng, sunbeams) {
 }
 
 /**
- * Build an irregular polygon resembling a real ceiling crack widening into a
- * shaft of light. The top is jagged (the crack itself, narrow), the sides
- * slope outward with a couple of kinks, and the bottom is wider with a
- * subtle uneven edge. Coordinates are relative to (sb.x, sb.y).
+ * Build an irregular polygon for a long ceiling crack widening into a sheet
+ * of light. The top edge is a jagged line spanning `sb.length`, the sides
+ * slope outward by `sb.splay`, and the bottom is a wider uneven edge.
+ * Coordinates are relative to (sb.x, sb.y).
  * @private
  */
 function buildBeamShape(sb, rng) {
-  const halfTop    = sb.w * 0.30;   // narrow opening at the ceiling
-  const halfBottom = sb.w * 0.85;   // splays outward toward the floor
+  const halfTop    = sb.length * 0.5;
+  const halfBottom = halfTop + sb.splay;
   const h          = sb.h;
   const pts        = [];
 
-  // ── Top edge: jagged crack ─────────────────────────────────────────
-  // 5–7 zig-zag points spanning -halfTop..+halfTop, vertical jitter.
-  const nTop = 5 + Math.floor(rng() * 3);
+  // ── Top edge: long jagged crack across the ceiling ─────────────────
+  // One zig-zag point every ~12 px, with vertical jitter.
+  const nTop = Math.max(6, Math.floor(sb.length / 12));
   for (let i = 0; i < nTop; i++) {
     const t = i / (nTop - 1);
-    const x = -halfTop + t * (halfTop * 2) + (rng() - 0.5) * 4;
+    const x = -halfTop + t * (halfTop * 2);
     const y = (rng() - 0.3) * 5;       // mostly above 0, occasional dip
-    pts.push([x, y]);
+    pts.push([x + (rng() - 0.5) * 3, y]);
   }
 
-  // ── Right side: from top-right down to bottom-right with 1–2 kinks ─
+  // ── Right side: 1–2 kinks down to the floor ───────────────────────
   const rightKinks = 1 + Math.floor(rng() * 2);
   for (let i = 1; i <= rightKinks; i++) {
     const t = i / (rightKinks + 1);
-    const x = halfTop + t * (halfBottom - halfTop) + (rng() - 0.5) * 6;
+    const x = halfTop + t * sb.splay + (rng() - 0.5) * 4;
     const y = t * h;
     pts.push([x, y]);
   }
-  // Bottom-right corner
   pts.push([halfBottom + (rng() - 0.5) * 4, h]);
 
-  // ── Bottom edge: wide, slight unevenness ──────────────────────────
-  const nBot = 2 + Math.floor(rng() * 2);
+  // ── Bottom edge: wide, slightly uneven ────────────────────────────
+  const nBot = Math.max(3, Math.floor(sb.length / 16));
   for (let i = 0; i < nBot; i++) {
     const t = (i + 1) / (nBot + 1);
-    const x = halfBottom - t * (halfBottom * 2) + (rng() - 0.5) * 6;
-    pts.push([x, h + (rng() - 0.5) * 3]);
+    const x = halfBottom - t * (halfBottom * 2);
+    pts.push([x + (rng() - 0.5) * 4, h + (rng() - 0.5) * 3]);
   }
-  // Bottom-left corner
   pts.push([-halfBottom + (rng() - 0.5) * 4, h]);
 
-  // ── Left side: bottom up to top with 1–2 kinks ────────────────────
+  // ── Left side: kinks back up to the top ───────────────────────────
   const leftKinks = 1 + Math.floor(rng() * 2);
   for (let i = leftKinks; i >= 1; i--) {
     const t = i / (leftKinks + 1);
-    const x = -halfTop - t * (halfBottom - halfTop) + (rng() - 0.5) * 6;
+    const x = -halfTop - t * sb.splay + (rng() - 0.5) * 4;
     const y = t * h;
     pts.push([x, y]);
   }
