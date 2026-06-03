@@ -1,10 +1,10 @@
 # Dungeon Depths
 
-> Un roguelite de mazmorra top-down hecho en JavaScript puro. Sin dependencias, sin build step, sin frameworks.
+> Un roguelite de mazmorra top-down hecho en **JavaScript moderno** (ES Modules), sin dependencias, sin bundler, sin frameworks.
 
 [**▶ Jugar online**](https://luis-barrientos.github.io/Juego/)
 
-![Dungeon Depths](https://img.shields.io/badge/HTML5-Canvas-orange) ![JS](https://img.shields.io/badge/JavaScript-Vanilla-yellow) ![License](https://img.shields.io/badge/license-MIT-blue)
+![HTML5](https://img.shields.io/badge/HTML5-Canvas-orange) ![JS](https://img.shields.io/badge/JavaScript-ES2022-yellow) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ---
 
@@ -26,47 +26,65 @@ La dirección de los ataques sigue al ratón.
 
 ## Características
 
-- **Generación procedural** de mazmorras con algoritmo BSP (Binary Space Partition)
+- **Generación procedural** con Binary Space Partition (BSP) y **estilos rotativos** por piso (compacto, escaso, pasillos, equilibrado), todo determinista por seed
 - **4 tipos de enemigos** con IA distinta — slime, esqueleto, mago, murciélago
 - **Boss final** con dos fases y patrones de ataque diferenciados
 - **Sistema de upgrades** — entre pisos eliges 1 de 3 bendiciones de un pool de 8
-- **Iluminación dinámica** — luz radial del jugador, antorchas y aura del boss
+- **Iluminación dinámica** — luz radial del jugador, antorchas, escaleras siempre visibles, aura del boss
 - **Audio procedural** generado en tiempo real con Web Audio API (sin assets de audio)
+- **Pre-render del mapa** a canvas offscreen para máximo rendimiento
 - **Partículas, screen shake y texto flotante de daño**
 - **Minimapa** en tiempo real con enemigos y escaleras
 
 ## Tecnología
 
-- HTML5 Canvas
-- JavaScript ES6+ (vanilla)
-- Web Audio API
+- HTML5 Canvas + Web Audio API
+- JavaScript ES2022 (módulos nativos)
 - CSS3
-
-Tres archivos: [`index.html`](index.html), [`style.css`](style.css), [`game.js`](game.js).
-
-## Cómo ejecutarlo localmente
-
-```bash
-git clone https://github.com/Luis-Barrientos/Juego.git
-cd Juego
-```
-
-Y abre `index.html` en cualquier navegador moderno. No hay nada que instalar.
-
-> Consejo: si lo abres con `file://` y el audio no suena, recarga después del primer click — algunos navegadores bloquean `AudioContext` hasta una interacción del usuario.
 
 ## Estructura del proyecto
 
 ```
 .
-├── index.html      # Estructura, HUD y overlays
-├── style.css       # Tema gótico oscuro
-├── game.js         # Lógica completa del juego (~1500 líneas)
+├── index.html
+├── style.css
+├── js/
+│   ├── main.js          # Entry point y game loop
+│   ├── config.js        # Constantes y stats base
+│   ├── state.js         # Estado compartido
+│   ├── utils.js         # Helpers + PRNG (Mulberry32)
+│   ├── audio.js         # Audio procedural
+│   ├── input.js         # Teclado y ratón
+│   ├── storage.js       # Wrapper localStorage
+│   ├── dungeon.js       # BSP + colisión + estilos
+│   ├── player.js        # Jugador
+│   ├── enemies.js       # Enemigos + boss
+│   ├── projectiles.js   # Proyectiles
+│   ├── particles.js     # Partículas + damage text
+│   ├── loot.js          # Oro, pociones, baúles
+│   ├── render.js        # Mapa, iluminación, minimapa
+│   └── ui.js            # HUD y overlays
 ├── LICENSE
 └── README.md
 ```
 
-`game.js` está organizado por secciones marcadas con cabeceras (`Constants`, `Audio`, `Input`, `Dungeon Generation`, `Player`, `Enemies`, `Projectiles`, `Particles`, `Loot`, `Render`, `UI`, `Game Loop`).
+## Cómo ejecutarlo localmente
+
+Como el proyecto usa **ES Modules**, los navegadores requieren servirlo por HTTP (no `file://`). Cualquiera de estas opciones sirve:
+
+```bash
+# Python
+python -m http.server 8000
+
+# Node (npx, sin instalar nada extra)
+npx serve
+
+# VS Code: extensión "Live Server"
+```
+
+Luego abre `http://localhost:8000` en el navegador.
+
+> Si abres `index.html` directamente con `file://` los módulos fallarán por CORS. En GitHub Pages funciona sin más, ya que sirve por HTTPS.
 
 ## Licencia
 

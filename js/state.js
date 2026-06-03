@@ -1,0 +1,27 @@
+/**
+ * Mutable game state shared across modules. Exposed as a single object so
+ * other modules can read and write fields without circular imports.
+ */
+export const state = {
+  state: 'menu',          // see config.STATE_*
+  map: null,              // 2D tile array
+  rooms: [],
+  player: null,
+  enemies: [],
+  projectiles: [],
+  particles: [],
+  loot: [],
+  damageTexts: [],
+  lights: [],             // torches
+  cameraX: 0,
+  cameraY: 0,
+  shake: 0,
+  floor: 1,
+  gold: 0,
+  score: 0,
+  kills: 0,
+  time: 0,
+  lastTime: 0,
+  currentRoom: null,
+  bossSpawned: false,
+};
