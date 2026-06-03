@@ -147,9 +147,10 @@ function goToNextFloor() {
   }
 }
 
-/** Apply the chosen upgrade and continue to the next floor. */
-function applyUpgrade(id) {
+/** Apply an upgrade effect to the player (no UI side-effects). */
+function grantBlessing(id) {
   const p = state.player;
+  if (!p) return;
   switch (id) {
     case 'sword':   p.upgrades.sword++;   break;
     case 'magic':   p.upgrades.magic++;   break;
@@ -160,6 +161,11 @@ function applyUpgrade(id) {
     case 'maxhp':   p.maxHp += 30; p.hp = p.maxHp; break;
     case 'maxmp':   p.maxMp += 25; p.mp = p.maxMp; break;
   }
+}
+
+/** Apply the chosen upgrade and continue to the next floor. */
+function applyUpgrade(id) {
+  grantBlessing(id);
   Audio.upgrade();
   hideUpgradePicker();
   state.state = STATE_PLAY;
@@ -200,7 +206,7 @@ const projectileHooks = {
 
 const playerHooks = {
   onStairs:    goToNextFloor,
-  onChest:     c => openChest(c, showToast),
+  onChest:     c => openChest(c, showToast, grantBlessing),
   onEnemyHit:  (e, dmg, crit) => damageEnemy(e, dmg, crit, { onWin: triggerWin }),
 };
 

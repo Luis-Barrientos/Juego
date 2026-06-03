@@ -237,11 +237,19 @@ export function spawnChest(room, opts = {}) {
 }
 
 /**
- * Open a chest. Rare chests cost gold and drop premium loot.
- * If the player can't afford a rare chest, the chest stays closed and the
- * caller is informed via toast.
+ * Open a chest.
+ *
+ *   • Common chests always drop something visible: at least 1 coin plus a
+ *     guaranteed potion if the player needs healing/mana.
+ *   • Rare chests cost gold and drop premium loot. They also have a 30%
+ *     chance to grant a permanent BLESSING (a random upgrade) on top of
+ *     the loot.
+ *
+ * @param {object} c           Chest entity.
+ * @param {(text:string)=>void} toast
+ * @param {(id:string)=>void} [grantBlessing] Applies a permanent upgrade by id.
  */
-export function openChest(c, toast) {
+export function openChest(c, toast, grantBlessing) {
   if (c.rare) {
     if (state.gold < c.cost) {
       toast(`Necesitas ${c.cost} oro`);
@@ -255,25 +263,69 @@ export function openChest(c, toast) {
   spawnParticles(c.x, c.y - 6, c.rare ? '#c0a0ff' : '#ffd040', c.rare ? 32 : 18);
 
   if (c.rare) {
-    // Premium drop: lots of high-value coins + 1 HP and 1 MP potion guaranteed.
+    // Premium drop: 1 HP pot + 1 MP pot + 6-9 high-value coins.
     state.loot.push(spawnItem('hp_potion', c));
     state.loot.push(spawnItem('mp_potion', c));
-    const n = irand(6, 9);
-    for (let i = 0; i < n; i++) {
-      state.loot.push(spawnItem('coin', c, irand(15, 30)));
+    const nCoins = irand(6, 9);
+    let totalGold = 0;
+    for (let i = 0; i < nCoins; i++) {
+      const v = irand(15, 30);
+      totalGold += v;
+      state.loot.push(spawnItem('coin', c, v));
     }
-    toast('¡Tesoro raro!');
+    // 30% chance of also granting a permanent blessing.
+    if (grantBlessing && Math.random() < 0.30) {
+      const id = pickRandomBlessingId();
+      grantBlessing(id);
+      toast(`¡Bendición rara! +${BLESSING_NAMES[id] || id}`);
+      spawnParticles(c.x, c.y - 6, '#ffe0a0', 24);
+      Audio.upgrade && Audio.upgrade();
+    } else {
+      toast(`¡Tesoro raro! +${totalGold} oro y pociones`);
+    }
     return;
   }
 
-  const n = irand(2, 4);
-  for (let i = 0; i < n; i++) {
-    const r = Math.random();
-    if (r < 0.55)      state.loot.push(spawnItem('coin', c, irand(8, 18)));
-    else if (r < 0.78) state.loot.push(spawnItem('hp_potion', c));
-    else               state.loot.push(spawnItem('mp_potion', c));
+  /* ── Common chest: guarantee meaningful loot ─────────────────────── */
+  const p = state.player;
+  const items = [];
+  // Always at least 1 coin so the chest is never silent.
+  items.push(spawnItem('coin', c, irand(8, 18)));
+  // Guarantee a potion the player actually needs, if any.
+  if (p && p.hp < p.maxHp - 20) {
+    items.push(spawnItem('hp_potion', c));
+  } else if (p && p.mp < p.maxMp - 15) {
+    items.push(spawnItem('mp_potion', c));
   }
+  // Plus 1-2 random extras.
+  const extras = irand(1, 2);
+  let extraGold = 0;
+  for (let i = 0; i < extras; i++) {
+    const r = Math.random();
+    if (r < 0.55) {
+      const v = irand(8, 18);
+      extraGold += v;
+      items.push(spawnItem('coin', c, v));
+    } else if (r < 0.78) {
+      items.push(spawnItem('hp_potion', c));
+    } else {
+      items.push(spawnItem('mp_potion', c));
+    }
+  }
+  for (const it of items) state.loot.push(it);
   toast('¡Baúl abierto!');
+}
+
+/** Friendly names for blessings shown in toasts when a chest grants one. */
+const BLESSING_NAMES = {
+  sword: 'FILO AGUDO', magic: 'PODER ARCANO', speed: 'PIES LIGEROS',
+  vampire: 'SED DE SANGRE', regen: 'REGENERACIÓN', crit: 'GOLPE LETAL',
+  maxhp: 'VITALIDAD', maxmp: 'INTELECTO',
+};
+
+function pickRandomBlessingId() {
+  const ids = Object.keys(BLESSING_NAMES);
+  return ids[Math.floor(Math.random() * ids.length)];
 }
 
 /** Helper: build a loot entity that scatters from a chest. */
