@@ -3,7 +3,6 @@
 html, body {
   width: 100%;
   height: 100%;
-  background: #0a0612;
   font-family: 'Cinzel', 'Times New Roman', serif;
   color: #d8c6a8;
   overflow: hidden;
@@ -622,6 +621,7 @@ body.overlay-active #toast { display: none; }
   transition: opacity 0.5s ease;
 }
 #floorIntro.show { opacity: 1; }
+#floorIntro.hidden { display: none; }
 
 .floor-intro-inner {
   text-align: center;
@@ -672,5 +672,6 @@ body.overlay-active #toast { display: none; }
   .floor-intro-name  { font-size: 24px; letter-spacing: 4px; }
   .floor-intro-num   { font-size: 14px; letter-spacing: 6px; }
   .floor-intro-sub   { font-size: 11px; }
+  .floor-intro-skip  { font-size: 9px; letter-spacing: 1px; margin-top: 12px; }
 }
 

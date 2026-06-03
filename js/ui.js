@@ -244,6 +244,9 @@ export function showFloorIntro(biome, floorNum, onDone, duration = 2200) {
     done = true;
     window.removeEventListener('keydown', skip);
     el.removeEventListener('click', skip);
+    // Restores CSS `pointer-events: none` immediately so canvas and touchUI
+    // receive input again during the fade-out (400 ms).
+    el.style.pointerEvents = '';
     el.classList.remove('show');
     setTimeout(() => {
       el.classList.add('hidden');
