@@ -27,6 +27,7 @@ import { clamp, lerp, rand }              from './utils.js';
 import {
   generateDungeon, getRoomAt,
 }                                         from './dungeon.js';
+import { getBiomeForFloor }               from './biomes.js';
 import {
   createPlayer, playerUpdate, drawPlayer, damagePlayer,
 }                                         from './player.js';
@@ -107,6 +108,7 @@ function startGame() {
  * @param {number} floor
  */
 function buildFloor(floor) {
+  state.biome = getBiomeForFloor(floor);
   const d = generateDungeon(floor);
   state.map    = d.map;
   state.rooms  = d.rooms;
@@ -125,7 +127,7 @@ function buildFloor(floor) {
 
   document.getElementById('floorVal').textContent = floor;
   if (floor === MAX_FLOOR) showToast('¡EL SEÑOR DE LAS PROFUNDIDADES TE ESPERA!');
-  else                     showToast(`Piso ${floor}`);
+  else                     showToast(`${state.biome.subtitle} · ${state.biome.name}`);
 }
 
 /** Triggered when the player enters the stair tile and presses E. */
@@ -201,12 +203,35 @@ const playerHooks = {
 
 /* ─────────────────────────── Update / render ─────────────────────────── */
 
+/**
+ * Apply per-frame biome effects to the player. Currently:
+ *   • hpRegenIdle  – heal HP per second while standing still
+ *   • mpRegenBonus – multiplier added to MP regen
+ */
+function applyBiomeModifiers(dt) {
+  const p = state.player;
+  const m = state.biome && state.biome.modifiers;
+  if (!p || !m) return;
+
+  if (m.hpRegenIdle) {
+    const moved = p._lastBX !== p.x || p._lastBY !== p.y;
+    p._lastBX = p.x; p._lastBY = p.y;
+    if (!moved && p.hp < p.maxHp) {
+      p.hp = Math.min(p.maxHp, p.hp + m.hpRegenIdle * dt);
+    }
+  }
+  if (m.mpRegenBonus && p.mp < p.maxMp) {
+    p.mp = Math.min(p.maxMp, p.mp + p.mpRegen * m.mpRegenBonus * dt);
+  }
+}
+
 function update(dt) {
   if (state.state !== STATE_PLAY) return;
   state.time += dt;
 
   updateTouchAim();
   playerUpdate(state.player, dt, playerHooks);
+  applyBiomeModifiers(dt);
   state.currentRoom = getRoomAt(state.rooms, state.player);
 
   for (const e of state.enemies) enemyUpdate(e, dt, enemyHooks);

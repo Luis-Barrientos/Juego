@@ -10,6 +10,7 @@ import { state } from './state.js';
 import {
   TILE, MAP_W, MAP_H, VIEW_W, VIEW_H, T_FLOOR, T_STAIR,
 } from './config.js';
+import { mulberry32 } from './utils.js';
 
 let mapCanvas = null;
 let mapCtx    = null;
@@ -18,8 +19,7 @@ let lightCanvas = null;
 let lightCtx    = null;
 
 /**
- * Pre-render the static map to an offscreen canvas. Call after the
- * dungeon for a new floor has been generated.
+ * Pre-render the static map to an offscreen canvas, themed by the active biome.
  */
 export function rebuildMapCache() {
   if (!mapCanvas) {
@@ -28,36 +28,206 @@ export function rebuildMapCache() {
     mapCanvas.height = MAP_H * TILE;
     mapCtx = mapCanvas.getContext('2d');
   }
-  const ctx = mapCtx;
+  const ctx   = mapCtx;
+  const biome = state.biome;
   ctx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
+
+  // Deterministic per-floor RNG so decorations don't flicker on rebuild.
+  const decorRng = mulberry32(state.floor * 9176 + 53);
 
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
-      const t = state.map[y][x];
+      const t  = state.map[y][x];
       const px = x * TILE;
       const py = y * TILE;
+
       if (t === T_FLOOR || t === T_STAIR) {
-        const hash  = (x * 7 + y * 13) % 5;
-        const shade = 32 + hash * 4;
-        ctx.fillStyle = `rgb(${shade},${shade - 6},${shade - 12})`;
-        ctx.fillRect(px, py, TILE, TILE);
-        if ((x + y) % 7 === 0) {
-          ctx.fillStyle = 'rgba(0,0,0,0.3)';
-          ctx.fillRect(px + 4, py + 6, 6, 1);
+        drawFloorTile(ctx, px, py, x, y, biome);
+        if (decorRng() < biome.decorChance) {
+          drawDecoration(ctx, px, py, biome, decorRng);
         }
       } else {
-        ctx.fillStyle = '#1a1218';
-        ctx.fillRect(px, py, TILE, TILE);
-        ctx.fillStyle = '#0a060a';
-        ctx.fillRect(px, py + TILE - 1, TILE, 1);
-        ctx.fillRect(px + TILE - 1, py, 1, TILE);
-        if (y + 1 < MAP_H && state.map[y + 1][x] !== 0) {
-          ctx.fillStyle = '#2a1820';
-          ctx.fillRect(px, py + TILE - 6, TILE, 6);
-          ctx.fillStyle = '#0a0408';
-          ctx.fillRect(px, py + TILE - 7, TILE, 1);
-        }
+        drawWallTile(ctx, px, py, x, y, biome);
       }
+    }
+  }
+}
+
+/**
+ * Draw a single floor cell using the biome's stone palette plus a subtle
+ * checker variant and occasional crack.
+ * @private
+ */
+function drawFloorTile(ctx, px, py, x, y, biome) {
+  const checker = (x + y) & 1;
+  const [r, g, b] = checker ? biome.floor.alt : biome.floor.base;
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(px, py, TILE, TILE);
+
+  const hash = (x * 7 + y * 13) % 9;
+  if (hash === 0) {
+    ctx.fillStyle = biome.floor.crackTint;
+    ctx.fillRect(px + 4, py + 6, 6, 1);
+    ctx.fillRect(px + 5, py + 7, 4, 1);
+  } else if (hash === 4) {
+    ctx.fillStyle = biome.floor.crackTint;
+    ctx.fillRect(px + TILE - 10, py + TILE - 8, 7, 1);
+  }
+}
+
+/**
+ * Draw a wall cell with a thin top edge and a darker bottom shadow when the
+ * tile below is a floor.
+ * @private
+ */
+function drawWallTile(ctx, px, py, x, y, biome) {
+  ctx.fillStyle = biome.wall.top;
+  ctx.fillRect(px, py, TILE, TILE);
+  ctx.fillStyle = biome.wall.bottom;
+  ctx.fillRect(px, py + TILE - 1, TILE, 1);
+  ctx.fillRect(px + TILE - 1, py, 1, TILE);
+  if (y + 1 < MAP_H && state.map[y + 1][x] !== 0) {
+    ctx.fillStyle = biome.wall.side;
+    ctx.fillRect(px, py + TILE - 6, TILE, 6);
+    ctx.fillStyle = biome.wall.bottom;
+    ctx.fillRect(px, py + TILE - 7, TILE, 1);
+  }
+}
+
+/**
+ * Pick a random decoration from the biome and draw it inside a floor tile.
+ * Decorations are tiny pixel-art sprites painted with `fillRect` calls.
+ * @private
+ */
+function drawDecoration(ctx, px, py, biome, rng) {
+  const kind = biome.decorations[Math.floor(rng() * biome.decorations.length)];
+  const cx   = px + TILE / 2;
+  const cy   = py + TILE / 2;
+
+  switch (kind) {
+    case 'moss': {
+      ctx.fillStyle = 'rgba(80,140,60,0.55)';
+      for (let i = 0; i < 6; i++) {
+        const ox = (rng() - 0.5) * TILE * 0.7;
+        const oy = (rng() - 0.5) * TILE * 0.7;
+        ctx.fillRect(cx + ox, cy + oy, 2 + rng() * 2, 1 + rng() * 2);
+      }
+      break;
+    }
+    case 'roots': {
+      ctx.strokeStyle = 'rgba(40,80,30,0.7)';
+      ctx.lineWidth   = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(px + 4, py + 4);
+      ctx.lineTo(cx + (rng() - 0.5) * 6, cy + (rng() - 0.5) * 6);
+      ctx.lineTo(px + TILE - 4, py + TILE - 4);
+      ctx.stroke();
+      break;
+    }
+    case 'mushroom': {
+      ctx.fillStyle = '#5a3018';
+      ctx.fillRect(cx - 1, cy, 2, 4);
+      ctx.fillStyle = '#c04030';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(cx - 2, cy - 1, 1, 1);
+      ctx.fillRect(cx + 1, cy - 1, 1, 1);
+      break;
+    }
+    case 'sunbeam': {
+      ctx.fillStyle = 'rgba(255,230,150,0.10)';
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, py);
+      ctx.lineTo(cx + 6, py);
+      ctx.lineTo(cx + 10, py + TILE);
+      ctx.lineTo(cx - 10, py + TILE);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'cobweb': {
+      ctx.strokeStyle = 'rgba(220,220,220,0.45)';
+      ctx.lineWidth   = 0.7;
+      ctx.beginPath();
+      const ox = px + (rng() < 0.5 ? 2 : TILE - 2);
+      const oy = py + (rng() < 0.5 ? 2 : TILE - 2);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 0.5;
+        ctx.moveTo(ox, oy);
+        ctx.lineTo(ox + Math.cos(a) * 9 * (ox < px + TILE / 2 ? 1 : -1),
+                   oy + Math.sin(a) * 9 * (oy < py + TILE / 2 ? 1 : -1));
+      }
+      ctx.stroke();
+      break;
+    }
+    case 'skull': {
+      ctx.fillStyle = 'rgba(220,210,180,0.85)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.fillRect(cx - 2, cy - 1, 1, 2);
+      ctx.fillRect(cx + 1, cy - 1, 1, 2);
+      ctx.fillRect(cx - 1, cy + 2, 3, 1);
+      break;
+    }
+    case 'driedRoot': {
+      ctx.strokeStyle = 'rgba(70,40,20,0.7)';
+      ctx.lineWidth   = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(px + 6, py + 6);
+      ctx.quadraticCurveTo(cx, cy + 4, px + TILE - 6, py + TILE - 6);
+      ctx.stroke();
+      break;
+    }
+    case 'books': {
+      const colors = ['#8a3010', '#3a3060', '#2a5a30', '#604010'];
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = colors[Math.floor(rng() * colors.length)];
+        ctx.fillRect(px + 4 + i * 6, py + TILE - 8, 5, 6);
+      }
+      break;
+    }
+    case 'rune': {
+      ctx.fillStyle = 'rgba(120,180,255,0.55)';
+      ctx.fillRect(cx - 4, cy, 8, 1);
+      ctx.fillRect(cx, cy - 4, 1, 8);
+      ctx.fillRect(cx - 3, cy - 3, 1, 1);
+      ctx.fillRect(cx + 3, cy - 3, 1, 1);
+      ctx.fillRect(cx - 3, cy + 3, 1, 1);
+      ctx.fillRect(cx + 3, cy + 3, 1, 1);
+      break;
+    }
+    case 'paper': {
+      ctx.fillStyle = 'rgba(220,200,160,0.5)';
+      ctx.fillRect(cx - 3, cy - 2, 6, 5);
+      ctx.fillStyle = 'rgba(60,40,10,0.5)';
+      ctx.fillRect(cx - 2, cy - 1, 4, 1);
+      ctx.fillRect(cx - 2, cy + 1, 3, 1);
+      break;
+    }
+    case 'bones': {
+      ctx.fillStyle = 'rgba(240,230,200,0.7)';
+      ctx.fillRect(cx - 5, cy, 10, 1);
+      ctx.fillRect(cx - 5, cy - 1, 1, 3);
+      ctx.fillRect(cx + 4, cy - 1, 1, 3);
+      break;
+    }
+    case 'lavaCrack': {
+      ctx.fillStyle = 'rgba(255,80,20,0.7)';
+      ctx.fillRect(px + 4, cy, TILE - 8, 1);
+      ctx.fillStyle = 'rgba(255,200,80,0.6)';
+      ctx.fillRect(px + 6, cy, TILE - 12, 1);
+      break;
+    }
+    case 'ash': {
+      ctx.fillStyle = 'rgba(90,80,80,0.5)';
+      for (let i = 0; i < 5; i++) {
+        ctx.fillRect(px + rng() * TILE, py + rng() * TILE, 1, 1);
+      }
+      break;
     }
   }
 }
@@ -142,9 +312,10 @@ export function drawLighting(ctx) {
     lightCanvas.height = VIEW_H;
   }
 
-  const lctx = lightCtx;
+  const lctx  = lightCtx;
+  const biome = state.biome;
   lctx.globalCompositeOperation = 'source-over';
-  lctx.fillStyle = 'rgba(8, 4, 12, 0.82)';
+  lctx.fillStyle = biome ? biome.ambientTint : 'rgba(8, 4, 12, 0.82)';
   lctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
   lctx.globalCompositeOperation = 'destination-out';
@@ -182,6 +353,7 @@ export function drawLighting(ctx) {
   }
 
   // Torches
+  const tc = (biome && biome.torchColor) || [255, 200, 140];
   for (const lt of state.lights) {
     lt.flicker += 0.15;
     const lx = lt.x - state.cameraX;
@@ -189,8 +361,8 @@ export function drawLighting(ctx) {
     if (lx < -lt.r || lx > VIEW_W + lt.r || ly < -lt.r || ly > VIEW_H + lt.r) continue;
     const r = lt.r + Math.sin(lt.flicker) * 6;
     const grad = lctx.createRadialGradient(lx, ly, 5, lx, ly, r);
-    grad.addColorStop(0,   'rgba(255,200,140,1)');
-    grad.addColorStop(0.6, 'rgba(255,140,80,0.5)');
+    grad.addColorStop(0,   `rgba(${tc[0]},${tc[1]},${tc[2]},1)`);
+    grad.addColorStop(0.6, `rgba(${tc[0]},${tc[1]},${tc[2]},0.5)`);
     grad.addColorStop(1,   'rgba(0,0,0,0)');
     lctx.fillStyle = grad;
     lctx.beginPath();
@@ -216,12 +388,13 @@ export function drawLighting(ctx) {
 
   // Warm tint over torches and stairs (additive).
   ctx.globalCompositeOperation = 'lighter';
+  const tint = (biome && biome.torchTint) || 'rgba(255,160,80,0.18)';
   for (const lt of state.lights) {
     const lx = lt.x - state.cameraX;
     const ly = lt.y - state.cameraY;
     if (lx < -120 || lx > VIEW_W + 120 || ly < -120 || ly > VIEW_H + 120) continue;
     const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, 80);
-    grad.addColorStop(0, 'rgba(255,160,80,0.18)');
+    grad.addColorStop(0, tint);
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = grad;
     ctx.beginPath();
@@ -245,6 +418,9 @@ export function drawLighting(ctx) {
   ctx.globalCompositeOperation = 'source-over';
 
   // Torch sprites on top.
+  const flame   = (biome && biome.torchColor) || [255, 128, 48];
+  const flameHi = `rgba(${Math.min(255, flame[0] + 40)},${Math.min(255, flame[1] + 60)},${Math.min(255, flame[2] + 90)},1)`;
+  const flameLo = `rgb(${flame[0]},${flame[1]},${flame[2]})`;
   for (const lt of state.lights) {
     const lx = lt.x - state.cameraX;
     const ly = lt.y - state.cameraY;
@@ -252,9 +428,9 @@ export function drawLighting(ctx) {
     ctx.fillStyle = '#3a2010';
     ctx.fillRect(lx - 1.5, ly - 2, 3, 8);
     const fl = Math.sin(lt.flicker * 1.7) * 1.5;
-    ctx.fillStyle = '#ff8030';
+    ctx.fillStyle = flameLo;
     ctx.beginPath(); ctx.ellipse(lx, ly - 6 + fl, 3, 5 + fl * 0.4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ffd060';
+    ctx.fillStyle = flameHi;
     ctx.beginPath(); ctx.ellipse(lx, ly - 6 + fl, 1.5, 3, 0, 0, Math.PI * 2); ctx.fill();
   }
 }

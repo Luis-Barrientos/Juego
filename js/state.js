@@ -24,4 +24,6 @@ export const state = {
   lastTime: 0,
   currentRoom: null,
   bossSpawned: false,
+  /** Active biome definition for the current floor. See biomes.js. */
+  biome: null,
 };
