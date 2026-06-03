@@ -1,0 +1,344 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #0a0612;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  color: #d8c6a8;
+  overflow: hidden;
+  user-select: none;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at center, #1a0f24 0%, #0a0612 60%, #000 100%);
+}
+
+#gameWrap {
+  position: relative;
+  width: 800px;
+  height: 600px;
+  box-shadow:
+    0 0 40px rgba(120, 40, 200, 0.25),
+    0 0 80px rgba(60, 20, 100, 0.15),
+    inset 0 0 0 2px #2a1838;
+}
+
+canvas#game {
+  display: block;
+  width: 800px;
+  height: 600px;
+  background: #000;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  cursor: crosshair;
+}
+
+/* ─── HUD ─── */
+#hud {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  z-index: 5;
+  text-shadow: 0 0 4px #000, 0 0 2px #000;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.bar-block {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bar-label {
+  width: 28px;
+  font-weight: bold;
+  color: #c8b48a;
+}
+
+.bar {
+  position: relative;
+  width: 200px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid #4a2e1a;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.8);
+}
+
+.bar-fill {
+  height: 100%;
+  transition: width 0.18s ease-out;
+}
+
+.bar-fill.hp {
+  background: linear-gradient(180deg, #ff5050, #a01818);
+  box-shadow: inset 0 0 6px rgba(255, 100, 100, 0.6);
+}
+
+.bar-fill.mp {
+  background: linear-gradient(180deg, #50a8ff, #1a3a8a);
+  box-shadow: inset 0 0 6px rgba(100, 180, 255, 0.6);
+}
+
+.bar span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #fff;
+  font-weight: bold;
+}
+
+.hud-stats {
+  display: flex;
+  gap: 14px;
+  margin-top: 4px;
+  color: #d8b878;
+  font-size: 13px;
+}
+
+.hud-stats span {
+  color: #ffd070;
+  font-weight: bold;
+  margin-left: 4px;
+}
+
+#buffs {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.buff {
+  padding: 2px 8px;
+  background: rgba(80, 40, 120, 0.7);
+  border: 1px solid #a060ff;
+  border-radius: 2px;
+  font-size: 11px;
+  color: #e0c0ff;
+  text-shadow: 0 0 6px #a060ff;
+}
+
+/* ─── Minimap ─── */
+#minimap {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 160px;
+  height: 160px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid #4a2e1a;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.8);
+  z-index: 5;
+}
+
+/* ─── Toast (mensajes) ─── */
+#toast {
+  position: absolute;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.toast-msg {
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.75);
+  border-left: 3px solid #ffc870;
+  color: #ffe0a0;
+  font-size: 13px;
+  letter-spacing: 1px;
+  animation: toastIn 0.3s ease-out, toastOut 0.4s 1.6s forwards;
+  text-shadow: 0 0 6px #000;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toastOut {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+/* ─── Overlays ─── */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: radial-gradient(ellipse at center, rgba(20, 10, 30, 0.92) 0%, rgba(0, 0, 0, 0.97) 100%);
+  z-index: 10;
+  text-align: center;
+  padding: 30px;
+}
+
+.overlay.hidden { display: none; }
+
+.overlay h1 {
+  font-size: 56px;
+  letter-spacing: 8px;
+  color: #d0a060;
+  text-shadow:
+    0 0 16px rgba(180, 100, 40, 0.6),
+    0 0 30px rgba(255, 100, 60, 0.3),
+    0 4px 0 #1a0a08;
+  line-height: 0.95;
+}
+
+.overlay h1 .accent {
+  color: #ff6040;
+  text-shadow:
+    0 0 20px rgba(255, 80, 40, 0.7),
+    0 0 40px rgba(200, 40, 20, 0.4);
+}
+
+.overlay h2 {
+  font-size: 42px;
+  letter-spacing: 6px;
+  color: #d0a060;
+  text-shadow: 0 0 16px rgba(180, 100, 40, 0.5);
+}
+
+.overlay h2.accent {
+  color: #ffd060;
+  text-shadow: 0 0 20px #ffaa30, 0 0 40px #ff6020;
+}
+
+.overlay h2.danger {
+  color: #ff4040;
+  text-shadow: 0 0 20px #ff2020, 0 0 40px #800;
+}
+
+.overlay p {
+  color: #aa9070;
+  font-size: 15px;
+  letter-spacing: 1px;
+  max-width: 460px;
+  line-height: 1.5;
+}
+
+.overlay .tagline {
+  color: #c8a878;
+  font-style: italic;
+  font-size: 17px;
+}
+
+.controls {
+  margin-top: 8px;
+  padding: 12px 24px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #3a2418;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #998870;
+}
+
+.controls b {
+  color: #ffc870;
+  margin-right: 4px;
+}
+
+.results {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #3a2418;
+  padding: 14px 30px;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.results span {
+  color: #ffd070;
+  font-weight: bold;
+  margin-left: 8px;
+}
+
+.overlay button {
+  margin-top: 10px;
+  padding: 14px 42px;
+  font-family: inherit;
+  font-size: 18px;
+  letter-spacing: 4px;
+  background: linear-gradient(180deg, #2a1810, #1a0a08);
+  color: #ffc870;
+  border: 2px solid #6a4020;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-weight: bold;
+  text-shadow: 0 0 6px #000;
+  transition: all 0.2s;
+}
+
+.overlay button:hover {
+  background: linear-gradient(180deg, #4a2818, #2a1410);
+  color: #ffd890;
+  border-color: #c08040;
+  box-shadow: 0 0 18px rgba(200, 120, 40, 0.6);
+  transform: translateY(-1px);
+}
+
+.overlay button:active {
+  transform: translateY(1px);
+}
+
+#upgradeOptions {
+  display: flex;
+  gap: 18px;
+  margin-top: 14px;
+}
+
+.upgrade-card {
+  width: 200px;
+  padding: 18px 14px;
+  background: linear-gradient(180deg, #1a0e22, #0a0612);
+  border: 2px solid #4a2868;
+  cursor: pointer;
+  transition: all 0.25s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.upgrade-card:hover {
+  border-color: #b070ff;
+  box-shadow: 0 0 24px rgba(160, 100, 255, 0.5);
+  transform: translateY(-4px);
+}
+
+.upgrade-card .icon {
+  font-size: 36px;
+  color: #d0a0ff;
+  text-shadow: 0 0 16px #a060ff;
+}
+
+.upgrade-card .name {
+  font-size: 16px;
+  color: #ffc870;
+  letter-spacing: 2px;
+  font-weight: bold;
+}
+
+.upgrade-card .desc {
+  font-size: 12px;
+  color: #a08070;
+  line-height: 1.4;
+}

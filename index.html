@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Dungeon Depths — un roguelite de mazmorra procedural en JavaScript puro. Desciende, mata y sobrevive." />
+<meta name="theme-color" content="#0a0612" />
+<meta property="og:title" content="Dungeon Depths" />
+<meta property="og:description" content="Roguelite top-down con mazmorras proceduralmente generadas, combate y un boss final." />
+<meta property="og:type" content="website" />
+<title>Dungeon Depths</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="gameWrap">
+  <canvas id="game" width="800" height="600"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="bar-block">
+      <div class="bar-label">HP</div>
+      <div class="bar"><div id="hpBar" class="bar-fill hp"></div><span id="hpText">100/100</span></div>
+    </div>
+    <div class="bar-block">
+      <div class="bar-label">MP</div>
+      <div class="bar"><div id="mpBar" class="bar-fill mp"></div><span id="mpText">50/50</span></div>
+    </div>
+    <div class="hud-stats">
+      <div>PISO <span id="floorVal">1</span></div>
+      <div>ORO <span id="goldVal">0</span></div>
+      <div>SCORE <span id="scoreVal">0</span></div>
+    </div>
+    <div id="buffs"></div>
+  </div>
+
+  <!-- Minimap -->
+  <canvas id="minimap" width="160" height="160"></canvas>
+
+  <!-- Mensajes flotantes -->
+  <div id="toast"></div>
+
+  <!-- Menú principal -->
+  <div id="menu" class="overlay">
+    <h1>DUNGEON<br><span class="accent">DEPTHS</span></h1>
+    <p class="tagline">Desciende. Mata. Sobrevive.</p>
+    <div class="controls">
+      <p><b>WASD</b> / Flechas — moverse</p>
+      <p><b>Click izq</b> / <b>Z</b> — espada</p>
+      <p><b>Click der</b> / <b>X</b> — magia (cuesta MP)</p>
+      <p><b>E</b> — interactuar (baúles, escaleras)</p>
+      <p><b>ESC</b> — pausa</p>
+    </div>
+    <button id="startBtn">COMENZAR</button>
+  </div>
+
+  <!-- Pausa -->
+  <div id="pauseMenu" class="overlay hidden">
+    <h2>PAUSA</h2>
+    <button id="resumeBtn">REANUDAR</button>
+    <button id="quitBtn">SALIR</button>
+  </div>
+
+  <!-- Game Over -->
+  <div id="gameOver" class="overlay hidden">
+    <h2 class="danger">HAS MUERTO</h2>
+    <div class="results">
+      <p>Piso alcanzado: <span id="goFloor">-</span></p>
+      <p>Enemigos abatidos: <span id="goKills">-</span></p>
+      <p>Oro recolectado: <span id="goGold">-</span></p>
+      <p>Puntuación: <span id="goScore">-</span></p>
+    </div>
+    <button id="retryBtn">REINTENTAR</button>
+  </div>
+
+  <!-- Victoria -->
+  <div id="winScreen" class="overlay hidden">
+    <h2 class="accent">¡VICTORIA!</h2>
+    <p>Has derrotado al Señor de las Profundidades.</p>
+    <div class="results">
+      <p>Enemigos abatidos: <span id="winKills">-</span></p>
+      <p>Oro recolectado: <span id="winGold">-</span></p>
+      <p>Puntuación final: <span id="winScore">-</span></p>
+    </div>
+    <button id="winBtn">JUGAR DE NUEVO</button>
+  </div>
+
+  <!-- Selector de upgrade -->
+  <div id="upgradePicker" class="overlay hidden">
+    <h2>ELIGE UNA BENDICIÓN</h2>
+    <div id="upgradeOptions"></div>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
