@@ -137,6 +137,9 @@ export function drawLighting(ctx) {
     lightCanvas.width  = VIEW_W;
     lightCanvas.height = VIEW_H;
     lightCtx = lightCanvas.getContext('2d');
+  } else if (lightCanvas.width !== VIEW_W || lightCanvas.height !== VIEW_H) {
+    lightCanvas.width  = VIEW_W;
+    lightCanvas.height = VIEW_H;
   }
 
   const lctx = lightCtx;

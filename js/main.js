@@ -17,7 +17,7 @@
  */
 
 import {
-  TILE, VIEW_W, VIEW_H, MAP_W, MAP_H, MAX_FLOOR,
+  TILE, VIEW_W, VIEW_H, MAP_W, MAP_H, MAX_FLOOR, setViewSize,
   STATE_MENU, STATE_PLAY, STATE_PAUSE, STATE_DEAD, STATE_WIN, STATE_UPGRADE,
 } from './config.js';
 import { state }                          from './state.js';
@@ -55,7 +55,21 @@ const canvas  = document.getElementById('game');
 const ctx     = canvas.getContext('2d');
 const minimap = document.getElementById('minimap');
 const mctx    = minimap.getContext('2d');
-
+/**
+ * Resize the canvas to fill the window. Capped on very large displays so the
+ * lighting overlay (drawn each frame) stays cheap on the GPU.
+ */
+function resizeCanvas() {
+  const maxW = 1920, maxH = 1200;
+  const w = Math.min(window.innerWidth,  maxW);
+  const h = Math.min(window.innerHeight, maxH);
+  canvas.width  = w;
+  canvas.height = h;
+  setViewSize(w, h);
+}
+resizeCanvas();
+window.addEventListener('resize',            resizeCanvas);
+window.addEventListener('orientationchange', resizeCanvas);
 initInput(canvas, { pause: pauseGame, resume: resumeGame });
 
 /* ─────────────────────────── Game flow ─────────────────────────── */

@@ -7,8 +7,18 @@
 export const TILE   = 32;
 export const MAP_W  = 48;
 export const MAP_H  = 48;
-export const VIEW_W = 800;
-export const VIEW_H = 600;
+
+/**
+ * Viewport size. These are *live bindings*: importers always see the latest
+ * value. Use `setViewSize(w, h)` to update them on window resize.
+ */
+export let VIEW_W = 800;
+export let VIEW_H = 600;
+
+export function setViewSize(w, h) {
+  VIEW_W = w;
+  VIEW_H = h;
+}
 
 // ── Tile types ────────────────────────────────────────────────
 export const T_WALL  = 0;

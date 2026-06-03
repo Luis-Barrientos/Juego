@@ -14,23 +14,19 @@ html, body {
 }
 
 body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  min-height: 100dvh;
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   background:
     radial-gradient(ellipse at center, #1a0f24 0%, #0a0612 60%, #000 100%);
 }
 
 #gameWrap {
   position: relative;
-  width: min(100vw, calc(100dvh * 4 / 3), 800px);
-  height: min(100dvh, calc(100vw * 3 / 4), 600px);
-  box-shadow:
-    0 0 40px rgba(120, 40, 200, 0.25),
-    0 0 80px rgba(60, 20, 100, 0.15),
-    inset 0 0 0 2px #2a1838;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
 }
 
 canvas#game {
