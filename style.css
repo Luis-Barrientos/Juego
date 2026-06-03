@@ -327,6 +327,26 @@ canvas#game {
   transform: translateY(-4px);
 }
 
+.upgrade-card.picked {
+  border-color: #ffc870;
+  box-shadow: 0 0 28px rgba(255, 200, 80, 0.7), inset 0 0 20px rgba(255, 200, 80, 0.18);
+  transform: translateY(-4px);
+}
+.upgrade-card.dimmed {
+  opacity: 0.35;
+  pointer-events: none;
+  filter: grayscale(0.6);
+}
+
+#descendBtn {
+  margin-top: 22px;
+}
+#descendBtn[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
 .upgrade-card .icon {
   font-size: 36px;
   color: #d0a0ff;
@@ -587,4 +607,62 @@ canvas#game {
 body.overlay-active #hud,
 body.overlay-active #minimap,
 body.overlay-active #toast { display: none; }
+
+/* ─── Cartel de intro de piso ─── */
+#floorIntro {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.95) 75%);
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+#floorIntro.show { opacity: 1; }
+
+.floor-intro-inner {
+  text-align: center;
+  padding: 28px 56px;
+  border-top: 2px solid var(--intro-accent, #6ec050);
+  border-bottom: 2px solid var(--intro-accent, #6ec050);
+  background: linear-gradient(180deg, rgba(10,8,12,0.4), rgba(0,0,0,0.7));
+  animation: floorIntroSlide 0.7s ease;
+}
+@keyframes floorIntroSlide {
+  from { opacity: 0; transform: translateY(18px); letter-spacing: 12px; }
+  to   { opacity: 1; transform: translateY(0);    letter-spacing: 6px; }
+}
+
+.floor-intro-num {
+  font-size: 18px;
+  letter-spacing: 8px;
+  color: var(--intro-accent, #6ec050);
+  text-shadow: 0 0 14px var(--intro-glow, rgba(110,192,80,0.7));
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+.floor-intro-name {
+  font-size: 38px;
+  letter-spacing: 6px;
+  color: #f4ead8;
+  text-shadow: 0 0 18px var(--intro-glow, rgba(110,192,80,0.5));
+  font-weight: bold;
+}
+.floor-intro-sub {
+  margin-top: 10px;
+  font-size: 13px;
+  letter-spacing: 4px;
+  color: #a08070;
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .floor-intro-inner { padding: 18px 28px; }
+  .floor-intro-name  { font-size: 24px; letter-spacing: 4px; }
+  .floor-intro-num   { font-size: 14px; letter-spacing: 6px; }
+  .floor-intro-sub   { font-size: 11px; }
+}
 

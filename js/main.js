@@ -49,6 +49,7 @@ import {
 import {
   updateHUD, showToast, hideAllOverlays, showMenu, showPause, hidePause,
   showGameOver, showWinScreen, showUpgradePicker, hideUpgradePicker,
+  showFloorIntro,
 }                                         from './ui.js';
 
 /* ─────────────────────────── DOM bootstrap ─────────────────────────── */
@@ -128,8 +129,8 @@ function buildFloor(floor) {
   rebuildMapCache();
 
   document.getElementById('floorVal').textContent = floor;
+  showFloorIntro(state.biome, floor);
   if (floor === MAX_FLOOR) showToast('¡EL SEÑOR DE LAS PROFUNDIDADES TE ESPERA!');
-  else                     showToast(`${state.biome.subtitle} · ${state.biome.name}`);
 }
 
 /** Triggered when the player enters the stair tile and presses E. */

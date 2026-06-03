@@ -22,6 +22,11 @@ const dom = {
   upgradeOpts: document.getElementById('upgradeOptions'),
   shopOpts:    document.getElementById('shopOptions'),
   shopGold:    document.getElementById('shopGold'),
+  descendBtn:  document.getElementById('descendBtn'),
+  floorIntro:     document.getElementById('floorIntro'),
+  floorIntroNum:  document.getElementById('floorIntroNum'),
+  floorIntroName: document.getElementById('floorIntroName'),
+  floorIntroSub:  document.getElementById('floorIntroSub'),
 };
 
 /** Refresh HUD bars and counters from the player state. */
@@ -123,17 +128,23 @@ export const SHOP_ITEMS = [
 
 /**
  * Show the upgrade picker plus the gold-driven shop. Picking an upgrade
- * card exits the screen; shop cards are optional and can be bought before.
+ * card highlights it but does NOT close the screen — the player must press
+ * the "DESCENDER" button to commit. This lets them shop first or change
+ * their mind.
  *
- * @param {(id:string) => void} onPick
+ * @param {(id:string) => void} onConfirm Called with the chosen upgrade id
+ *                                        when the player presses DESCENDER.
  */
-export function showUpgradePicker(onPick) {
+export function showUpgradePicker(onConfirm) {
   markOverlayActive();
   dom.upgrade.classList.remove('hidden');
+
+  let chosen = null;
 
   // ── Free upgrade cards (one is required to continue) ──────────────
   const pool = UPGRADES.slice().sort(() => Math.random() - 0.5).slice(0, 3);
   dom.upgradeOpts.innerHTML = '';
+  const cards = [];
   for (const u of pool) {
     const card = document.createElement('div');
     card.className = 'upgrade-card';
@@ -141,12 +152,64 @@ export function showUpgradePicker(onPick) {
       <div class="icon">${u.icon}</div>
       <div class="name">${u.name}</div>
       <div class="desc">${u.desc}</div>`;
-    card.addEventListener('click', () => onPick(u.id));
+    card.addEventListener('click', () => {
+      chosen = u.id;
+      for (const c of cards) {
+        c.classList.toggle('picked', c === card);
+        c.classList.toggle('dimmed', c !== card);
+      }
+      dom.descendBtn.disabled = false;
+    });
     dom.upgradeOpts.appendChild(card);
+    cards.push(card);
   }
+
+  dom.descendBtn.disabled = true;
+  dom.descendBtn.onclick = () => {
+    if (!chosen) return;
+    onConfirm(chosen);
+  };
 
   // ── Shop cards (optional, cost gold, can buy multiple) ────────────
   buildShop();
+}
+
+/**
+ * Show the floor-intro banner, themed to the active biome's accent colour.
+ * Auto-hides after `duration` ms and then calls `onDone`.
+ *
+ * @param {object} biome    Active biome (from biomes.js).
+ * @param {number} floorNum 1-based floor number.
+ * @param {() => void} onDone Callback when the banner finishes.
+ * @param {number} [duration=2200] Visible time in ms.
+ */
+export function showFloorIntro(biome, floorNum, onDone, duration = 2200) {
+  const el = dom.floorIntro;
+  if (!el) { onDone && onDone(); return; }
+
+  dom.floorIntroNum.textContent  = `${floorNum} · ${biome.subtitle}`;
+  dom.floorIntroName.textContent = biome.name;
+  dom.floorIntroSub.textContent  = biome.tagline || '';
+
+  el.style.setProperty('--intro-accent', biome.accent || '#ffd060');
+  el.style.setProperty('--intro-glow',
+    biome.torchColor
+      ? `rgba(${biome.torchColor[0]},${biome.torchColor[1]},${biome.torchColor[2]},0.55)`
+      : 'rgba(255,200,80,0.55)');
+
+  el.classList.remove('hidden');
+  // Force reflow so the CSS transition runs reliably.
+  // eslint-disable-next-line no-unused-expressions
+  el.offsetWidth;
+  el.classList.add('show');
+
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => {
+      el.classList.add('hidden');
+      onDone && onDone();
+    }, 500);
+  }, duration);
 }
 
 /** (Re)render the shop section using the current player's gold. */
