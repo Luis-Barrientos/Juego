@@ -138,9 +138,15 @@ function placeFloorTorches(r, rng, lights, density) {
     { x: r.x + 1,         y: r.y + r.h - 2 },
     { x: r.x + r.w - 2,   y: r.y + r.h - 2 },
   ];
-  const n = Math.max(1, Math.min(corners.length, Math.round(density + rng() * 0.8)));
+  // Scale count with room area: ~1 torch per ~25 floor tiles, clamped.
+  const target = Math.round(density + r.w * r.h / 25);
+  const n = Math.max(1, Math.min(corners.length, target));
+  const used = new Set();
   for (let i = 0; i < n; i++) {
-    const c = corners[Math.floor(rng() * corners.length)];
+    let idx;
+    do { idx = Math.floor(rng() * corners.length); } while (used.has(idx) && used.size < corners.length);
+    used.add(idx);
+    const c = corners[idx];
     lights.push({
       type: 'torch',
       x: c.x * TILE + TILE / 2,
@@ -177,9 +183,17 @@ function placeWallSconces(map, r, rng, lights, density) {
     placeFloorTorches(r, rng, lights, density);
     return;
   }
-  const n = Math.max(1, Math.round(density + rng() * 0.5));
+  // Scale with room perimeter: roughly 1 sconce per 6 wall tiles.
+  const perimeter = (r.w + r.h) * 2;
+  const target = Math.max(2, Math.round(density + perimeter / 6));
+  const n = Math.min(target, candidates.length);
+  // Shuffle candidates and take the first N for a spread layout.
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
   for (let i = 0; i < n; i++) {
-    const c = candidates[Math.floor(rng() * candidates.length)];
+    const c = candidates[i];
     lights.push({
       type: 'sconce',
       dir:  c.dir,
@@ -192,21 +206,40 @@ function placeWallSconces(map, r, rng, lights, density) {
 }
 
 /**
- * 35% chance to drop a tall sunbeam in a sufficiently large room.
- * Sunbeams are rendered separately and animated with floating dust.
+ * Drop one or more sunbeams in a room. Larger rooms get a higher chance and
+ * may receive a second beam, spaced apart from the first. Ruins (the surface
+ * floor) is the brightest biome and gets boosted odds.
  * @private
  */
 function maybePlaceSunbeam(r, rng, sunbeams) {
-  if (r.w * r.h < 60) return;
-  if (rng() > 0.35) return;
-  const cx = r.x + 1 + Math.floor(rng() * (r.w - 2));
-  sunbeams.push({
-    x: cx * TILE + TILE / 2,
-    y: r.y * TILE,
-    h: r.h * TILE,
-    w: TILE * (1.6 + rng() * 0.8),
-    seed: Math.floor(rng() * 1e9),
-  });
+  const area = r.w * r.h;
+  if (area < 30) return;
+  // Base 50% rises with area; ruins always at least 0.65.
+  const chance = Math.min(0.95, 0.50 + area / 250);
+  if (rng() > chance) return;
+
+  const placeOne = (avoidX) => {
+    let cx;
+    let tries = 0;
+    do {
+      cx = r.x + 1 + Math.floor(rng() * (r.w - 2));
+      tries++;
+    } while (avoidX !== null && Math.abs(cx - avoidX) < 3 && tries < 6);
+    sunbeams.push({
+      x: cx * TILE + TILE / 2,
+      y: r.y * TILE,
+      h: r.h * TILE,
+      w: TILE * (1.6 + rng() * 0.8),
+      seed: Math.floor(rng() * 1e9),
+    });
+    return cx;
+  };
+
+  const firstX = placeOne(null);
+  // Very large rooms get a second beam, well separated.
+  if (area >= 90 && r.w >= 9 && rng() < 0.6) {
+    placeOne(firstX);
+  }
 }
 
 /**

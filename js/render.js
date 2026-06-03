@@ -384,6 +384,33 @@ export function drawLighting(ctx) {
     }
   }
 
+  // Sunbeams cut the ambient overlay so the floor under the ceiling crack
+  // actually receives sunlight. Brighter near the top, fading toward the
+  // ground; widens like the visual trapezoid in drawSunbeams.
+  if (state.sunbeams && state.sunbeams.length > 0) {
+    for (const sb of state.sunbeams) {
+      const sx = sb.x - state.cameraX;
+      const sy = sb.y - state.cameraY;
+      if (sx < -sb.w * 2 || sx > VIEW_W + sb.w * 2) continue;
+      if (sy + sb.h < 0 || sy > VIEW_H) continue;
+      const halfTop    = sb.w * 0.6;
+      const halfBottom = sb.w * 1.4;
+      // Vertical gradient — strongest at top, fades at bottom.
+      const grad = lctx.createLinearGradient(0, sy, 0, sy + sb.h);
+      grad.addColorStop(0,    'rgba(255,255,255,0.95)');
+      grad.addColorStop(0.55, 'rgba(255,255,255,0.55)');
+      grad.addColorStop(1,    'rgba(255,255,255,0)');
+      lctx.fillStyle = grad;
+      lctx.beginPath();
+      lctx.moveTo(sx - halfTop,    sy);
+      lctx.lineTo(sx + halfTop,    sy);
+      lctx.lineTo(sx + halfBottom, sy + sb.h);
+      lctx.lineTo(sx - halfBottom, sy + sb.h);
+      lctx.closePath();
+      lctx.fill();
+    }
+  }
+
   ctx.drawImage(lightCanvas, 0, 0);
 
   // Warm tint over torches and stairs (additive).
