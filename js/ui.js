@@ -97,14 +97,20 @@ export function showWinScreen(stats) {
 
 /** Available upgrades. Picked from at floor transitions. */
 export const UPGRADES = [
-  { id: 'sword',   icon: '⚔', name: 'FILO AGUDO',     desc: '+10 daño de espada y +4 alcance.' },
-  { id: 'magic',   icon: '✦', name: 'PODER ARCANO',   desc: '+8 daño mágico y regen MP mejorado.' },
-  { id: 'speed',   icon: '⚡', name: 'PIES LIGEROS',  desc: '+15% velocidad de movimiento.' },
-  { id: 'vampire', icon: '✤', name: 'SED DE SANGRE',  desc: 'Robas vida con cada golpe de espada.' },
-  { id: 'regen',   icon: '✚', name: 'REGENERACIÓN',  desc: 'Regeneras HP lentamente.' },
-  { id: 'crit',    icon: '✸', name: 'GOLPE LETAL',    desc: '12% probabilidad de crítico x2.' },
-  { id: 'maxhp',   icon: '♥', name: 'VITALIDAD',      desc: '+30 HP máximo y cura completa.' },
-  { id: 'maxmp',   icon: '◆', name: 'INTELECTO',      desc: '+25 MP máximo y restaura MP.' },
+  { id: 'sword',     icon: '⚔', name: 'FILO AGUDO',     desc: '+10 daño de espada y +4 alcance.' },
+  { id: 'magic',     icon: '✦', name: 'PODER ARCANO',   desc: '+8 daño mágico y regen MP mejorado.' },
+  { id: 'speed',     icon: '⚡', name: 'PIES LIGEROS',  desc: '+15% velocidad de movimiento.' },
+  { id: 'vampire',   icon: '✤', name: 'SED DE SANGRE',  desc: 'Robas vida con cada golpe de espada.' },
+  { id: 'regen',     icon: '✚', name: 'REGENERACIÓN',   desc: 'Regeneras HP lentamente.' },
+  { id: 'crit',      icon: '✸', name: 'GOLPE LETAL',    desc: '12% probabilidad de crítico x2.' },
+  { id: 'maxhp',     icon: '♥', name: 'VITALIDAD',      desc: '+30 HP máximo y cura completa.' },
+  { id: 'maxmp',     icon: '◆', name: 'INTELECTO',      desc: '+25 MP máximo y restaura MP.' },
+  { id: 'swift',     icon: '⟳', name: 'BRAZO ÁGIL',     desc: '−15% tiempo de recarga de espada.' },
+  { id: 'reach',     icon: '➤', name: 'GRAN ARCO',      desc: '+10 alcance y arco amplio de espada.' },
+  { id: 'mana_eff',  icon: '◇', name: 'CONSERVACIÓN',   desc: '−2 MP de coste a cada hechizo.' },
+  { id: 'fortune',   icon: '✦', name: 'AVARICIA',       desc: 'Enemigos sueltan +35% de oro.' },
+  { id: 'guard',     icon: '◈', name: 'PIEL DE PIEDRA', desc: 'Reduce daño recibido en 8%.' },
+  { id: 'thorns',    icon: '✣', name: 'ESPINAS',        desc: 'Devuelves 30% del daño al atacante.' },
 ];
 
 /**
@@ -112,18 +118,47 @@ export const UPGRADES = [
  * itself to the player. Randomly sampled when the picker is shown.
  */
 export const SHOP_ITEMS = [
-  { id: 'hp_pot', icon: '♥',  name: 'POCIÓN HP',   desc: 'Restaura 50 HP.',           price: 25,
+  /* ── Consumibles baratos ─────────────────────────────────────── */
+  { id: 'hp_pot',  icon: '♥', name: 'POCIÓN HP',    desc: 'Restaura 50 HP al instante.',  price: 25,
     apply: p => { p.hp = Math.min(p.maxHp, p.hp + 50); } },
-  { id: 'mp_pot', icon: '◆',  name: 'POCIÓN MP',   desc: 'Restaura 40 MP.',           price: 20,
+  { id: 'mp_pot',  icon: '◆', name: 'POCIÓN MP',    desc: 'Restaura 40 MP al instante.',  price: 20,
     apply: p => { p.mp = Math.min(p.maxMp, p.mp + 40); } },
-  { id: 'full',   icon: '✤',  name: 'CURA TOTAL',  desc: 'Restaura HP y MP al máximo.', price: 60,
+  { id: 'full',    icon: '✤', name: 'CURA TOTAL',   desc: 'Recupera HP y MP al máximo.',  price: 65,
     apply: p => { p.hp = p.maxHp; p.mp = p.maxMp; } },
-  { id: 'maxhp',  icon: '✚',  name: '+15 HP MÁX',  desc: 'Aumenta el HP máximo en 15.', price: 90,
-    apply: p => { p.maxHp += 15; p.hp += 15; } },
-  { id: 'maxmp',  icon: '✦',  name: '+12 MP MÁX',  desc: 'Aumenta el MP máximo en 12.', price: 70,
-    apply: p => { p.maxMp += 12; p.mp += 12; } },
-  { id: 'shield', icon: '◈',  name: 'GUARDIA',     desc: 'Reduce daño recibido en 10%.', price: 110,
+
+  /* ── Mejoras de stat ─────────────────────────────────────────── */
+  { id: 'maxhp',   icon: '✚', name: '+20 HP MÁX',   desc: 'Aumenta el HP máximo en 20.',  price: 95,
+    apply: p => { p.maxHp += 20; p.hp += 20; } },
+  { id: 'maxmp',   icon: '✦', name: '+15 MP MÁX',   desc: 'Aumenta el MP máximo en 15.',  price: 75,
+    apply: p => { p.maxMp += 15; p.mp += 15; } },
+  { id: 'sword',   icon: '⚔', name: 'AFILADO',      desc: '+8 daño de espada permanente.', price: 100,
+    apply: p => { p.swingDmg += 8; } },
+  { id: 'magic',   icon: '☄', name: 'CHISPA',       desc: '+6 daño mágico permanente.',   price: 90,
+    apply: p => { p.magicDmg += 6; } },
+  { id: 'speed',   icon: '⚡', name: 'BOTAS RÁPIDAS', desc: '+10% velocidad de movimiento.', price: 85,
+    apply: p => { p.speed *= 1.10; } },
+  { id: 'reach',   icon: '➤', name: 'HOJA LARGA',   desc: '+8 alcance de espada.',        price: 70,
+    apply: p => { p.swingRange += 8; } },
+  { id: 'swift',   icon: '⟳', name: 'GUANTES',      desc: 'Espada un 12% más rápida.',    price: 80,
+    apply: p => { p.swingDur *= 0.88; } },
+  { id: 'mana_eff',icon: '◇', name: 'CRISTAL',      desc: 'Hechizos cuestan 3 MP menos.', price: 70,
+    apply: p => { p.magicCost = Math.max(2, p.magicCost - 3); } },
+
+  /* ── Defensivos ──────────────────────────────────────────────── */
+  { id: 'guard',   icon: '◈', name: 'GUARDIA',      desc: 'Reduce daño recibido en 10%.',  price: 110,
     apply: p => { p.dmgReduce = (p.dmgReduce || 0) + 0.10; } },
+  { id: 'iframes', icon: '◉', name: 'REFLEJOS',     desc: '+30% duración de invulnerabilidad.', price: 60,
+    apply: p => { p.iframesMul = (p.iframesMul || 1) + 0.30; } },
+  { id: 'thorns',  icon: '✣', name: 'CORAZA ESPINOSA', desc: 'Devuelves 25% del daño recibido.', price: 95,
+    apply: p => { p.thorns = (p.thorns || 0) + 0.25; } },
+
+  /* ── Caros / utility ─────────────────────────────────────────── */
+  { id: 'extra_gold', icon: '✪', name: 'PERGAMINO',  desc: 'Genera 50 oro al instante.',   price: 40,
+    apply: () => { state.gold += 50; } },
+  { id: 'fortune_p',  icon: '◇', name: 'AVARICIA',   desc: 'Enemigos sueltan +25% oro.',   price: 130,
+    apply: p => { p.goldBonus = (p.goldBonus || 0) + 0.25; } },
+  { id: 'maxhp_lg',   icon: '✚', name: 'CORAZÓN GIGANTE', desc: '+35 HP máx (cura).',     price: 160,
+    apply: p => { p.maxHp += 35; p.hp = p.maxHp; } },
 ];
 
 /**
@@ -203,13 +238,25 @@ export function showFloorIntro(biome, floorNum, onDone, duration = 2200) {
   el.offsetWidth;
   el.classList.add('show');
 
-  setTimeout(() => {
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener('keydown', skip);
+    el.removeEventListener('click', skip);
     el.classList.remove('show');
     setTimeout(() => {
       el.classList.add('hidden');
       onDone && onDone();
-    }, 500);
-  }, duration);
+    }, 400);
+  };
+  const skip = () => finish();
+
+  el.style.pointerEvents = 'auto';
+  el.addEventListener('click', skip, { once: true });
+  window.addEventListener('keydown', skip);
+
+  setTimeout(finish, duration);
 }
 
 /** (Re)render the shop section using the current player's gold. */

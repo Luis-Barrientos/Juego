@@ -28,10 +28,33 @@ export function spawnParticles(x, y, color, count) {
  */
 export function spawnDamageText(x, y, dmg, crit) {
   state.damageTexts.push({
-    x, y, dmg, crit,
+    x, y,
+    text: crit ? `${dmg}!` : `${dmg}`,
+    color: crit ? '#ffd040' : '#fff',
+    size: crit ? 18 : 14,
     life: 0.9, maxLife: 0.9,
-    vy: -55,
-    vx: rand(-20, 20),
+    vy: -55, vx: rand(-20, 20),
+    gravity: 80,
+  });
+}
+
+/**
+ * Generic floating text (for loot reveals, pickups, blessings…).
+ * Stays visible longer than damage numbers and rises slowly without gravity.
+ *
+ * @param {number} x World x
+ * @param {number} y World y
+ * @param {string} text
+ * @param {string} [color='#ffd040']
+ * @param {number} [size=13]
+ * @param {number} [life=1.6]
+ */
+export function spawnFloatText(x, y, text, color = '#ffd040', size = 13, life = 1.6) {
+  state.damageTexts.push({
+    x, y, text, color, size,
+    life, maxLife: life,
+    vy: -28, vx: 0,
+    gravity: 0,
   });
 }
 
@@ -50,7 +73,7 @@ export function updateParticles(dt) {
     const t = state.damageTexts[i];
     t.x += t.vx * dt;
     t.y += t.vy * dt;
-    t.vy += 80 * dt;
+    t.vy += (t.gravity || 0) * dt;
     t.life -= dt;
     if (t.life <= 0) state.damageTexts.splice(i, 1);
   }
@@ -74,15 +97,14 @@ export function drawDamageTexts(ctx) {
   for (const t of state.damageTexts) {
     const a = Math.max(0, t.life / t.maxLife);
     ctx.globalAlpha = a;
-    ctx.fillStyle = t.crit ? '#ffd040' : '#fff';
+    ctx.fillStyle = t.color || '#fff';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 3;
-    ctx.font = t.crit ? 'bold 18px sans-serif' : 'bold 14px sans-serif';
-    const txt = t.crit ? `${t.dmg}!` : `${t.dmg}`;
+    ctx.font = `bold ${t.size || 14}px sans-serif`;
     const x = t.x - state.cameraX;
     const y = t.y - state.cameraY;
-    ctx.strokeText(txt, x, y);
-    ctx.fillText(txt, x, y);
+    ctx.strokeText(t.text, x, y);
+    ctx.fillText(t.text, x, y);
   }
   ctx.globalAlpha = 1;
   ctx.restore();

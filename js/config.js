@@ -33,6 +33,7 @@ export const STATE_PAUSE   = 'pause';
 export const STATE_DEAD    = 'dead';
 export const STATE_WIN     = 'win';
 export const STATE_UPGRADE = 'upgrade';
+export const STATE_INTRO   = 'intro';
 
 // ── Run length ────────────────────────────────────────────────
 /** Number of floors in a complete run (last floor is the final boss). */

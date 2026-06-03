@@ -166,14 +166,20 @@ function doSwordHit(p, onEnemyHit) {
 }
 
 /** Apply damage to the player respecting i-frames. */
-export function damagePlayer(p, dmg, onDeath) {
+export function damagePlayer(p, dmg, onDeath, attacker) {
   if (p.iframes > 0) return;
   if (p.dmgReduce) dmg *= Math.max(0.1, 1 - p.dmgReduce);
   p.hp -= dmg;
-  p.iframes = 0.6;
+  p.iframes = 0.6 * (p.iframesMul || 1);
   state.shake = Math.min(14, state.shake + 6);
   Audio.playerHurt();
   spawnParticles(p.x, p.y, '#ff4040', 12);
+  // Thorns: reflect a fraction back to the attacker.
+  if (p.thorns && attacker && !attacker.dead) {
+    const reflect = Math.max(1, Math.round(dmg * p.thorns));
+    attacker.hp -= reflect;
+    spawnParticles(attacker.x, attacker.y, '#ffffff', 6);
+  }
   if (p.hp <= 0) {
     p.hp = 0;
     onDeath();

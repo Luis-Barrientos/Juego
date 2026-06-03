@@ -122,7 +122,7 @@ export function enemyUpdate(e, dt, hooks) {
       e.state = 'attack';
       if (e.attackCool <= 0) {
         e.attackCool = e.attackRate;
-        hooks.onPlayerHit(e.dmg);
+        hooks.onPlayerHit(e.dmg, e);
       }
     }
   } else if (e.behavior === 'ranged') {
@@ -194,7 +194,7 @@ function bossAI(b, dt, dx, dy, d, hooks) {
 
   if (d < b.r + state.player.r + 4) {
     if (!b._touchCool || b._touchCool <= 0) {
-      hooks.onPlayerHit(b.dmg);
+      hooks.onPlayerHit(b.dmg, b);
       b._touchCool = 0.7;
     }
   }
@@ -224,7 +224,8 @@ export function damageEnemy(e, dmg, crit, hooks) {
     state.shake = Math.min(14, state.shake + (e.isBoss ? 14 : 4));
     Audio.enemyDie();
 
-    const coins = irand(e.gold[0], e.gold[1]);
+    const goldMul = 1 + ((state.player && state.player.goldBonus) || 0);
+    const coins = Math.max(1, Math.round(irand(e.gold[0], e.gold[1]) * goldMul));
     const splits = Math.min(coins, 8);
     for (let i = 0; i < splits; i++) {
       const ang = Math.random() * Math.PI * 2;

@@ -6,6 +6,7 @@ import { state } from './state.js';
 import { tryMove } from './dungeon.js';
 import { Audio } from './audio.js';
 import { spawnParticles } from './particles.js';
+import { spawnFloatText } from './particles.js';
 import { rand, irand, dist } from './utils.js';
 import { TILE } from './config.js';
 
@@ -25,14 +26,14 @@ export function updateLoot(dt, toast) {
       if (Math.hypot(l.vx, l.vy) < 5) { l.vx = 0; l.vy = 0; }
     }
 
-    if (l.type === 'coin' && dist(l, p) < 80) {
+    if (l.type === 'coin' && l.age > 0.6 && dist(l, p) < 80) {
       const ang  = Math.atan2(p.y - l.y, p.x - l.x);
       const pull = 200;
       l.x += Math.cos(ang) * pull * dt;
       l.y += Math.sin(ang) * pull * dt;
     }
 
-    if (l.type !== 'chest' && dist(l, p) < p.r + l.r) {
+    if (l.type !== 'chest' && l.age > 0.4 && dist(l, p) < p.r + l.r) {
       if (l.type === 'coin') {
         state.gold  += l.value;
         state.score += l.value;
@@ -262,58 +263,66 @@ export function openChest(c, toast, grantBlessing) {
   Audio.pickup();
   spawnParticles(c.x, c.y - 6, c.rare ? '#c0a0ff' : '#ffd040', c.rare ? 32 : 18);
 
+  /* Local helpers to record drops so we can summarise them at the end. */
+  const summary = { coins: 0, gold: 0, hp: 0, mp: 0, blessing: null };
+  const dropCoin = v => {
+    state.loot.push(spawnItem('coin', c, v));
+    summary.coins++; summary.gold += v;
+  };
+  const dropHp   = () => { state.loot.push(spawnItem('hp_potion', c)); summary.hp++; };
+  const dropMp   = () => { state.loot.push(spawnItem('mp_potion', c)); summary.mp++; };
+
   if (c.rare) {
-    // Premium drop: 1 HP pot + 1 MP pot + 6-9 high-value coins.
-    state.loot.push(spawnItem('hp_potion', c));
-    state.loot.push(spawnItem('mp_potion', c));
+    dropHp(); dropMp();
     const nCoins = irand(6, 9);
-    let totalGold = 0;
-    for (let i = 0; i < nCoins; i++) {
-      const v = irand(15, 30);
-      totalGold += v;
-      state.loot.push(spawnItem('coin', c, v));
-    }
-    // 30% chance of also granting a permanent blessing.
+    for (let i = 0; i < nCoins; i++) dropCoin(irand(15, 30));
     if (grantBlessing && Math.random() < 0.30) {
       const id = pickRandomBlessingId();
       grantBlessing(id);
-      toast(`¡Bendición rara! +${BLESSING_NAMES[id] || id}`);
+      summary.blessing = BLESSING_NAMES[id] || id;
       spawnParticles(c.x, c.y - 6, '#ffe0a0', 24);
       Audio.upgrade && Audio.upgrade();
-    } else {
-      toast(`¡Tesoro raro! +${totalGold} oro y pociones`);
     }
+    revealLoot(c, summary, true, toast);
     return;
   }
 
   /* ── Common chest: guarantee meaningful loot ─────────────────────── */
   const p = state.player;
-  const items = [];
-  // Always at least 1 coin so the chest is never silent.
-  items.push(spawnItem('coin', c, irand(8, 18)));
-  // Guarantee a potion the player actually needs, if any.
-  if (p && p.hp < p.maxHp - 20) {
-    items.push(spawnItem('hp_potion', c));
-  } else if (p && p.mp < p.maxMp - 15) {
-    items.push(spawnItem('mp_potion', c));
-  }
-  // Plus 1-2 random extras.
+  dropCoin(irand(8, 18));
+  if (p && p.hp < p.maxHp - 20)       dropHp();
+  else if (p && p.mp < p.maxMp - 15)  dropMp();
   const extras = irand(1, 2);
-  let extraGold = 0;
   for (let i = 0; i < extras; i++) {
     const r = Math.random();
-    if (r < 0.55) {
-      const v = irand(8, 18);
-      extraGold += v;
-      items.push(spawnItem('coin', c, v));
-    } else if (r < 0.78) {
-      items.push(spawnItem('hp_potion', c));
-    } else {
-      items.push(spawnItem('mp_potion', c));
-    }
+    if (r < 0.55)      dropCoin(irand(8, 18));
+    else if (r < 0.78) dropHp();
+    else               dropMp();
   }
-  for (const it of items) state.loot.push(it);
-  toast('¡Baúl abierto!');
+  revealLoot(c, summary, false, toast);
+}
+
+/**
+ * Spawn floating labels above the chest summarising what fell out.
+ * Lines are staggered vertically so the player can read them.
+ */
+function revealLoot(c, s, rare, toast) {
+  const lines = [];
+  if (s.gold > 0)     lines.push({ t: `+${s.gold} oro`, c: '#ffd040' });
+  if (s.hp > 0)       lines.push({ t: `+${s.hp} poción HP`, c: '#ff7070' });
+  if (s.mp > 0)       lines.push({ t: `+${s.mp} poción MP`, c: '#70a0ff' });
+  if (s.blessing)     lines.push({ t: `★ ${s.blessing}`,   c: '#ffe0a0' });
+
+  // Stack labels above the chest, slightly offset.
+  let offsetY = -16;
+  for (const ln of lines) {
+    spawnFloatText(c.x, c.y + offsetY, ln.t, ln.c, 13, 1.8);
+    offsetY -= 16;
+  }
+
+  if (rare && s.blessing) toast(`¡Bendición rara! ${s.blessing}`);
+  else if (rare)          toast('¡Tesoro raro!');
+  else                    toast('¡Baúl abierto!');
 }
 
 /** Friendly names for blessings shown in toasts when a chest grants one. */
@@ -321,6 +330,8 @@ const BLESSING_NAMES = {
   sword: 'FILO AGUDO', magic: 'PODER ARCANO', speed: 'PIES LIGEROS',
   vampire: 'SED DE SANGRE', regen: 'REGENERACIÓN', crit: 'GOLPE LETAL',
   maxhp: 'VITALIDAD', maxmp: 'INTELECTO',
+  swift: 'BRAZO ÁGIL', reach: 'GRAN ARCO', mana_eff: 'CONSERVACIÓN',
+  fortune: 'AVARICIA', guard: 'PIEL DE PIEDRA', thorns: 'ESPINAS',
 };
 
 function pickRandomBlessingId() {
@@ -331,7 +342,7 @@ function pickRandomBlessingId() {
 /** Helper: build a loot entity that scatters from a chest. */
 function spawnItem(type, c, value) {
   const ang = Math.random() * Math.PI * 2;
-  const sp  = rand(60, 120);
+  const sp  = rand(35, 75);
   return {
     type, x: c.x, y: c.y,
     vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,

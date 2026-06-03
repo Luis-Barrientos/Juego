@@ -18,7 +18,7 @@
 
 import {
   TILE, VIEW_W, VIEW_H, MAP_W, MAP_H, MAX_FLOOR, setViewSize,
-  STATE_MENU, STATE_PLAY, STATE_PAUSE, STATE_DEAD, STATE_WIN, STATE_UPGRADE,
+  STATE_MENU, STATE_PLAY, STATE_PAUSE, STATE_DEAD, STATE_WIN, STATE_UPGRADE, STATE_INTRO,
 } from './config.js';
 import { state }                          from './state.js';
 import { Audio }                          from './audio.js';
@@ -129,8 +129,17 @@ function buildFloor(floor) {
   rebuildMapCache();
 
   document.getElementById('floorVal').textContent = floor;
-  showFloorIntro(state.biome, floor);
-  if (floor === MAX_FLOOR) showToast('¡EL SEÑOR DE LAS PROFUNDIDADES TE ESPERA!');
+
+  // Pause world while the floor banner is on-screen so enemies can't
+  // chip the player. Banner exits → resume play.
+  const prevState = state.state;
+  state.state = STATE_INTRO;
+  showFloorIntro(state.biome, floor, () => {
+    if (state.state === STATE_INTRO) {
+      state.state = (prevState === STATE_PLAY ? STATE_PLAY : STATE_PLAY);
+    }
+    if (floor === MAX_FLOOR) showToast('¡EL SEÑOR DE LAS PROFUNDIDADES TE ESPERA!');
+  });
 }
 
 /** Triggered when the player enters the stair tile and presses E. */
@@ -152,14 +161,20 @@ function grantBlessing(id) {
   const p = state.player;
   if (!p) return;
   switch (id) {
-    case 'sword':   p.upgrades.sword++;   break;
-    case 'magic':   p.upgrades.magic++;   break;
-    case 'speed':   p.upgrades.speed++;   break;
-    case 'vampire': p.upgrades.vampire++; break;
-    case 'regen':   p.upgrades.regen++;   break;
-    case 'crit':    p.upgrades.crit++;    break;
-    case 'maxhp':   p.maxHp += 30; p.hp = p.maxHp; break;
-    case 'maxmp':   p.maxMp += 25; p.mp = p.maxMp; break;
+    case 'sword':    p.upgrades.sword++;   break;
+    case 'magic':    p.upgrades.magic++;   break;
+    case 'speed':    p.upgrades.speed++;   break;
+    case 'vampire':  p.upgrades.vampire++; break;
+    case 'regen':    p.upgrades.regen++;   break;
+    case 'crit':     p.upgrades.crit++;    break;
+    case 'maxhp':    p.maxHp += 30; p.hp = p.maxHp; break;
+    case 'maxmp':    p.maxMp += 25; p.mp = p.maxMp; break;
+    case 'swift':    p.swingDur *= 0.85; break;
+    case 'reach':    p.swingRange += 10; p.swingArc = Math.min(Math.PI, p.swingArc + 0.15); break;
+    case 'mana_eff': p.magicCost = Math.max(2, p.magicCost - 2); break;
+    case 'fortune':  p.goldBonus = (p.goldBonus || 0) + 0.35; break;
+    case 'guard':    p.dmgReduce = (p.dmgReduce || 0) + 0.08; break;
+    case 'thorns':   p.thorns = (p.thorns || 0) + 0.30; break;
   }
 }
 
@@ -195,13 +210,13 @@ function triggerWin() {
 /* ─────────────────────────── Hooks ─────────────────────────── */
 
 const enemyHooks = {
-  onPlayerHit: dmg => damagePlayer(state.player, dmg, triggerDeath),
+  onPlayerHit: (dmg, attacker) => damagePlayer(state.player, dmg, triggerDeath, attacker),
   onWin:       triggerWin,
 };
 
 const projectileHooks = {
   onEnemyHit:  (e, dmg) => damageEnemy(e, dmg, false, { onWin: triggerWin }),
-  onPlayerHit: dmg      => damagePlayer(state.player, dmg, triggerDeath),
+  onPlayerHit: (dmg, attacker) => damagePlayer(state.player, dmg, triggerDeath, attacker),
 };
 
 const playerHooks = {
