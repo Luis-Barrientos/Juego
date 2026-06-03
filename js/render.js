@@ -417,22 +417,100 @@ export function drawLighting(ctx) {
   }
   ctx.globalCompositeOperation = 'source-over';
 
-  // Torch sprites on top.
+  // Torch / sconce sprites on top.
   const flame   = (biome && biome.torchColor) || [255, 128, 48];
   const flameHi = `rgba(${Math.min(255, flame[0] + 40)},${Math.min(255, flame[1] + 60)},${Math.min(255, flame[2] + 90)},1)`;
   const flameLo = `rgb(${flame[0]},${flame[1]},${flame[2]})`;
   for (const lt of state.lights) {
     const lx = lt.x - state.cameraX;
     const ly = lt.y - state.cameraY;
-    if (lx < 0 || lx > VIEW_W || ly < 0 || ly > VIEW_H) continue;
-    ctx.fillStyle = '#3a2010';
-    ctx.fillRect(lx - 1.5, ly - 2, 3, 8);
+    if (lx < -10 || lx > VIEW_W + 10 || ly < 0 || ly > VIEW_H) continue;
     const fl = Math.sin(lt.flicker * 1.7) * 1.5;
-    ctx.fillStyle = flameLo;
-    ctx.beginPath(); ctx.ellipse(lx, ly - 6 + fl, 3, 5 + fl * 0.4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = flameHi;
-    ctx.beginPath(); ctx.ellipse(lx, ly - 6 + fl, 1.5, 3, 0, 0, Math.PI * 2); ctx.fill();
+    if (lt.type === 'sconce') {
+      // Wall bracket: short metal arm sticking out of the wall, bowl on top
+      const dir = lt.dir === 'left' ? -1 : 1;
+      ctx.fillStyle = '#2a1a10';
+      ctx.fillRect(lx - (dir < 0 ? 5 : 0), ly - 1, 5, 2);   // bracket arm
+      ctx.fillStyle = '#4a3020';
+      ctx.fillRect(lx + dir * 3 - 2, ly - 4, 4, 3);          // bowl
+      // Flame on bowl
+      ctx.fillStyle = flameLo;
+      ctx.beginPath();
+      ctx.ellipse(lx + dir * 3, ly - 7 + fl, 2.2, 4 + fl * 0.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = flameHi;
+      ctx.beginPath();
+      ctx.ellipse(lx + dir * 3, ly - 7 + fl, 1, 2.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Floor torch: stake + flame
+      ctx.fillStyle = '#3a2010';
+      ctx.fillRect(lx - 1.5, ly - 2, 3, 8);
+      ctx.fillStyle = flameLo;
+      ctx.beginPath(); ctx.ellipse(lx, ly - 6 + fl, 3, 5 + fl * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = flameHi;
+      ctx.beginPath(); ctx.ellipse(lx, ly - 6 + fl, 1.5, 3, 0, 0, Math.PI * 2); ctx.fill();
+    }
   }
+}
+
+/**
+ * Draw atmospheric sunbeams falling from above (only used by 'ruins').
+ * Beams are tall semi-transparent trapezoids with floating dust motes.
+ * Call BEFORE drawLighting so the ambient overlay still tints them slightly.
+ */
+export function drawSunbeams(ctx) {
+  if (!state.sunbeams || state.sunbeams.length === 0) return;
+  const t = state.time;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const sb of state.sunbeams) {
+    const sx = sb.x - state.cameraX;
+    const sy = sb.y - state.cameraY;
+    if (sx < -sb.w || sx > VIEW_W + sb.w) continue;
+    if (sy + sb.h < 0 || sy > VIEW_H) continue;
+
+    // Body of the beam — wider at the bottom, fading from top.
+    const halfTop    = sb.w * 0.25;
+    const halfBottom = sb.w * 0.75;
+    const grad = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
+    grad.addColorStop(0,    'rgba(255, 240, 180, 0.22)');
+    grad.addColorStop(0.6,  'rgba(255, 230, 160, 0.10)');
+    grad.addColorStop(1,    'rgba(255, 220, 140, 0.00)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(sx - halfTop,    sy);
+    ctx.lineTo(sx + halfTop,    sy);
+    ctx.lineTo(sx + halfBottom, sy + sb.h);
+    ctx.lineTo(sx - halfBottom, sy + sb.h);
+    ctx.closePath();
+    ctx.fill();
+
+    // Inner brighter core
+    const grad2 = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
+    grad2.addColorStop(0,   'rgba(255, 250, 220, 0.35)');
+    grad2.addColorStop(1,   'rgba(255, 240, 180, 0.00)');
+    ctx.fillStyle = grad2;
+    ctx.beginPath();
+    ctx.moveTo(sx - halfTop * 0.4,    sy);
+    ctx.lineTo(sx + halfTop * 0.4,    sy);
+    ctx.lineTo(sx + halfBottom * 0.4, sy + sb.h);
+    ctx.lineTo(sx - halfBottom * 0.4, sy + sb.h);
+    ctx.closePath();
+    ctx.fill();
+
+    // Dust motes (deterministic per-beam, animated by time)
+    ctx.fillStyle = 'rgba(255, 245, 200, 0.7)';
+    for (let i = 0; i < 7; i++) {
+      const seed = sb.seed + i * 137;
+      const phase = ((seed % 1000) / 1000 + t * 0.12) % 1;
+      const driftX = Math.sin(t * 0.6 + seed) * 4;
+      const dx = sx - halfBottom * 0.5 + ((seed * 13) % 100) / 100 * halfBottom + driftX;
+      const dy = sy + phase * sb.h;
+      ctx.fillRect(dx, dy, 1.2, 1.2);
+    }
+  }
+  ctx.restore();
 }
 
 /**

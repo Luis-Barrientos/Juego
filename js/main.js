@@ -44,7 +44,7 @@ import {
   updateLoot, drawLoot, spawnChest, openChest,
 }                                         from './loot.js';
 import {
-  rebuildMapCache, drawMap, drawLighting, drawMinimap,
+  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawMinimap,
 }                                         from './render.js';
 import {
   updateHUD, showToast, hideAllOverlays, showMenu, showPause, hidePause,
@@ -95,6 +95,7 @@ function startGame() {
   state.loot        = [];
   state.damageTexts = [];
   state.lights      = [];
+  state.sunbeams    = [];
   state.shake       = 0;
   state.cameraX     = 0;
   state.cameraY     = 0;
@@ -109,10 +110,11 @@ function startGame() {
  */
 function buildFloor(floor) {
   state.biome = getBiomeForFloor(floor);
-  const d = generateDungeon(floor);
-  state.map    = d.map;
-  state.rooms  = d.rooms;
-  state.lights = d.lights;
+  const d = generateDungeon(floor, undefined, state.biome);
+  state.map      = d.map;
+  state.rooms    = d.rooms;
+  state.lights   = d.lights;
+  state.sunbeams = d.sunbeams || [];
 
   const start = d.startRoom;
   if (state.player) {
@@ -274,6 +276,7 @@ function render() {
   for (const prj of state.projectiles) drawProjectile(ctx, prj);
   drawParticles(ctx);
   drawDamageTexts(ctx);
+  drawSunbeams(ctx);
   drawLighting(ctx);
 
   // Boss banner

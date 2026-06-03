@@ -32,9 +32,11 @@ const STYLE_KEYS = ['BALANCED', 'COMPACT', 'HALLWAYS', 'SPARSE'];
  * Generate a complete floor.
  * @param {number} floor 1-based floor number.
  * @param {number} [seed] Optional explicit seed; otherwise random.
- * @returns {{map: number[][], rooms: object[], lights: object[], startRoom: object, stairsRoom: object, style: string, seed: number}}
+ * @param {object} [biome] Active biome (see biomes.js). Used to vary lighting
+ *                         (e.g. wall sconces and sunbeams in 'ruins').
+ * @returns {{map: number[][], rooms: object[], lights: object[], sunbeams: object[], startRoom: object, stairsRoom: object, style: string, seed: number}}
  */
-export function generateDungeon(floor, seed) {
+export function generateDungeon(floor, seed, biome) {
   const finalSeed = seed ?? Math.floor(Math.random() * 0xFFFFFFFF);
   const rng       = mulberry32(finalSeed + floor * 1009);
   // Rotate styles per floor so the visual rhythm changes.
@@ -93,30 +95,105 @@ export function generateDungeon(floor, seed) {
   stairsRoom.isStairsRoom = true;
   startRoom.isStartRoom   = true;
 
-  // Place torches in room corners. Density depends on style.
-  const lights = [];
+  // Place lights. Most biomes use floor torches in room corners; the
+  // 'ruins' biome instead uses wall-mounted sconces plus a few sunbeam
+  // columns falling through the broken ceiling of large rooms.
+  const lights   = [];
+  const sunbeams = [];
+  const isRuins  = biome && biome.id === 'ruins';
+
   for (const r of rooms) {
-    const corners = [
-      { x: r.x + 1,         y: r.y + 1 },
-      { x: r.x + r.w - 2,   y: r.y + 1 },
-      { x: r.x + 1,         y: r.y + r.h - 2 },
-      { x: r.x + r.w - 2,   y: r.y + r.h - 2 },
-    ];
-    const n = Math.max(1, Math.min(corners.length,
-      Math.round(style.torchDensity + rng() * 0.8)));
-    for (let i = 0; i < n; i++) {
-      const c = corners[Math.floor(rng() * corners.length)];
-      lights.push({
-        x: c.x * TILE + TILE / 2,
-        y: c.y * TILE + TILE / 2,
-        r: 110 + rng() * 30,
-        flicker: rng() * Math.PI * 2,
-        color: '#ff8030',
-      });
+    if (isRuins) {
+      placeWallSconces(map, r, rng, lights, style.torchDensity);
+      maybePlaceSunbeam(r, rng, sunbeams);
+    } else {
+      placeFloorTorches(r, rng, lights, style.torchDensity);
     }
   }
 
-  return { map, rooms, lights, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+  return { map, rooms, lights, sunbeams, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+}
+
+/**
+ * Place torches in floor corners of a room (default lighting style).
+ * @private
+ */
+function placeFloorTorches(r, rng, lights, density) {
+  const corners = [
+    { x: r.x + 1,         y: r.y + 1 },
+    { x: r.x + r.w - 2,   y: r.y + 1 },
+    { x: r.x + 1,         y: r.y + r.h - 2 },
+    { x: r.x + r.w - 2,   y: r.y + r.h - 2 },
+  ];
+  const n = Math.max(1, Math.min(corners.length, Math.round(density + rng() * 0.8)));
+  for (let i = 0; i < n; i++) {
+    const c = corners[Math.floor(rng() * corners.length)];
+    lights.push({
+      type: 'torch',
+      x: c.x * TILE + TILE / 2,
+      y: c.y * TILE + TILE / 2,
+      r: 110 + rng() * 30,
+      flicker: rng() * Math.PI * 2,
+    });
+  }
+}
+
+/**
+ * Place wall-mounted sconces along vertical walls of a room. Each sconce
+ * is positioned just outside the floor area, attached to the inner edge
+ * of the bordering wall tile, and 'orient'ed left or right so the bracket
+ * sticks the right way.
+ * @private
+ */
+function placeWallSconces(map, r, rng, lights, density) {
+  const candidates = [];
+  // Left wall (sconce facing right into the room)
+  for (let y = r.y + 1; y < r.y + r.h - 1; y++) {
+    if (r.x - 1 >= 0 && map[y][r.x - 1] === T_WALL) {
+      candidates.push({ tx: r.x, ty: y, dir: 'right', edge: r.x * TILE + 2 });
+    }
+  }
+  // Right wall (sconce facing left)
+  for (let y = r.y + 1; y < r.y + r.h - 1; y++) {
+    const wx = r.x + r.w;
+    if (wx < MAP_W && map[y][wx] === T_WALL) {
+      candidates.push({ tx: r.x + r.w - 1, ty: y, dir: 'left', edge: (r.x + r.w) * TILE - 2 });
+    }
+  }
+  if (candidates.length === 0) {
+    placeFloorTorches(r, rng, lights, density);
+    return;
+  }
+  const n = Math.max(1, Math.round(density + rng() * 0.5));
+  for (let i = 0; i < n; i++) {
+    const c = candidates[Math.floor(rng() * candidates.length)];
+    lights.push({
+      type: 'sconce',
+      dir:  c.dir,
+      x:    c.edge,
+      y:    c.ty * TILE + TILE / 2,
+      r:    120 + rng() * 30,
+      flicker: rng() * Math.PI * 2,
+    });
+  }
+}
+
+/**
+ * 35% chance to drop a tall sunbeam in a sufficiently large room.
+ * Sunbeams are rendered separately and animated with floating dust.
+ * @private
+ */
+function maybePlaceSunbeam(r, rng, sunbeams) {
+  if (r.w * r.h < 60) return;
+  if (rng() > 0.35) return;
+  const cx = r.x + 1 + Math.floor(rng() * (r.w - 2));
+  sunbeams.push({
+    x: cx * TILE + TILE / 2,
+    y: r.y * TILE,
+    h: r.h * TILE,
+    w: TILE * (1.6 + rng() * 0.8),
+    seed: Math.floor(rng() * 1e9),
+  });
 }
 
 /**

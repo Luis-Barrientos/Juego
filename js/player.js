@@ -168,6 +168,7 @@ function doSwordHit(p, onEnemyHit) {
 /** Apply damage to the player respecting i-frames. */
 export function damagePlayer(p, dmg, onDeath) {
   if (p.iframes > 0) return;
+  if (p.dmgReduce) dmg *= Math.max(0.1, 1 - p.dmgReduce);
   p.hp -= dmg;
   p.iframes = 0.6;
   state.shake = Math.min(14, state.shake + 6);

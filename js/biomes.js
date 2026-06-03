@@ -29,7 +29,7 @@ export const BIOMES = {
     ambientTint:   'rgba(20, 30, 14, 0.55)',
     /** Density of decoration sprites on floor tiles. */
     decorChance:   0.20,
-    decorations:   ['moss', 'roots', 'mushroom', 'sunbeam'],
+    decorations:   ['moss', 'roots', 'mushroom'],
     modifiers:     { hpRegenIdle: 0.6 },
   },
 

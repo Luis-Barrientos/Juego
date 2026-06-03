@@ -20,6 +20,8 @@ const dom = {
   win:         document.getElementById('winScreen'),
   upgrade:     document.getElementById('upgradePicker'),
   upgradeOpts: document.getElementById('upgradeOptions'),
+  shopOpts:    document.getElementById('shopOptions'),
+  shopGold:    document.getElementById('shopGold'),
 };
 
 /** Refresh HUD bars and counters from the player state. */
@@ -101,12 +103,35 @@ export const UPGRADES = [
 ];
 
 /**
- * Show the 3-card upgrade picker.
+ * Items sold by the between-floors shop. Each item knows how to apply
+ * itself to the player. Randomly sampled when the picker is shown.
+ */
+export const SHOP_ITEMS = [
+  { id: 'hp_pot', icon: '♥',  name: 'POCIÓN HP',   desc: 'Restaura 50 HP.',           price: 25,
+    apply: p => { p.hp = Math.min(p.maxHp, p.hp + 50); } },
+  { id: 'mp_pot', icon: '◆',  name: 'POCIÓN MP',   desc: 'Restaura 40 MP.',           price: 20,
+    apply: p => { p.mp = Math.min(p.maxMp, p.mp + 40); } },
+  { id: 'full',   icon: '✤',  name: 'CURA TOTAL',  desc: 'Restaura HP y MP al máximo.', price: 60,
+    apply: p => { p.hp = p.maxHp; p.mp = p.maxMp; } },
+  { id: 'maxhp',  icon: '✚',  name: '+15 HP MÁX',  desc: 'Aumenta el HP máximo en 15.', price: 90,
+    apply: p => { p.maxHp += 15; p.hp += 15; } },
+  { id: 'maxmp',  icon: '✦',  name: '+12 MP MÁX',  desc: 'Aumenta el MP máximo en 12.', price: 70,
+    apply: p => { p.maxMp += 12; p.mp += 12; } },
+  { id: 'shield', icon: '◈',  name: 'GUARDIA',     desc: 'Reduce daño recibido en 10%.', price: 110,
+    apply: p => { p.dmgReduce = (p.dmgReduce || 0) + 0.10; } },
+];
+
+/**
+ * Show the upgrade picker plus the gold-driven shop. Picking an upgrade
+ * card exits the screen; shop cards are optional and can be bought before.
+ *
  * @param {(id:string) => void} onPick
  */
 export function showUpgradePicker(onPick) {
   markOverlayActive();
   dom.upgrade.classList.remove('hidden');
+
+  // ── Free upgrade cards (one is required to continue) ──────────────
   const pool = UPGRADES.slice().sort(() => Math.random() - 0.5).slice(0, 3);
   dom.upgradeOpts.innerHTML = '';
   for (const u of pool) {
@@ -118,6 +143,45 @@ export function showUpgradePicker(onPick) {
       <div class="desc">${u.desc}</div>`;
     card.addEventListener('click', () => onPick(u.id));
     dom.upgradeOpts.appendChild(card);
+  }
+
+  // ── Shop cards (optional, cost gold, can buy multiple) ────────────
+  buildShop();
+}
+
+/** (Re)render the shop section using the current player's gold. */
+function buildShop() {
+  const p = state.player;
+  if (!dom.shopOpts) return;
+  dom.shopGold.textContent = state.gold;
+  const items = SHOP_ITEMS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+  dom.shopOpts.innerHTML = '';
+  for (const it of items) {
+    const affordable = state.gold >= it.price;
+    const card = document.createElement('div');
+    card.className = 'shop-card' + (affordable ? '' : ' disabled');
+    card.innerHTML = `
+      <div class="icon">${it.icon}</div>
+      <div class="name">${it.name}</div>
+      <div class="desc">${it.desc}</div>
+      <div class="price">${it.price} oro</div>`;
+    if (affordable) {
+      card.addEventListener('click', () => {
+        if (state.gold < it.price) return;
+        state.gold -= it.price;
+        it.apply(p);
+        card.classList.add('sold');
+        // Refresh disabled state on remaining cards.
+        dom.shopGold.textContent = state.gold;
+        for (const c of dom.shopOpts.children) {
+          if (c === card || c.classList.contains('sold')) continue;
+          const priceEl = c.querySelector('.price');
+          const cost = parseInt(priceEl.textContent, 10);
+          c.classList.toggle('disabled', state.gold < cost);
+        }
+      });
+    }
+    dom.shopOpts.appendChild(card);
   }
 }
 

@@ -13,6 +13,7 @@ export const state = {
   loot: [],
   damageTexts: [],
   lights: [],             // torches
+  sunbeams: [],           // tall light shafts (biome 'ruins')
   cameraX: 0,
   cameraY: 0,
   shake: 0,
