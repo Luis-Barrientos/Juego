@@ -8,21 +8,25 @@ html, body {
   color: #d8c6a8;
   overflow: hidden;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
 }
 
 body {
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
   background:
     radial-gradient(ellipse at center, #1a0f24 0%, #0a0612 60%, #000 100%);
 }
 
 #gameWrap {
   position: relative;
-  width: min(100vw, calc(100vh * 4 / 3), 800px);
-  aspect-ratio: 4 / 3;
-  max-height: 100vh;
+  width: min(100vw, calc(100dvh * 4 / 3), 800px);
+  height: min(100dvh, calc(100vw * 3 / 4), 600px);
   box-shadow:
     0 0 40px rgba(120, 40, 200, 0.25),
     0 0 80px rgba(60, 20, 100, 0.15),
@@ -347,23 +351,24 @@ canvas#game {
 
 /* ─── Controles táctiles ─── */
 #touchUI {
-  position: absolute;
+  position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 8;
+  z-index: 50;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 #touchUI.hidden { display: none; }
 
 #joystick {
   position: absolute;
-  left: 4%;
-  bottom: 6%;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(20px, env(safe-area-inset-bottom));
   width: 130px;
   height: 130px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(60, 30, 80, 0.45) 0%, rgba(20, 10, 30, 0.35) 70%, transparent 100%);
-  border: 2px solid rgba(180, 120, 220, 0.35);
+  background: radial-gradient(circle, rgba(60, 30, 80, 0.55) 0%, rgba(20, 10, 30, 0.4) 70%, transparent 100%);
+  border: 2px solid rgba(180, 120, 220, 0.45);
   pointer-events: auto;
   touch-action: none;
 }
@@ -385,8 +390,8 @@ canvas#game {
 
 #touchActions {
   position: absolute;
-  right: 4%;
-  bottom: 6%;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
   display: flex;
   align-items: flex-end;
   gap: 12px;
@@ -425,8 +430,8 @@ canvas#game {
 
 .pauseBtn {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
   width: 44px;
   height: 44px;
   font-size: 18px;
@@ -438,33 +443,37 @@ canvas#game {
   #hud {
     font-size: 11px;
     gap: 4px;
+    top: 6px;
+    left: 6px;
   }
-  .bar { width: 130px; height: 13px; }
-  .bar-label { width: 22px; }
-  .bar span { font-size: 10px; }
-  .hud-stats { font-size: 11px; gap: 8px; }
+  .bar { width: 110px; height: 12px; }
+  .bar-label { width: 20px; font-size: 10px; }
+  .bar span { font-size: 9px; }
+  .hud-stats { font-size: 10px; gap: 6px; }
   #minimap {
-    width: 96px;
-    height: 96px;
+    width: 80px;
+    height: 80px;
     top: 6px;
     right: 6px;
   }
-  .overlay h1 { font-size: 38px; letter-spacing: 5px; }
-  .overlay h2 { font-size: 28px; letter-spacing: 4px; }
-  .overlay p  { font-size: 13px; }
-  .overlay .tagline { font-size: 14px; }
+  .overlay { padding: 16px; gap: 12px; }
+  .overlay h1 { font-size: 36px; letter-spacing: 4px; }
+  .overlay h2 { font-size: 26px; letter-spacing: 3px; }
+  .overlay p  { font-size: 12px; }
+  .overlay .tagline { font-size: 13px; }
   .overlay button {
-    font-size: 15px;
-    padding: 12px 30px;
-    letter-spacing: 3px;
+    font-size: 14px;
+    padding: 10px 24px;
+    letter-spacing: 2px;
+    margin-top: 4px;
   }
-  .controls { font-size: 11px; padding: 8px 14px; line-height: 1.6; }
-  .results  { font-size: 13px; padding: 10px 18px; }
-  #upgradeOptions { gap: 10px; flex-wrap: wrap; justify-content: center; }
-  .upgrade-card { width: 140px; padding: 12px 8px; }
-  .upgrade-card .icon { font-size: 28px; }
-  .upgrade-card .name { font-size: 13px; }
-  .upgrade-card .desc { font-size: 11px; }
+  .controls { font-size: 11px; padding: 6px 12px; line-height: 1.5; }
+  .results  { font-size: 12px; padding: 8px 14px; line-height: 1.5; }
+  #upgradeOptions { gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .upgrade-card { width: 130px; padding: 10px 6px; }
+  .upgrade-card .icon { font-size: 26px; }
+  .upgrade-card .name { font-size: 12px; letter-spacing: 1px; }
+  .upgrade-card .desc { font-size: 10px; }
 }
 
 @media (max-width: 480px) {
@@ -475,21 +484,3 @@ canvas#game {
   .touchBtn.small { width: 46px; height: 46px; font-size: 16px; }
 }
 
-@media (orientation: portrait) and (max-width: 900px) {
-  body::before {
-    content: "Para una mejor experiencia gira el dispositivo →";
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 20px;
-    background: rgba(10, 6, 18, 0.96);
-    color: #ffc870;
-    font-size: 18px;
-    letter-spacing: 2px;
-    z-index: 100;
-    pointer-events: none;
-  }
-}

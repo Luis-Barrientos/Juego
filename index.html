@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta name="description" content="Dungeon Depths — un roguelite de mazmorra procedural en JavaScript puro. Desciende, mata y sobrevive." />
 <meta name="theme-color" content="#0a0612" />
 <meta property="og:title" content="Dungeon Depths" />
@@ -90,19 +90,19 @@
     <h2>ELIGE UNA BENDICIÓN</h2>
     <div id="upgradeOptions"></div>
   </div>
+</div>
 
-  <!-- Controles táctiles (solo móvil) -->
-  <div id="touchUI" class="hidden">
-    <div id="joystick">
-      <div id="joystickKnob"></div>
-    </div>
-    <div id="touchActions">
-      <button id="btnE"     class="touchBtn small" aria-label="Interactuar">E</button>
-      <button id="btnMagic" class="touchBtn"       aria-label="Magia">✦</button>
-      <button id="btnSword" class="touchBtn big"   aria-label="Espada">⚔</button>
-    </div>
-    <button id="btnPause" class="touchBtn pauseBtn" aria-label="Pausa">II</button>
+<!-- Controles táctiles (fuera de #gameWrap para ocupar toda la pantalla) -->
+<div id="touchUI" class="hidden">
+  <div id="joystick">
+    <div id="joystickKnob"></div>
   </div>
+  <div id="touchActions">
+    <button id="btnE"     class="touchBtn small" aria-label="Interactuar">E</button>
+    <button id="btnMagic" class="touchBtn"       aria-label="Magia">✦</button>
+    <button id="btnSword" class="touchBtn big"   aria-label="Espada">⚔</button>
+  </div>
+  <button id="btnPause" class="touchBtn pauseBtn" aria-label="Pausa">II</button>
 </div>
 
 <script type="module" src="js/main.js"></script>
