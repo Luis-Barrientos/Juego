@@ -10,23 +10,28 @@
 import {
   TILE, MAP_W, MAP_H, T_WALL, T_FLOOR, T_STAIR, MAX_FLOOR,
 } from './config.js';
-import { mulberry32, sirand } from './utils.js';
+import { mulberry32 } from './utils.js';
 
 /**
  * Generation styles. Each tweaks BSP parameters to produce a distinct layout.
+ * `corridorW` controls the visible width of carved corridors (1 = standard).
  */
 const STYLES = {
   /** Many small rooms, tight corridors. Feels like a cramped crypt. */
-  COMPACT:  { depth: 6, minRoomW: 5, maxRoomW: 8,  minRoomH: 4, maxRoomH: 7,  splitMin: 0.42, splitMax: 0.58, torchDensity: 1.6 },
+  COMPACT:  { depth: 6, minRoomW: 5, maxRoomW: 8,  minRoomH: 4, maxRoomH: 7,  splitMin: 0.42, splitMax: 0.58, torchDensity: 1.6, corridorW: 1 },
   /** Few but large rooms, big arenas. */
-  SPARSE:   { depth: 3, minRoomW: 9, maxRoomW: 14, minRoomH: 7, maxRoomH: 11, splitMin: 0.45, splitMax: 0.55, torchDensity: 1.0 },
+  SPARSE:   { depth: 3, minRoomW: 9, maxRoomW: 14, minRoomH: 7, maxRoomH: 11, splitMin: 0.45, splitMax: 0.55, torchDensity: 1.0, corridorW: 3 },
   /** Long corridors, asymmetric splits. */
-  HALLWAYS: { depth: 5, minRoomW: 6, maxRoomW: 10, minRoomH: 4, maxRoomH: 8,  splitMin: 0.30, splitMax: 0.70, torchDensity: 1.2 },
+  HALLWAYS: { depth: 5, minRoomW: 6, maxRoomW: 10, minRoomH: 4, maxRoomH: 8,  splitMin: 0.30, splitMax: 0.70, torchDensity: 1.2, corridorW: 2 },
   /** Balanced default. */
-  BALANCED: { depth: 5, minRoomW: 6, maxRoomW: 11, minRoomH: 5, maxRoomH: 9,  splitMin: 0.40, splitMax: 0.60, torchDensity: 1.4 },
+  BALANCED: { depth: 5, minRoomW: 6, maxRoomW: 11, minRoomH: 5, maxRoomH: 9,  splitMin: 0.40, splitMax: 0.60, torchDensity: 1.4, corridorW: 1 },
 };
 
-const STYLE_KEYS = ['BALANCED', 'COMPACT', 'HALLWAYS', 'SPARSE'];
+/**
+ * Style rotation per floor (index = floor - 1). Curve: open → medium →
+ * labyrinthine → open (boss). Matches the design pacing.
+ */
+const STYLE_KEYS = ['SPARSE', 'BALANCED', 'COMPACT', 'SPARSE'];
 
 /**
  * Generate a complete floor.
@@ -51,11 +56,19 @@ export function generateDungeon(floor, seed, biome) {
   splitNode(root, style.depth, leaves, rng, style);
 
   for (const leaf of leaves) {
-    const rw = sirand(rng, style.minRoomW, Math.min(style.maxRoomW, leaf.w - 2));
-    const rh = sirand(rng, style.minRoomH, Math.min(style.maxRoomH, leaf.h - 2));
-    if (rw < 3 || rh < 3) continue;
-    const rx = leaf.x + sirand(rng, 1, leaf.w - rw - 1);
-    const ry = leaf.y + sirand(rng, 1, leaf.h - rh - 1);
+    // Rooms now fill 75-92% of their BSP leaf — almost no dead space.
+    const ratioW = 0.75 + rng() * 0.17;
+    const ratioH = 0.75 + rng() * 0.17;
+    let rw = Math.floor(leaf.w * ratioW);
+    let rh = Math.floor(leaf.h * ratioH);
+    rw = Math.min(rw, leaf.w - 2);
+    rh = Math.min(rh, leaf.h - 2);
+    if (rw < 4 || rh < 4) continue;
+    // Centre the room in its leaf with a small jitter so they don't all align.
+    const slackX = leaf.w - rw - 1;
+    const slackY = leaf.h - rh - 1;
+    const rx = leaf.x + 1 + (slackX > 0 ? Math.floor(rng() * slackX) : 0);
+    const ry = leaf.y + 1 + (slackY > 0 ? Math.floor(rng() * slackY) : 0);
     const room = {
       x: rx, y: ry, w: rw, h: rh,
       cx: rx + (rw >> 1),
@@ -70,20 +83,20 @@ export function generateDungeon(floor, seed, biome) {
     }
   }
 
-  // Connect rooms in spatial order. Sort by centre on the dominant axis
-  // for the chosen style: HALLWAYS prefers x, SPARSE prefers diagonal.
-  if (styleKey === 'SPARSE') {
-    rooms.sort((a, b) => (a.cx + a.cy) - (b.cx + b.cy));
-  } else {
-    rooms.sort((a, b) => a.cx - b.cx);
-  }
-  for (let i = 0; i < rooms.length - 1; i++) {
-    carveCorridor(map, rooms[i], rooms[i + 1], rng);
+  // Connect rooms using a Minimum Spanning Tree built from a complete
+  // distance graph. Then add ~27% extra short edges to create loops and
+  // shortcuts — much more interesting to navigate than a single chain.
+  const connections = buildConnections(rooms, rng, 0.27);
+  for (const [i, j] of connections) {
+    carveCorridor(map, rooms[i], rooms[j], rooms, rng, style.corridorW);
   }
 
-  // Pick start (first) and stairs (farthest from start) rooms.
-  const startRoom = rooms[0];
-  let stairsRoom  = rooms[rooms.length - 1];
+  // Pick start (top-left-most room) and stairs (farthest from start).
+  let startRoom = rooms[0];
+  for (const r of rooms) {
+    if (r.cx + r.cy < startRoom.cx + startRoom.cy) startRoom = r;
+  }
+  let stairsRoom = startRoom;
   let bestD = 0;
   for (const r of rooms) {
     const d = Math.hypot(r.cx - startRoom.cx, r.cy - startRoom.cy);
@@ -224,23 +237,128 @@ function splitNode(node, depth, leaves, rng, style) {
 }
 
 /**
- * Dig an L-shaped corridor between two room centres. Order of axes is
- * randomised so corridors are not always horizontal-first.
+ * Build connections between rooms using Kruskal's MST plus a fraction of
+ * extra short edges to introduce loops. Returns an array of [i, j] index
+ * pairs into the `rooms` array.
+ *
+ * @param {Array} rooms
+ * @param {() => number} rng
+ * @param {number} extraRatio Extra edges as fraction of MST size (0.25–0.30 recommended).
+ */
+function buildConnections(rooms, rng, extraRatio) {
+  const n = rooms.length;
+  if (n < 2) return [];
+
+  // Complete graph of room-centre distances.
+  const edges = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const dx = rooms[i].cx - rooms[j].cx;
+      const dy = rooms[i].cy - rooms[j].cy;
+      edges.push({ i, j, d: dx * dx + dy * dy });
+    }
+  }
+  edges.sort((a, b) => a.d - b.d);
+
+  // Union-find for Kruskal.
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const find = i => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const union = (a, b) => {
+    const ra = find(a), rb = find(b);
+    if (ra === rb) return false;
+    parent[ra] = rb;
+    return true;
+  };
+
+  const out = [];
+  const remaining = [];
+  for (const e of edges) {
+    if (union(e.i, e.j)) out.push([e.i, e.j]);
+    else                 remaining.push(e);
+  }
+
+  // Add extra short edges from the unused pool to create loops.
+  const nExtra = Math.round(out.length * extraRatio);
+  // Bias toward shorter remaining edges (already sorted).
+  const pickPool = remaining.slice(0, Math.max(nExtra * 3, 4));
+  for (let k = 0; k < nExtra && pickPool.length > 0; k++) {
+    const idx = Math.floor(rng() * pickPool.length);
+    const e = pickPool.splice(idx, 1)[0];
+    out.push([e.i, e.j]);
+  }
+  return out;
+}
+
+/**
+ * Test if the L-shaped path between (ax,ay) and (bx,by) — going `horizontalFirst`
+ * — passes through the interior of a room other than `a` or `b`.
  * @private
  */
-function carveCorridor(map, a, b, rng) {
+function pathCrossesOtherRoom(rooms, a, b, horizontalFirst) {
   let x = a.cx, y = a.cy;
   const tx = b.cx, ty = b.cy;
-  const horizontalFirst = rng() < 0.5;
-
+  const cells = [];
   if (horizontalFirst) {
-    while (x !== tx) { map[y][x] = T_FLOOR; x += x < tx ? 1 : -1; }
-    while (y !== ty) { map[y][x] = T_FLOOR; y += y < ty ? 1 : -1; }
+    while (x !== tx) { cells.push([x, y]); x += x < tx ? 1 : -1; }
+    while (y !== ty) { cells.push([x, y]); y += y < ty ? 1 : -1; }
   } else {
-    while (y !== ty) { map[y][x] = T_FLOOR; y += y < ty ? 1 : -1; }
-    while (x !== tx) { map[y][x] = T_FLOOR; x += x < tx ? 1 : -1; }
+    while (y !== ty) { cells.push([x, y]); y += y < ty ? 1 : -1; }
+    while (x !== tx) { cells.push([x, y]); x += x < tx ? 1 : -1; }
   }
-  map[ty][tx] = T_FLOOR;
+  for (const [px, py] of cells) {
+    for (const r of rooms) {
+      if (r === a || r === b) continue;
+      // Strict interior — touching the edge is fine (that's a natural door).
+      if (px > r.x && px < r.x + r.w - 1 && py > r.y && py < r.y + r.h - 1) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Carve a single floor cell plus a perpendicular brush so the corridor has
+ * width `w`. For w=1 this is a single tile; for w=2 one extra tile is added
+ * down/right; for w=3 one tile to each side.
+ * @private
+ */
+function carveCell(map, x, y, w) {
+  const half  = (w - 1) >> 1;
+  const extra = (w - 1) - half;
+  for (let dy = -half; dy <= extra; dy++) {
+    for (let dx = -half; dx <= extra; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx > 0 && ny > 0 && nx < MAP_W - 1 && ny < MAP_H - 1) {
+        map[ny][nx] = T_FLOOR;
+      }
+    }
+  }
+}
+
+/**
+ * Dig an L-shaped corridor of width `w` between two room centres. If the
+ * default L would cross a third room's interior, try the alternative axis
+ * order first; if both cross, fall back to the random pick.
+ * @private
+ */
+function carveCorridor(map, a, b, allRooms, rng, w = 1) {
+  let horizontalFirst = rng() < 0.5;
+  if (pathCrossesOtherRoom(allRooms, a, b, horizontalFirst) &&
+     !pathCrossesOtherRoom(allRooms, a, b, !horizontalFirst)) {
+    horizontalFirst = !horizontalFirst;
+  }
+
+  let x = a.cx, y = a.cy;
+  const tx = b.cx, ty = b.cy;
+  if (horizontalFirst) {
+    while (x !== tx) { carveCell(map, x, y, w); x += x < tx ? 1 : -1; }
+    while (y !== ty) { carveCell(map, x, y, w); y += y < ty ? 1 : -1; }
+  } else {
+    while (y !== ty) { carveCell(map, x, y, w); y += y < ty ? 1 : -1; }
+    while (x !== tx) { carveCell(map, x, y, w); x += x < tx ? 1 : -1; }
+  }
+  carveCell(map, tx, ty, w);
 }
 
 /**
