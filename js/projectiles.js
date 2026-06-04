@@ -5,6 +5,7 @@
 import { state } from './state.js';
 import { isWall } from './dungeon.js';
 import { spawnParticles } from './particles.js';
+import { breakProp } from './loot.js';
 import { TILE } from './config.js';
 
 /**
@@ -32,6 +33,15 @@ export function projectileUpdate(prj, dt, hooks) {
         e.knockX = Math.cos(ang) * 120;
         e.knockY = Math.sin(ang) * 120;
         spawnParticles(prj.x, prj.y, prj.glow, 10);
+        prj._dead = true;
+        return;
+      }
+    }
+    for (const l of state.loot) {
+      if (l.type !== 'prop') continue;
+      if (Math.hypot(prj.x - l.x, prj.y - l.y) < prj.r + l.r) {
+        breakProp(l);
+        spawnParticles(prj.x, prj.y, prj.glow, 8);
         prj._dead = true;
         return;
       }

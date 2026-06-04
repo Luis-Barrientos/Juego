@@ -7,6 +7,7 @@ import { input } from './input.js';
 import { Audio } from './audio.js';
 import { tryMove, isWall } from './dungeon.js';
 import { spawnParticles } from './particles.js';
+import { breakProp } from './loot.js';
 import { TILE, T_STAIR, PLAYER_BASE } from './config.js';
 
 /**
@@ -162,6 +163,19 @@ function doSwordHit(p, onEnemyHit) {
   if (landed) {
     state.shake = Math.min(8, state.shake + 4);
     Audio.hit();
+  }
+
+  // Break any props caught in the swing arc.
+  for (let i = state.loot.length - 1; i >= 0; i--) {
+    const l = state.loot[i];
+    if (l.type !== 'prop') continue;
+    const ex = l.x - p.x, ey = l.y - p.y;
+    const d  = Math.hypot(ex, ey);
+    if (d > range + l.r) continue;
+    const ang = Math.atan2(ey, ex);
+    let diff = Math.abs(ang - p.swingAngle);
+    if (diff > Math.PI) diff = Math.PI * 2 - diff;
+    if (diff < p.swingArc / 2) breakProp(l);
   }
 }
 

@@ -33,7 +33,7 @@ export function updateLoot(dt, toast) {
       l.y += Math.sin(ang) * pull * dt;
     }
 
-    if (l.type !== 'chest' && l.age > 0.4 && dist(l, p) < p.r + l.r) {
+    if (l.type !== 'chest' && l.type !== 'prop' && l.age > 0.4 && dist(l, p) < p.r + l.r) {
       if (l.type === 'coin') {
         state.gold  += l.value;
         state.score += l.value;
@@ -81,6 +81,8 @@ export function drawLoot(ctx) {
       ctx.fillRect(x - 3, y - 8 + bob, 6, 3);
     } else if (l.type === 'chest') {
       drawChest(ctx, l, x, y);
+    } else if (l.type === 'prop') {
+      drawProp(ctx, l, x, y);
     }
     ctx.restore();
   }
@@ -350,3 +352,97 @@ function spawnItem(type, c, value) {
     value,
   };
 }
+
+/* ─── Breakable props ───────────────────────────────────────────────── */
+
+/** Place a breakable prop at world coords (px, py). */
+export function spawnProp(px, py, variant) {
+  state.loot.push({
+    type: 'prop', variant,           // 'pot' | 'barrel' | 'urn'
+    x: px, y: py,
+    age: 0, r: 9, hp: 1,
+    vx: 0, vy: 0,
+  });
+}
+
+/** Break a prop: drop loot and remove it from state.loot. */
+export function breakProp(prop) {
+  Audio.hit && Audio.hit();
+  const colors = prop.variant === 'barrel' ? '#a06030'
+               : prop.variant === 'urn'    ? '#c0a070'
+                                           : '#b07050';
+  spawnParticles(prop.x, prop.y, colors, 14);
+
+  const r = Math.random();
+  if (r < 0.60) {
+    state.loot.push({
+      type: 'coin', x: prop.x, y: prop.y,
+      vx: rand(-30, 30), vy: rand(-30, 30),
+      age: 0, r: 6, value: irand(2, 6),
+    });
+  } else if (r < 0.75) {
+    state.loot.push({
+      type: 'hp_potion', x: prop.x, y: prop.y,
+      vx: rand(-25, 25), vy: rand(-25, 25),
+      age: 0, r: 8,
+    });
+  }
+  // remaining 25%: nothing
+  prop._dead = true;
+  const idx = state.loot.indexOf(prop);
+  if (idx >= 0) state.loot.splice(idx, 1);
+}
+
+/**
+ * Draw a breakable prop (pot, barrel, or urn).
+ * @private
+ */
+function drawProp(ctx, l, x, y) {
+  const bob = Math.sin(l.age * 2.4 + (l.x + l.y) * 0.01) * 0.4;
+  ctx.save();
+  // Shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.beginPath(); ctx.ellipse(x, y + 7, 7, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+
+  if (l.variant === 'pot') {
+    // Round clay pot.
+    ctx.fillStyle = '#8a4a2a';
+    ctx.beginPath(); ctx.ellipse(x, y + bob, 6.5, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#6a3520';
+    ctx.fillRect(x - 4, y - 6 + bob, 8, 2);
+    ctx.fillStyle = '#a86040';
+    ctx.fillRect(x - 5, y - 7 + bob, 10, 1.5);
+    // Highlight.
+    ctx.fillStyle = 'rgba(255,200,150,0.35)';
+    ctx.beginPath(); ctx.ellipse(x - 2, y - 1 + bob, 1.8, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+  } else if (l.variant === 'barrel') {
+    // Wooden barrel with bands.
+    ctx.fillStyle = '#7a4a26';
+    ctx.fillRect(x - 6, y - 7 + bob, 12, 14);
+    ctx.fillStyle = '#5a3418';
+    ctx.fillRect(x - 6, y - 4 + bob, 12, 1.5);
+    ctx.fillRect(x - 6, y + 2  + bob, 12, 1.5);
+    ctx.fillStyle = '#3a2a18';
+    ctx.fillRect(x - 6, y - 7 + bob, 1, 14);
+    ctx.fillRect(x + 5, y - 7 + bob, 1, 14);
+    ctx.fillStyle = 'rgba(255,200,140,0.25)';
+    ctx.fillRect(x - 5, y - 6 + bob, 1.5, 12);
+  } else { // urn
+    // Tall narrow urn.
+    ctx.fillStyle = '#9a7a4a';
+    ctx.beginPath();
+    ctx.moveTo(x - 4, y - 6 + bob);
+    ctx.lineTo(x + 4, y - 6 + bob);
+    ctx.lineTo(x + 5, y     + bob);
+    ctx.lineTo(x + 3, y + 7 + bob);
+    ctx.lineTo(x - 3, y + 7 + bob);
+    ctx.lineTo(x - 5, y     + bob);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#7a5a30';
+    ctx.fillRect(x - 4, y - 7 + bob, 8, 1.5);
+    ctx.fillStyle = 'rgba(255,220,160,0.30)';
+    ctx.fillRect(x - 3, y - 4 + bob, 1, 8);
+  }
+  ctx.restore();
+}
+

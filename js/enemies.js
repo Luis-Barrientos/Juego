@@ -4,10 +4,11 @@
 
 import { state } from './state.js';
 import { Audio } from './audio.js';
-import { tryMove } from './dungeon.js';
+import { tryMove, isWall } from './dungeon.js';
 import { spawnParticles, spawnDamageText } from './particles.js';
 import { irand, rand, choice } from './utils.js';
 import { TILE } from './config.js';
+import { spawnProp } from './loot.js';
 
 /** Static stats for each enemy archetype. */
 export const ENEMY_TYPES = {
@@ -392,7 +393,12 @@ export function populateFloor(floor, maxFloor, spawnChest) {
 
   for (const r of state.rooms) {
     if (r.isStartRoom) continue;
-    const n = irand(2, 4 + floor);
+    // Density scales with room area: ~1 enemy per 28 tiles, clamped to a
+    // sensible band so tiny rooms still pose a threat and star rooms
+    // don't become slaughterhouses.
+    const area = r.w * r.h;
+    const base = Math.ceil(area / 28);
+    const n    = Math.max(2, Math.min(4 + floor, base + irand(0, 1 + Math.floor(floor / 2))));
     for (let i = 0; i < n; i++) {
       const ex = (r.x + irand(1, r.w - 2)) * TILE + TILE / 2;
       const ey = (r.y + irand(1, r.h - 2)) * TILE + TILE / 2;
@@ -404,8 +410,53 @@ export function populateFloor(floor, maxFloor, spawnChest) {
   }
   for (const r of state.rooms) {
     if (r.isStartRoom || r.isStairsRoom) continue;
-    if (Math.random() < 0.32) {
+    // Star rooms get two small chests grouped near the centre instead of
+    // a single one — feels more rewarding to clear.
+    if (r.isLarge) {
+      if (Math.random() < 0.85) {
+        spawnChest(r, { rare: Math.random() < 0.18 });
+        const dx = (Math.random() < 0.5 ? -1 : 1);
+        const dy = (Math.random() < 0.5 ? -1 : 1);
+        spawnChest({ ...r, cx: r.cx + dx, cy: r.cy + dy }, { rare: false });
+      }
+    } else if (Math.random() < 0.32) {
       spawnChest(r, { rare: Math.random() < 0.18 });
     }
+  }
+
+  // Breakable props scattered through non-start rooms.
+  for (const r of state.rooms) {
+    if (r.isStartRoom) continue;
+    placeProps(r, floor);
+  }
+}
+
+/**
+ * Place 1-4 breakable props (pots, barrels, urns) in a room. Props sit on
+ * empty floor tiles and avoid the room centre (where the chest goes) and
+ * walls (which include pillars).
+ * @private
+ */
+function placeProps(r, floor) {
+  const variants = ['pot', 'barrel', 'urn'];
+  const area = r.w * r.h;
+  const target = Math.max(1, Math.min(5, Math.floor(area / 18)));
+  let placed = 0, attempts = 0;
+  while (placed < target && attempts < 30) {
+    attempts++;
+    const tx = r.x + irand(1, r.w - 2);
+    const ty = r.y + irand(1, r.h - 2);
+    if (isWall(state.map, tx, ty)) continue;
+    if (Math.abs(tx - r.cx) < 2 && Math.abs(ty - r.cy) < 2) continue;
+    const px = tx * TILE + TILE / 2;
+    const py = ty * TILE + TILE / 2;
+    // Avoid stacking on existing loot/props/chests.
+    let blocked = false;
+    for (const l of state.loot) {
+      if (Math.hypot(l.x - px, l.y - py) < 18) { blocked = true; break; }
+    }
+    if (blocked) continue;
+    spawnProp(px, py, choice(variants));
+    placed++;
   }
 }
