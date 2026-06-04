@@ -130,7 +130,9 @@ export function generateDungeon(floor, seed, biome) {
   // tiles consumed by sarcophagi don't sit inside corridors.
   const isCatacombsBiome = biome && biome.id === 'crypt';
   const sarcophagi = [];
-  if (isCatacombsBiome) placeSarcophagi(rooms, map, rng, sarcophagi);
+  // Pre-create lights so placeSarcophagi can append the altar's flame.
+  const lights      = [];
+  if (isCatacombsBiome) placeSarcophagi(rooms, map, rng, sarcophagi, lights);
 
   // Connect rooms using a Minimum Spanning Tree built from a complete
   // distance graph. Then add ~27% extra short edges to create loops and
@@ -148,7 +150,8 @@ export function generateDungeon(floor, seed, biome) {
 
   // Place lights. Each biome uses a different fixture (warm sconces in
   // ruins, cool wall candles in catacombs, plain floor torches elsewhere).
-  const lights      = [];
+  // Note: `lights` was already declared above so placeSarcophagi could
+  // append the altar's flame.
   const sunbeams    = [];
   const puddles     = [];
   const decorations = [];
@@ -623,13 +626,13 @@ function placePillars(rooms, map, rng) {
  * blue aura at runtime — they are awakable/breakable in commit 5.
  * @private
  */
-function placeSarcophagi(rooms, map, rng, sarcophagi) {
+function placeSarcophagi(rooms, map, rng, sarcophagi, lights) {
   for (const r of rooms) {
     if (r.isStartRoom || r.isStairsRoom) continue;
     if (r.w < 4 || r.h < 4) continue;
 
     if (r.isLarge) {
-      placeAltar(r, map, sarcophagi);
+      placeAltar(r, map, sarcophagi, lights);
       placeCryptaSarcophagi(r, map, rng, sarcophagi);
     } else {
       // Cubicula: 35% chance of a normal sarcophagus.
@@ -640,10 +643,11 @@ function placeSarcophagi(rooms, map, rng, sarcophagi) {
 }
 
 /**
- * Place the 2×2 altar at the centre of the crypta.
+ * Place the 2×2 altar at the centre of the crypta plus a cool blue light
+ * source coming from the bowl on top.
  * @private
  */
-function placeAltar(r, map, sarcophagi) {
+function placeAltar(r, map, sarcophagi, lights) {
   const tx = r.cx - 1;
   const ty = r.cy - 1;
   // Verify all 4 tiles are floor.
@@ -660,6 +664,16 @@ function placeAltar(r, map, sarcophagi) {
     variant: 'altar',
     awakable: false, awakened: false,
   });
+  // Flickering cool flame light on the bowl.
+  if (lights) {
+    lights.push({
+      type: 'altar',
+      x: (tx + 1) * TILE,           // centre of 2x2 footprint
+      y: (ty + 1) * TILE,           // bowl sits roughly at the centre row
+      r: 140,
+      seed: Math.floor(Math.random() * 1000),
+    });
+  }
 }
 
 /**

@@ -148,11 +148,15 @@ function drawWeb(ctx, d) {
 }
 
 /**
- * Paint a sarcophagus over its wall tiles in the map cache. Three variants:
- * - 'normal': solid stone tomb with grey lid.
- * - 'cracked': solid stone tomb with a visible crack down the lid (the
- *   awakable variant — also gets a runtime aura via drawSarcophagiOverlay).
- * - 'altar': 2×2 raised altar block at the centre of the crypta.
+ * Paint a sarcophagus over its wall tiles in the map cache. The tile
+ * underneath is the regular wall, so we first repaint a clean floor patch
+ * to erase wall edges, then we draw the tomb silhouette on top.
+ *
+ * Variants:
+ * - 'normal':  solid stone coffin with engraved cross.
+ * - 'cracked': same shape with a visible crack + baked blue tint
+ *              (awakable; gets a runtime aura from drawSarcophagiOverlay).
+ * - 'altar':   stepped 2×2 pedestal with a flaming bowl on top.
  * @private
  */
 function drawSarcophagusBase(ctx, s) {
@@ -160,65 +164,171 @@ function drawSarcophagusBase(ctx, s) {
   const py = s.ty * 32;
   const w  = s.w * 32;
   const h  = s.h * 32;
+
   ctx.save();
+
+  // 1. Erase the wall pattern under the sarcophagus footprint with a
+  //    floor-tone patch so the tomb silhouette is unambiguous.
+  ctx.fillStyle = '#1a1d22';
+  ctx.fillRect(px, py, w, h);
+
   if (s.variant === 'altar') {
-    // Stone block.
-    ctx.fillStyle = '#3e4250';
-    ctx.fillRect(px + 2, py + 2, w - 4, h - 4);
-    // Lighter top edge.
-    ctx.fillStyle = '#5a5e6e';
-    ctx.fillRect(px + 2, py + 2, w - 4, 4);
-    // Carved cross on top.
-    ctx.fillStyle = '#1a1c22';
-    ctx.fillRect(px + w * 0.5 - 1.5, py + 6, 3, h - 12);
-    ctx.fillRect(px + 8, py + h * 0.5 - 1, w - 16, 3);
-    // Drip shadow at base.
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(px + 2, py + h - 4, w - 4, 2);
+    drawAltar(ctx, px, py, w, h);
   } else {
-    const orient = s.orient || 'h';
-    // Body (slightly lighter than wall so it pops).
-    ctx.fillStyle = '#4a4e58';
-    ctx.fillRect(px + 2, py + 2, w - 4, h - 4);
-    // Top lid edge.
-    ctx.fillStyle = '#62677a';
-    if (orient === 'h') {
-      ctx.fillRect(px + 2, py + 2, w - 4, 5);
-    } else {
-      ctx.fillRect(px + 2, py + 2, 5, h - 4);
-    }
-    // Bottom shadow.
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    if (orient === 'h') ctx.fillRect(px + 2, py + h - 5, w - 4, 3);
-    else                ctx.fillRect(px + w - 5, py + 2, 3, h - 4);
-    // Engraved line on lid.
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    if (orient === 'h') ctx.fillRect(px + 6, py + h * 0.5, w - 12, 1);
-    else                ctx.fillRect(px + w * 0.5, py + 6, 1, h - 12);
-    // Crack signature for awakable variant.
-    if (s.variant === 'cracked') {
-      ctx.strokeStyle = 'rgba(20, 30, 40, 0.85)';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      if (orient === 'h') {
-        ctx.moveTo(px + w * 0.30, py + 6);
-        ctx.lineTo(px + w * 0.40, py + 12);
-        ctx.lineTo(px + w * 0.55, py + 9);
-        ctx.lineTo(px + w * 0.70, py + h - 8);
-      } else {
-        ctx.moveTo(px + 6,         py + h * 0.30);
-        ctx.lineTo(px + 12,        py + h * 0.40);
-        ctx.lineTo(px + 9,         py + h * 0.55);
-        ctx.lineTo(px + w - 8,     py + h * 0.70);
-      }
-      ctx.stroke();
-      // Faint blue glow leaking from the crack (baked, additive look).
-      ctx.fillStyle = 'rgba(140, 180, 220, 0.25)';
-      if (orient === 'h') ctx.fillRect(px + w * 0.32, py + 6, w * 0.40, h - 12);
-      else                ctx.fillRect(px + 6,        py + h * 0.32, w - 12, h * 0.40);
-    }
+    drawCoffin(ctx, px, py, w, h, s);
   }
+
   ctx.restore();
+}
+
+/**
+ * 2×2 altar: stepped pedestal plus a stone bowl with a blue flame.
+ * @private
+ */
+function drawAltar(ctx, px, py, w, h) {
+  const cx = px + w * 0.5;
+  // Base step (wider, dark stone).
+  ctx.fillStyle = '#3a3f4a';
+  ctx.fillRect(px + 3, py + h - 16, w - 6, 14);
+  // Base highlight.
+  ctx.fillStyle = '#5a6070';
+  ctx.fillRect(px + 3, py + h - 16, w - 6, 3);
+  // Base shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.fillRect(px + 3, py + h - 4, w - 6, 2);
+
+  // Top tier (narrower).
+  ctx.fillStyle = '#454a56';
+  ctx.fillRect(px + 9, py + h - 30, w - 18, 16);
+  ctx.fillStyle = '#666c7c';
+  ctx.fillRect(px + 9, py + h - 30, w - 18, 3);
+  // Carved cross on top tier.
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(cx - 1, py + h - 27, 2, 11);
+  ctx.fillRect(cx - 5, py + h - 22, 10, 2);
+
+  // Stone bowl rim.
+  ctx.fillStyle = '#2c3038';
+  ctx.beginPath();
+  ctx.ellipse(cx, py + h - 32, 11, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#5a6070';
+  ctx.beginPath();
+  ctx.ellipse(cx, py + h - 33, 11, 3.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Bowl interior shadow.
+  ctx.fillStyle = '#15181e';
+  ctx.beginPath();
+  ctx.ellipse(cx, py + h - 32.5, 8, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cool blue flame in the bowl. Static seed (animated lighting layer
+  // adds the flicker via a 'candle'-style light placed elsewhere; here
+  // we just paint a shape so the altar reads as 'lit'.)
+  ctx.fillStyle = 'rgba(180, 220, 255, 0.85)';
+  ctx.beginPath();
+  ctx.ellipse(cx, py + h - 38, 4, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.beginPath();
+  ctx.ellipse(cx, py + h - 39, 1.6, 3.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * 2×1 (or 1×2) coffin. Rounded ends, raised lid with a seam down the
+ * middle, engraved cross, and a crack + blue tint for the awakable
+ * 'cracked' variant.
+ * @private
+ */
+function drawCoffin(ctx, px, py, w, h, s) {
+  const horizontal = (s.orient || 'h') === 'h';
+
+  // Body (full tile width minus 1px so corners read).
+  const bx = px + 1, by = py + 1, bw = w - 2, bh = h - 2;
+
+  // Rounded coffin body.
+  const r = horizontal ? Math.min(bh * 0.45, 10) : Math.min(bw * 0.45, 10);
+  ctx.fillStyle = '#5a5e6a';
+  roundedRect(ctx, bx, by, bw, bh, r);
+  ctx.fill();
+
+  // Lid (slightly smaller, lighter, raised).
+  const lx = bx + 2, ly = by + 2, lw = bw - 4, lh = bh - 4;
+  const lr = Math.max(0, r - 2);
+  ctx.fillStyle = '#787d8c';
+  roundedRect(ctx, lx, ly, lw, lh, lr);
+  ctx.fill();
+
+  // Lid highlight (top edge).
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  if (horizontal) ctx.fillRect(lx + 4, ly + 1, lw - 8, 2);
+  else            ctx.fillRect(lx + 1, ly + 4, 2, lh - 8);
+
+  // Lid seam.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  if (horizontal) ctx.fillRect(lx + 4, ly + lh * 0.5 - 0.5, lw - 8, 1);
+  else            ctx.fillRect(lx + lw * 0.5 - 0.5, ly + 4, 1, lh - 8);
+
+  // Engraved cross at one end (head of the coffin).
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  if (horizontal) {
+    // Cross at left third.
+    const ccx = lx + lw * 0.30;
+    const ccy = ly + lh * 0.5;
+    ctx.fillRect(ccx - 1, ccy - 5, 2, 11);
+    ctx.fillRect(ccx - 4, ccy - 1, 8, 2);
+  } else {
+    const ccx = lx + lw * 0.5;
+    const ccy = ly + lh * 0.30;
+    ctx.fillRect(ccx - 1, ccy - 5, 2, 11);
+    ctx.fillRect(ccx - 4, ccy - 1, 8, 2);
+  }
+
+  // Outer outline so it pops against the dark wall behind it.
+  ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+  ctx.lineWidth   = 1;
+  roundedRect(ctx, bx + 0.5, by + 0.5, bw - 1, bh - 1, r);
+  ctx.stroke();
+
+  if (s.variant === 'cracked') {
+    // Bright jagged crack.
+    ctx.strokeStyle = 'rgba(20, 28, 38, 0.95)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    if (horizontal) {
+      ctx.moveTo(lx + lw * 0.55, ly + 3);
+      ctx.lineTo(lx + lw * 0.62, ly + lh * 0.45);
+      ctx.lineTo(lx + lw * 0.74, ly + lh * 0.55);
+      ctx.lineTo(lx + lw * 0.85, ly + lh - 3);
+    } else {
+      ctx.moveTo(lx + 3,           ly + lh * 0.55);
+      ctx.lineTo(lx + lw * 0.45,   ly + lh * 0.62);
+      ctx.lineTo(lx + lw * 0.55,   ly + lh * 0.74);
+      ctx.lineTo(lx + lw - 3,      ly + lh * 0.85);
+    }
+    ctx.stroke();
+
+    // Baked blue tint inside the lid (tells the player 'something glows here').
+    ctx.fillStyle = 'rgba(140, 180, 220, 0.30)';
+    if (horizontal) ctx.fillRect(lx + lw * 0.50, ly + 4, lw * 0.40, lh - 8);
+    else            ctx.fillRect(lx + 4, ly + lh * 0.50, lw - 8, lh * 0.40);
+  }
+}
+
+/** @private */
+function roundedRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 /**
@@ -655,6 +765,10 @@ export function drawLighting(ctx) {
       // Steady cool flame: small flicker, cool blue-white pool.
       radius = lt.r + Math.sin(lt.flicker * 0.7) * 2 + Math.sin(lt.flicker * 1.9) * 1;
       color  = [180, 200, 255];
+    } else if (lt.type === 'altar') {
+      // Strong cool altar flame, lively flicker.
+      radius = lt.r + Math.sin(lt.flicker * 0.8) * 6 + Math.sin(lt.flicker * 2.1) * 3;
+      color  = [170, 210, 255];
     } else {
       radius = lt.r + Math.sin(lt.flicker) * 6;
     }
@@ -732,6 +846,7 @@ export function drawLighting(ctx) {
   for (const lt of state.lights) {
     if (lt.type === 'glowMushroom') continue;
     if (lt.type === 'skull')        continue;
+    if (lt.type === 'altar')        continue;
     const lx = lt.x - state.cameraX;
     const ly = lt.y - state.cameraY;
     if (lx < -120 || lx > VIEW_W + 120 || ly < -120 || ly > VIEW_H + 120) continue;
@@ -768,6 +883,7 @@ export function drawLighting(ctx) {
     const lx = lt.x - state.cameraX;
     const ly = lt.y - state.cameraY;
     if (lx < -10 || lx > VIEW_W + 10 || ly < 0 || ly > VIEW_H) continue;
+    if (lt.type === 'altar') continue;  // flame already painted into the cache
     const fl = Math.sin(lt.flicker * 1.7) * 1.5;
     if (lt.type === 'sconce') {
       // Wall bracket: short metal arm sticking out of the wall, bowl on top
