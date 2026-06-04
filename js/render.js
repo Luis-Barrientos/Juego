@@ -51,6 +51,56 @@ export function rebuildMapCache() {
       }
     }
   }
+
+  // Ceiling cracks (ruins biome). Painted into the map cache so the fissure
+  // sits on top of the wall row above each sunbeam-emitting room.
+  if (state.sunbeams && state.sunbeams.length > 0) {
+    for (const sb of state.sunbeams) {
+      if (sb.crack) drawCeilingCrack(ctx, sb);
+    }
+  }
+}
+
+/**
+ * Paint a long jagged ceiling fissure with a bright leaking edge.
+ * The crack is a polyline already computed in dungeon.js.
+ * @private
+ */
+function drawCeilingCrack(ctx, sb) {
+  const pts = sb.crack;
+  if (!pts || pts.length < 2) return;
+  ctx.save();
+
+  // Soft glow around the crack so it reads as light leaking through.
+  ctx.shadowColor = 'rgba(255, 240, 180, 0.55)';
+  ctx.shadowBlur  = 8;
+  ctx.strokeStyle = 'rgba(255, 245, 200, 0.35)';
+  ctx.lineWidth   = 4;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Dark fissure body (the actual gap in the stone).
+  ctx.strokeStyle = 'rgba(8, 6, 4, 0.95)';
+  ctx.lineWidth   = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.stroke();
+
+  // Bright inner highlight — sunlight breaking through.
+  ctx.strokeStyle = 'rgba(255, 248, 210, 0.85)';
+  ctx.lineWidth   = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1] - 0.4);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1] - 0.4);
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 /**
@@ -488,7 +538,9 @@ export function drawLighting(ctx) {
 
 /**
  * Draw atmospheric sunbeams falling from above (only used by 'ruins').
- * Beams are tall semi-transparent trapezoids with floating dust motes.
+ * Each beam is composed of a clipped main body (warm gradient), a few
+ * thin parallel god-rays drifting horizontally, and dust motes that fall
+ * with gravity, twinkle, and respawn at the crack.
  * Call BEFORE drawLighting so the ambient overlay still tints them slightly.
  */
 export function drawSunbeams(ctx) {
@@ -503,7 +555,7 @@ export function drawSunbeams(ctx) {
     if (sx < -halfBBox || sx > VIEW_W + halfBBox) continue;
     if (sy + sb.h < 0 || sy > VIEW_H) continue;
 
-    // Outer body — clipped to the irregular crack polygon.
+    // Clip everything to the irregular crack polygon.
     ctx.save();
     ctx.beginPath();
     const shape = sb.shape;
@@ -514,25 +566,59 @@ export function drawSunbeams(ctx) {
     ctx.closePath();
     ctx.clip();
 
+    // Main body — warm vertical gradient.
     const grad = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
-    grad.addColorStop(0,    'rgba(255, 240, 180, 0.22)');
-    grad.addColorStop(0.6,  'rgba(255, 230, 160, 0.10)');
+    grad.addColorStop(0,    'rgba(255, 240, 180, 0.26)');
+    grad.addColorStop(0.55, 'rgba(255, 230, 160, 0.12)');
     grad.addColorStop(1,    'rgba(255, 220, 140, 0.00)');
     ctx.fillStyle = grad;
     ctx.fillRect(sx - halfBBox, sy, halfBBox * 2, sb.h);
+
+    // Parallel god-rays: 3 thin vertical bands drifting horizontally so the
+    // beam feels volumetric instead of flat.
+    const rayCount = 3;
+    const rayHalf  = sb.length * 0.42;
+    for (let k = 0; k < rayCount; k++) {
+      const phase  = (sb.seed * 0.0001) + k * 1.7;
+      const drift  = Math.sin(t * 0.35 + phase) * (sb.splay * 0.35);
+      const baseX  = sx + ((k - (rayCount - 1) / 2) / (rayCount)) * rayHalf * 1.4 + drift;
+      const width  = 6 + Math.sin(t * 0.7 + phase) * 1.5;
+      const alpha  = 0.05 + (Math.sin(t * 0.9 + phase) * 0.5 + 0.5) * 0.06;
+      const rgrad  = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
+      rgrad.addColorStop(0,   `rgba(255, 245, 200, ${alpha * 1.3})`);
+      rgrad.addColorStop(0.7, `rgba(255, 235, 170, ${alpha * 0.6})`);
+      rgrad.addColorStop(1,   'rgba(255, 220, 140, 0)');
+      ctx.fillStyle = rgrad;
+      ctx.fillRect(baseX - width / 2, sy, width, sb.h);
+    }
     ctx.restore();
 
-    // Dust motes (deterministic per-beam, animated by time)
-    ctx.fillStyle = 'rgba(255, 245, 200, 0.7)';
+    // Dust motes — fall with gravity, twinkle, respawn at the crack.
+    // Drawn UNCLIPPED so a few escape past the floor edge for realism.
     const motesHalf = sb.length * 0.5;
-    const nMotes = Math.max(7, Math.floor(sb.length / 14));
+    const nMotes = Math.max(10, Math.floor(sb.length / 10));
     for (let i = 0; i < nMotes; i++) {
-      const seed = sb.seed + i * 137;
-      const phase = ((seed % 1000) / 1000 + t * 0.12) % 1;
-      const driftX = Math.sin(t * 0.6 + seed) * 4;
-      const dx = sx - motesHalf + ((seed * 13) % 100) / 100 * (motesHalf * 2) + driftX;
-      const dy = sy + phase * sb.h;
-      ctx.fillRect(dx, dy, 1.2, 1.2);
+      const seed   = sb.seed + i * 137;
+      const speed  = 0.05 + ((seed * 11) % 100) / 100 * 0.10;     // 0.05 - 0.15
+      const phase  = ((seed % 1000) / 1000 + t * speed) % 1;
+      // Gravity-like easing — accelerates as it falls.
+      const eased  = phase * phase;
+      const driftX = Math.sin(t * 0.6 + seed) * 5;
+      const baseX  = sx - motesHalf + ((seed * 13) % 100) / 100 * (motesHalf * 2);
+      const dx = baseX + driftX;
+      const dy = sy + eased * sb.h;
+      const size = 1 + ((seed >> 3) % 3) * 0.6;                   // 1 - 2.2 px
+      // Twinkle: alpha modulated by sin + occasional sparkle peak.
+      const twinkle = 0.45 + 0.55 * (Math.sin(t * 2.3 + seed) * 0.5 + 0.5);
+      const isSparkle = ((seed >> 5) % 17) === 0 && phase > 0.3 && phase < 0.7;
+      const a = Math.max(0, twinkle * (1 - eased * 0.5));
+      if (isSparkle) {
+        ctx.fillStyle = `rgba(255, 252, 230, ${Math.min(1, a * 1.6)})`;
+        ctx.fillRect(dx - size, dy - size, size * 2, size * 2);
+      } else {
+        ctx.fillStyle = `rgba(255, 245, 200, ${a})`;
+        ctx.fillRect(dx, dy, size, size);
+      }
     }
   }
   ctx.restore();

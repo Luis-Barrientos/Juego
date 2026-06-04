@@ -219,21 +219,21 @@ function placeWallSconces(map, r, rng, lights, density) {
  * @private
  */
 function placeSunbeams(rooms, rng, sunbeams) {
-  const HARD_CAP = 2;
-  const MIN_AREA = 80;          // ruined ceiling only collapses on big rooms
-  const PER_ROOM_CHANCE = 0.30; // independent roll per eligible room
+  const HARD_CAP = 3;
+  const MIN_AREA = 55;          // medium+large rooms can host a crack
+  const PER_ROOM_CHANCE = 0.55; // ruins are atmospheric; cracks should feel present
 
   // Sort eligible rooms by area desc and try the top few.
   const eligible = rooms
     .filter(r => r.w * r.h >= MIN_AREA)
     .sort((a, b) => (b.w * b.h) - (a.w * a.h))
-    .slice(0, 4);
+    .slice(0, 5);
 
   for (const r of eligible) {
     if (sunbeams.length >= HARD_CAP) break;
     if (rng() > PER_ROOM_CHANCE) continue;
-    // The crack runs across most of the ceiling: 60-85% of room width.
-    const lengthRatio = 0.60 + rng() * 0.25;
+    // The crack runs across most of the ceiling: 60-90% of room width.
+    const lengthRatio = 0.60 + rng() * 0.30;
     const length      = Math.max(4, Math.floor(r.w * lengthRatio)) * TILE;
     // Centre the crack horizontally with a small offset.
     const slack       = (r.w * TILE - length) * 0.5;
@@ -248,10 +248,41 @@ function placeSunbeams(rooms, rng, sunbeams) {
       // Beam splays outward by `splay` pixels on each side at the floor.
       splay: TILE * (0.8 + rng() * 0.6),
       seed: Math.floor(rng() * 1e9),
+      // Tile row of the wall above this room — used to paint the visible
+      // ceiling fissure into the map cache.
+      wallRow: r.y - 1,
     };
     sb.shape = buildBeamShape(sb, rng);
+    sb.crack = buildCrackPath(sb, rng);
     sunbeams.push(sb);
   }
+}
+
+/**
+ * Build a jagged polyline describing the visible ceiling crack on the wall
+ * tile row directly above the room. Coordinates are world-space pixels.
+ * The polyline is a horizontal random walk inside the wall row, ranging
+ * across ±length/2 around `sb.x` and biased toward y = wallRow*TILE + ~half.
+ * @private
+ */
+function buildCrackPath(sb, rng) {
+  const halfLen = sb.length * 0.5;
+  const baseY   = sb.wallRow * TILE + TILE * 0.55;
+  const n       = Math.max(8, Math.floor(sb.length / 8));
+  const pts     = [];
+  let y = baseY;
+  for (let i = 0; i < n; i++) {
+    const t  = i / (n - 1);
+    const x  = sb.x - halfLen + t * sb.length;
+    // Random-walk Y inside the wall row, clamped to stay visible.
+    y += (rng() - 0.5) * 4;
+    const minY = sb.wallRow * TILE + 3;
+    const maxY = sb.wallRow * TILE + TILE - 3;
+    if (y < minY) y = minY;
+    if (y > maxY) y = maxY;
+    pts.push([x, y]);
+  }
+  return pts;
 }
 
 /**
