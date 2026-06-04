@@ -77,6 +77,11 @@ export function rebuildMapCache() {
       else if (d.kind === 'namePlate')    drawNamePlate(ctx, d);
       else if (d.kind === 'clawMarks')    drawClawMarks(ctx, d);
       else if (d.kind === 'wallSkull')    drawWallSkull(ctx, d);
+      else if (d.kind === 'wallShelf')      drawWallShelf(ctx, d);
+      else if (d.kind === 'scrollHanging')  drawScrollHanging(ctx, d);
+      else if (d.kind === 'runeSymbol')     drawRuneSymbol(ctx, d);
+      else if (d.kind === 'darkPortrait')   drawDarkPortrait(ctx, d);
+      else if (d.kind === 'noticeBoard')    drawNoticeBoard(ctx, d);
     }
   }
 
@@ -331,6 +336,217 @@ function drawWallSkull(ctx, d) {
   ctx.fillRect(px + 17, py + 22, 2, 2);
   // Nose.
   ctx.fillRect(px + 15.5, py + 25, 1, 1);
+  ctx.restore();
+}
+
+/** Recessed wall shelf with 2-3 books resting on it (library). */
+function drawWallShelf(ctx, d) {
+  const px = d.tx * 32, py = d.ty * 32;
+  let s = (d.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  ctx.save();
+  // Recess shadow behind the shelf.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(px + 7, py + 19, 18, 11);
+  // Shelf board (wood plank).
+  ctx.fillStyle = '#5a3818';
+  ctx.fillRect(px + 6, py + 27, 20, 3);
+  ctx.fillStyle = '#7a5028';
+  ctx.fillRect(px + 6, py + 27, 20, 1);
+  ctx.fillStyle = '#2a1808';
+  ctx.fillRect(px + 6, py + 30, 20, 1);
+  // Books leaning on the shelf.
+  const colors = ['#8a3010', '#3a3060', '#2a5a30', '#604010', '#5a2a48'];
+  let x = px + 8;
+  while (x < px + 24) {
+    const bw = 3 + Math.floor(rnd() * 2);
+    const bh = 5 + Math.floor(rnd() * 3);
+    ctx.fillStyle = colors[Math.floor(rnd() * colors.length)];
+    ctx.fillRect(x, py + 27 - bh, bw, bh);
+    ctx.fillStyle = 'rgba(220,200,160,0.40)';
+    ctx.fillRect(x, py + 27 - bh, bw, 1);
+    x += bw + 1;
+  }
+  // Bracket pegs.
+  ctx.fillStyle = '#1a0e08';
+  ctx.fillRect(px + 7,  py + 30, 2, 1);
+  ctx.fillRect(px + 23, py + 30, 2, 1);
+  ctx.restore();
+}
+
+/** Long parchment scroll hanging from a rod (library). */
+function drawScrollHanging(ctx, d) {
+  const px = d.tx * 32, py = d.ty * 32;
+  let s = (d.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  ctx.save();
+  // Rod across the top.
+  ctx.fillStyle = '#3a2818';
+  ctx.fillRect(px + 10, py + 17, 12, 2);
+  ctx.fillStyle = '#1a0e08';
+  ctx.fillRect(px + 9,  py + 17, 1, 2);
+  ctx.fillRect(px + 22, py + 17, 1, 2);
+  // Drop shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(px + 12, py + 20, 9, 11);
+  // Parchment body.
+  ctx.fillStyle = '#d8c890';
+  ctx.fillRect(px + 11, py + 19, 10, 11);
+  // Parchment top fold (under rod).
+  ctx.fillStyle = '#b8a872';
+  ctx.fillRect(px + 11, py + 19, 10, 2);
+  // Subtle lines of script.
+  ctx.fillStyle = 'rgba(60,40,12,0.65)';
+  for (let i = 0; i < 4; i++) {
+    const ly = py + 22 + i * 2;
+    const w  = 4 + Math.floor(rnd() * 5);
+    ctx.fillRect(px + 12, ly, w, 1);
+  }
+  // Curled bottom.
+  ctx.fillStyle = '#b8a872';
+  ctx.fillRect(px + 11, py + 30, 10, 1);
+  // Right edge shading.
+  ctx.fillStyle = 'rgba(80, 50, 20, 0.35)';
+  ctx.fillRect(px + 20, py + 19, 1, 12);
+  ctx.restore();
+}
+
+/** Glowing arcane rune painted on the wall (library). */
+function drawRuneSymbol(ctx, d) {
+  const px = d.tx * 32, py = d.ty * 32;
+  let s = (d.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  // Choose between a circular sigil, a triangle, or angular runes.
+  const variant = Math.floor(rnd() * 3);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(184, 144, 255, 0.85)';
+  ctx.lineWidth = 1.1;
+  ctx.lineCap = 'round';
+  // Faint glow halo (baked, no per-frame animation).
+  ctx.fillStyle = 'rgba(184, 144, 255, 0.10)';
+  ctx.beginPath();
+  ctx.arc(px + 16, py + 24, 8, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (variant === 0) {
+    // Sigil: outer circle + inner triangle + dot.
+    ctx.beginPath();
+    ctx.arc(px + 16, py + 24, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(px + 16, py + 19);
+    ctx.lineTo(px + 21, py + 27);
+    ctx.lineTo(px + 11, py + 27);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(184, 144, 255, 0.95)';
+    ctx.beginPath();
+    ctx.arc(px + 16, py + 24, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (variant === 1) {
+    // Triangle + bisecting line.
+    ctx.beginPath();
+    ctx.moveTo(px + 16, py + 18);
+    ctx.lineTo(px + 22, py + 29);
+    ctx.lineTo(px + 10, py + 29);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(px + 16, py + 18);
+    ctx.lineTo(px + 16, py + 29);
+    ctx.stroke();
+  } else {
+    // Angular runes: three vertical strokes with crossbars.
+    for (let i = 0; i < 3; i++) {
+      const sx = px + 11 + i * 5;
+      ctx.beginPath();
+      ctx.moveTo(sx, py + 19);
+      ctx.lineTo(sx, py + 29);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(sx - 2, py + 22 + i);
+      ctx.lineTo(sx + 2, py + 22 + i);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/** Dark portrait — framed painting with worn face (library). */
+function drawDarkPortrait(ctx, d) {
+  const px = d.tx * 32, py = d.ty * 32;
+  ctx.save();
+  // Drop shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(px + 9, py + 18, 14, 14);
+  // Outer gilded frame.
+  ctx.fillStyle = '#6a4a18';
+  ctx.fillRect(px + 8, py + 17, 16, 14);
+  ctx.fillStyle = '#8a6020';
+  ctx.fillRect(px + 8, py + 17, 16, 1);
+  ctx.fillStyle = '#3a2808';
+  ctx.fillRect(px + 8, py + 30, 16, 1);
+  // Canvas (dark).
+  ctx.fillStyle = '#1a1418';
+  ctx.fillRect(px + 10, py + 19, 12, 10);
+  // Vignette.
+  const grd = ctx.createRadialGradient(px + 16, py + 23, 1, px + 16, py + 24, 8);
+  grd.addColorStop(0, 'rgba(80, 60, 50, 0.55)');
+  grd.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(px + 10, py + 19, 12, 10);
+  // Faint silhouette: head + shoulders.
+  ctx.fillStyle = 'rgba(60, 50, 45, 0.85)';
+  ctx.beginPath();
+  ctx.arc(px + 16, py + 23, 2.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(px + 12, py + 26, 8, 3);
+  // Pale eye glints (uncanny).
+  ctx.fillStyle = 'rgba(220, 210, 190, 0.65)';
+  ctx.fillRect(px + 15, py + 23, 1, 1);
+  ctx.fillRect(px + 17, py + 23, 1, 1);
+  ctx.restore();
+}
+
+/** Cork notice board with pinned papers (library). */
+function drawNoticeBoard(ctx, d) {
+  const px = d.tx * 32, py = d.ty * 32;
+  let s = (d.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  ctx.save();
+  // Drop shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.50)';
+  ctx.fillRect(px + 8, py + 19, 16, 12);
+  // Wooden frame.
+  ctx.fillStyle = '#3a2818';
+  ctx.fillRect(px + 7, py + 18, 18, 12);
+  // Cork surface.
+  ctx.fillStyle = '#7a5828';
+  ctx.fillRect(px + 8, py + 19, 16, 10);
+  // Cork dots (texture).
+  ctx.fillStyle = 'rgba(40, 24, 8, 0.45)';
+  for (let i = 0; i < 14; i++) {
+    const dx = px + 9 + Math.floor(rnd() * 14);
+    const dy = py + 20 + Math.floor(rnd() * 8);
+    ctx.fillRect(dx, dy, 1, 1);
+  }
+  // Pinned notes (2-3 small papers at jaunty offsets).
+  const notes = 2 + Math.floor(rnd() * 2);
+  for (let i = 0; i < notes; i++) {
+    const nx = px + 9 + i * 5 + Math.floor(rnd() * 2);
+    const ny = py + 20 + Math.floor(rnd() * 3);
+    ctx.fillStyle = 'rgba(0,0,0,0.40)';
+    ctx.fillRect(nx + 1, ny + 1, 5, 5);
+    ctx.fillStyle = '#e8d8a0';
+    ctx.fillRect(nx, ny, 5, 5);
+    // Ink lines.
+    ctx.fillStyle = 'rgba(60, 40, 12, 0.65)';
+    ctx.fillRect(nx + 1, ny + 1, 3, 1);
+    ctx.fillRect(nx + 1, ny + 3, 2, 1);
+    // Red pin.
+    ctx.fillStyle = '#a02018';
+    ctx.fillRect(nx + 2, ny - 1, 1, 1);
+  }
   ctx.restore();
 }
 

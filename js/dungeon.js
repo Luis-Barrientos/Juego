@@ -205,6 +205,8 @@ export function generateDungeon(floor, seed, biome) {
 
   if (isLibrary) {
     placeMagicFlames(rooms, rng, lights);
+    placeRoomWallDecorations(map, rooms, rng, decorations, lights,
+      ['wallShelf', 'scrollHanging', 'runeSymbol', 'darkPortrait', 'noticeBoard']);
   }
 
   return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, libraryProps, soulSpawners, startRoom, stairsRoom, style: styleKey, seed: finalSeed };

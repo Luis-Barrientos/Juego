@@ -15,6 +15,19 @@
 
 export const CHANGELOG = [
   {
+    version: '0.6.2',
+    date: '2026-06-04',
+    title: 'Biblioteca: decoraciones de muro',
+    items: [
+      'Estanterías empotradas en la pared con libros apilados.',
+      'Pergaminos colgados de varilla con texto manuscrito.',
+      'Runas mágicas pintadas (sigilos, triángulos o trazos angulares) con halo violeta.',
+      'Retratos oscuros con marco dorado y mirada inquietante.',
+      'Tablones de corcho con notas clavadas con chinchetas rojas.',
+      'Aplican la misma regla loculus: solo en muros frontales que la cámara ve.',
+    ],
+  },
+  {
     version: '0.6.1',
     date: '2026-06-04',
     title: 'Biblioteca: estanterías y mesas',
