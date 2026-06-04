@@ -15,6 +15,16 @@
 
 export const CHANGELOG = [
   {
+    version: '0.6.1',
+    date: '2026-06-04',
+    title: 'Biblioteca: estanterías y mesas',
+    items: [
+      'Estanterías sólidas pegadas a los muros de las salas (1–3 por sala según tamaño), llenas de libros con orientación por pared.',
+      'Mesas de lectura en el centro de salas medianas y grandes; algunas están rotas, otras intactas con un libro abierto encima.',
+      'Ambas categorías bloquean el paso (T_WALL) como los sarcófagos en la cripta.',
+    ],
+  },
+  {
     version: '0.6.0',
     date: '2026-06-04',
     title: 'Biblioteca: ecos de magia',

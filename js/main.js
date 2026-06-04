@@ -103,6 +103,7 @@ function startGame() {
   state.puddles     = [];
   state.decorations = [];
   state.sarcophagi  = [];
+  state.libraryProps = [];
   state.soulSpawners = [];
   state._whisperTimer = 6;
   state.shake       = 0;
@@ -127,6 +128,7 @@ function buildFloor(floor) {
   state.puddles     = d.puddles     || [];
   state.decorations = d.decorations || [];
   state.sarcophagi  = d.sarcophagi  || [];
+  state.libraryProps = d.libraryProps || [];
   state.soulSpawners = d.soulSpawners || [];
   state._whisperTimer = 6 + Math.random() * 6;
 

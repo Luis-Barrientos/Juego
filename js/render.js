@@ -86,6 +86,12 @@ export function rebuildMapCache() {
   if (state.sarcophagi && state.sarcophagi.length > 0) {
     for (const s of state.sarcophagi) drawSarcophagusBase(ctx, s);
   }
+
+  // Library structural props (shelves, tables) painted over the wall tile
+  // they occupy. Path-blocking is handled by them being T_WALL in the map.
+  if (state.libraryProps && state.libraryProps.length > 0) {
+    for (const p of state.libraryProps) drawLibraryProp(ctx, p);
+  }
 }
 
 /**
@@ -526,6 +532,183 @@ function roundedRect(ctx, x, y, w, h, r) {
   ctx.lineTo(x, y + r);
   ctx.quadraticCurveTo(x, y, x + r, y);
   ctx.closePath();
+}
+
+/**
+ * Draw a library structural prop (shelf or table) over its T_WALL footprint.
+ * Each kind has its own draw routine; shelves orient along their hugged wall,
+ * tables include intact and broken variants.
+ *
+ * @private
+ */
+function drawLibraryProp(ctx, p) {
+  const px = p.tx * TILE;
+  const py = p.ty * TILE;
+  const w  = p.w  * TILE;
+  const h  = p.h  * TILE;
+
+  // Wipe the underlying wall tile back to floor tone so the prop has its
+  // own silhouette instead of inheriting the dark wall fill.
+  ctx.fillStyle = 'rgba(40, 28, 18, 1)';
+  ctx.fillRect(px, py, w, h);
+
+  if (p.kind === 'shelf')         drawShelf(ctx, px, py, w, h, p);
+  else if (p.kind === 'table')        drawTable(ctx, px, py, w, h, p, false);
+  else if (p.kind === 'tableBroken')  drawTable(ctx, px, py, w, h, p, true);
+}
+
+/** Tall bookshelf full of leaning books. Orientation follows p.orient. */
+function drawShelf(ctx, px, py, w, h, p) {
+  const horiz = p.orient === 'h';
+  // Drop shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(px + 2, py + 3, w - 2, h - 2);
+  // Wood frame.
+  ctx.fillStyle = '#3a2412';
+  ctx.fillRect(px + 1, py + 1, w - 2, h - 2);
+  // Inner cavity (where the books sit).
+  ctx.fillStyle = '#1a0e08';
+  const ix = px + 3, iy = py + 3, iw = w - 6, ih = h - 6;
+  ctx.fillRect(ix, iy, iw, ih);
+  // Wood top/bottom highlights.
+  ctx.fillStyle = '#5a3818';
+  ctx.fillRect(px + 1, py + 1, w - 2, 2);
+  ctx.fillStyle = '#1c1108';
+  ctx.fillRect(px + 1, py + h - 3, w - 2, 2);
+
+  // Books — each shelf has 1-2 internal rows depending on size.
+  const colors = ['#8a3010', '#3a3060', '#2a5a30', '#604010', '#5a2a48', '#2a4060'];
+  // Deterministic pseudo-rng from p.seed.
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+
+  if (horiz) {
+    // Horizontal shelf: a single row of vertical books across the cavity.
+    const rows = Math.max(1, Math.floor(ih / 14));
+    const rowH = ih / rows;
+    for (let r = 0; r < rows; r++) {
+      const ry = iy + r * rowH;
+      let x = ix + 1;
+      while (x < ix + iw - 1) {
+        const bw = 3 + Math.floor(rnd() * 3);
+        const bh = rowH - 2 - Math.floor(rnd() * 3);
+        ctx.fillStyle = colors[Math.floor(rnd() * colors.length)];
+        ctx.fillRect(x, ry + (rowH - bh) - 1, bw, bh);
+        // Page edge.
+        ctx.fillStyle = 'rgba(220,200,160,0.35)';
+        ctx.fillRect(x, ry + (rowH - bh) - 1, bw, 1);
+        x += bw + 1;
+      }
+      // Shelf board between rows.
+      if (r < rows - 1) {
+        ctx.fillStyle = '#4a2c14';
+        ctx.fillRect(ix, ry + rowH - 1, iw, 1);
+      }
+    }
+  } else {
+    // Vertical shelf: shelves stacked top to bottom.
+    const rows = Math.max(2, Math.floor(ih / 14));
+    const rowH = ih / rows;
+    for (let r = 0; r < rows; r++) {
+      const ry = iy + r * rowH + 1;
+      let x = ix + 1;
+      while (x < ix + iw - 1) {
+        const bw = 3 + Math.floor(rnd() * 3);
+        const bh = rowH - 3 - Math.floor(rnd() * 2);
+        ctx.fillStyle = colors[Math.floor(rnd() * colors.length)];
+        ctx.fillRect(x, ry + (rowH - bh) - 2, bw, bh);
+        ctx.fillStyle = 'rgba(220,200,160,0.35)';
+        ctx.fillRect(x, ry + (rowH - bh) - 2, bw, 1);
+        x += bw + 1;
+      }
+      ctx.fillStyle = '#4a2c14';
+      ctx.fillRect(ix, ry + rowH - 2, iw, 1);
+    }
+  }
+
+  // Front rim highlight.
+  ctx.strokeStyle = 'rgba(140, 90, 40, 0.45)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(px + 1.5, py + 1.5, w - 3, h - 3);
+}
+
+/** Reading table — intact or toppled. Wood top with carved edge. */
+function drawTable(ctx, px, py, w, h, p, broken) {
+  // Drop shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(px + 2, py + 3, w - 2, h - 2);
+
+  if (broken) {
+    // Splintered planks lying on the floor: a couple of angled boards
+    // plus a few debris dots.
+    ctx.save();
+    ctx.translate(px + w / 2, py + h / 2);
+    ctx.rotate(-0.15);
+    ctx.fillStyle = '#5a3a1c';
+    ctx.fillRect(-w * 0.42, -3, w * 0.84, 6);
+    ctx.fillStyle = '#3a2412';
+    ctx.fillRect(-w * 0.42, 2,  w * 0.84, 1);
+    ctx.fillStyle = '#7a5028';
+    ctx.fillRect(-w * 0.40, -3, w * 0.80, 1);
+    ctx.restore();
+    ctx.save();
+    ctx.translate(px + w / 2 + 4, py + h / 2 + 5);
+    ctx.rotate(0.35);
+    ctx.fillStyle = '#5a3a1c';
+    ctx.fillRect(-w * 0.30, -2, w * 0.60, 4);
+    ctx.fillStyle = '#7a5028';
+    ctx.fillRect(-w * 0.30, -2, w * 0.60, 1);
+    ctx.restore();
+    // Splinters.
+    ctx.fillStyle = 'rgba(60, 40, 20, 0.85)';
+    for (let i = 0; i < 5; i++) {
+      const sx = px + 4 + Math.random() * (w - 8);
+      const sy = py + 4 + Math.random() * (h - 8);
+      ctx.fillRect(sx, sy, 2, 1);
+    }
+    return;
+  }
+
+  // Intact table: top + 4 leg shadows + a book/paper on top.
+  // Legs (corner shadows).
+  ctx.fillStyle = '#1a0e08';
+  ctx.fillRect(px + 2,         py + h - 4, 4, 3);
+  ctx.fillRect(px + w - 6,     py + h - 4, 4, 3);
+  // Tabletop.
+  ctx.fillStyle = '#6a4220';
+  ctx.fillRect(px + 1, py + 1, w - 2, h - 4);
+  // Top highlight.
+  ctx.fillStyle = '#8a5a30';
+  ctx.fillRect(px + 1, py + 1, w - 2, 2);
+  // Bottom edge shadow.
+  ctx.fillStyle = '#3a2412';
+  ctx.fillRect(px + 1, py + h - 5, w - 2, 1);
+  // Wood grain.
+  ctx.strokeStyle = 'rgba(60, 30, 10, 0.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(px + 3, py + 5);  ctx.lineTo(px + w - 3, py + 5);
+  ctx.moveTo(px + 3, py + 9);  ctx.lineTo(px + w - 3, py + 9);
+  ctx.stroke();
+
+  // Open book on the table (deterministic via seed).
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  if (rnd() < 0.7) {
+    const bx = px + 4 + Math.floor(rnd() * Math.max(1, w - 16));
+    const by = py + 3 + Math.floor(rnd() * Math.max(1, h - 12));
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(bx + 1, by + 1, 10, 6);
+    ctx.fillStyle = '#d8c890';
+    ctx.fillRect(bx, by, 10, 6);
+    ctx.fillStyle = '#3a2810';
+    ctx.fillRect(bx + 4, by, 1, 6);
+    ctx.fillStyle = 'rgba(60,40,12,0.65)';
+    ctx.fillRect(bx + 1, by + 2, 3, 1);
+    ctx.fillRect(bx + 6, by + 2, 3, 1);
+    ctx.fillRect(bx + 1, by + 4, 2, 1);
+    ctx.fillRect(bx + 6, by + 4, 3, 1);
+  }
 }
 
 /**

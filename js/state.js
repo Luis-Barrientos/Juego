@@ -17,6 +17,7 @@ export const state = {
   puddles: [],            // water puddles on floor (biome 'ruins')
   decorations: [],        // painted decorations: loculi, cobwebs, etc.
   sarcophagi: [],         // catacombs sarcophagi (solid props, some awakable)
+  libraryProps: [],       // library shelves and tables (solid props)
   challenge: null,        // crypta challenge state (see challenge.js)
   soulSpawners: [],       // catacombs ambient soul anchors (see main.js)
   _whisperTimer: 0,       // seconds until the next whisper sound

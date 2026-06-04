@@ -142,6 +142,14 @@ export function generateDungeon(floor, seed, biome) {
   // Catacombs structural decor (after corridors so tombs survive).
   if (isCatacombsBiome) placeSarcophagi(rooms, map, rng, sarcophagi, lights);
 
+  // Library structural props (shelves on room walls, tables in centre).
+  // Same timing rationale as sarcophagi: after corridors so they survive.
+  const libraryProps = [];
+  if (biome && biome.id === 'library') {
+    placeShelves(rooms, map, rng, libraryProps);
+    placeTables(rooms, map, rng, libraryProps);
+  }
+
   // Now that corridors are carved, place the stair tile. Its centre is
   // protected from sarcophagi/pillars by the room flag check above.
   if (floor < MAX_FLOOR) {
@@ -199,7 +207,7 @@ export function generateDungeon(floor, seed, biome) {
     placeMagicFlames(rooms, rng, lights);
   }
 
-  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, soulSpawners, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, libraryProps, soulSpawners, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
 }
 
 /**
@@ -761,6 +769,132 @@ function placeMagicFlames(rooms, rng, lights) {
         r:       70 + rng() * 25,
         flicker: rng() * Math.PI * 2,
       });
+    }
+  }
+}
+
+/**
+ * Library biome: place tall bookshelves along the inner perimeter of each
+ * room (one tile in from a wall). Shelves are 2-tile wide solids written
+ * as T_WALL, oriented along the wall they hug.
+ *
+ * Skips start, stairs and any room shorter than 4 in either axis. Roughly
+ * 35% of eligible rooms get 1 shelf, large rooms get 2-3.
+ *
+ * @private
+ */
+function placeShelves(rooms, map, rng, libraryProps) {
+  for (const r of rooms) {
+    if (r.isStartRoom || r.isStairsRoom) continue;
+    if (r.w < 4 || r.h < 4) continue;
+    if (!r.isLarge && rng() > 0.55) continue;
+
+    const target = r.isLarge ? 2 + Math.floor(rng() * 2) : 1;
+    let placed = 0;
+    let safety = 16;
+    while (placed < target && safety-- > 0) {
+      // Side: 0=top, 1=right, 2=bottom, 3=left.
+      const side = Math.floor(rng() * 4);
+      const horizontal = side === 0 || side === 2;
+      const len = 2;
+      let tx, ty;
+      if (side === 0)      { tx = r.x + 1 + Math.floor(rng() * (r.w - 2 - len + 1)); ty = r.y + 1; }
+      else if (side === 2) { tx = r.x + 1 + Math.floor(rng() * (r.w - 2 - len + 1)); ty = r.y + r.h - 2; }
+      else if (side === 1) { tx = r.x + r.w - 2; ty = r.y + 1 + Math.floor(rng() * (r.h - 2 - len + 1)); }
+      else                 { tx = r.x + 1;       ty = r.y + 1 + Math.floor(rng() * (r.h - 2 - len + 1)); }
+
+      const w = horizontal ? len : 1;
+      const h = horizontal ? 1   : len;
+
+      // Skip if it covers the room centre (door axis area).
+      let blocksCentre = false;
+      for (let yy = ty; yy < ty + h; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) {
+          if (xx === r.cx && yy === r.cy) blocksCentre = true;
+        }
+      }
+      if (blocksCentre) continue;
+
+      // All target tiles must be floor and not already taken.
+      let ok = true;
+      for (let yy = ty; yy < ty + h && ok; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) {
+          if (!map[yy] || map[yy][xx] !== T_FLOOR) { ok = false; break; }
+          if (libraryProps.some(p => xx >= p.tx && xx < p.tx + p.w && yy >= p.ty && yy < p.ty + p.h)) {
+            ok = false; break;
+          }
+        }
+      }
+      if (!ok) continue;
+
+      for (let yy = ty; yy < ty + h; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) map[yy][xx] = T_WALL;
+      }
+      libraryProps.push({
+        kind: 'shelf',
+        tx, ty, w, h,
+        orient: horizontal ? 'h' : 'v',
+        // Which side it hugs determines which side of the prop is the front.
+        face:   side === 0 ? 'S' : side === 2 ? 'N' : side === 1 ? 'W' : 'E',
+        seed:   Math.floor(rng() * 1e9),
+      });
+      placed++;
+    }
+  }
+}
+
+/**
+ * Library biome: place 1-2 reading tables in the middle of each non-start
+ * room. Tables are 1×1 (small) or 2×1 (long) solids written as T_WALL.
+ *
+ * @private
+ */
+function placeTables(rooms, map, rng, libraryProps) {
+  for (const r of rooms) {
+    if (r.isStartRoom || r.isStairsRoom) continue;
+    if (r.w < 5 || r.h < 4) continue;
+    if (rng() > 0.6) continue;
+
+    const target = r.isLarge ? 2 : 1;
+    let placed = 0;
+    let safety = 12;
+    while (placed < target && safety-- > 0) {
+      const horizontal = rng() < 0.5;
+      const w = horizontal ? 2 : 1;
+      const h = horizontal ? 1 : (rng() < 0.4 ? 2 : 1);
+      // Stay one tile away from walls and avoid the room centre tile.
+      const tx = r.x + 2 + Math.floor(rng() * Math.max(1, r.w - 3 - w));
+      const ty = r.y + 2 + Math.floor(rng() * Math.max(1, r.h - 3 - h));
+
+      let blocksCentre = false;
+      for (let yy = ty; yy < ty + h; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) {
+          if (xx === r.cx && yy === r.cy) blocksCentre = true;
+        }
+      }
+      if (blocksCentre) continue;
+
+      let ok = true;
+      for (let yy = ty; yy < ty + h && ok; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) {
+          if (!map[yy] || map[yy][xx] !== T_FLOOR) { ok = false; break; }
+          if (libraryProps.some(p => xx >= p.tx && xx < p.tx + p.w && yy >= p.ty && yy < p.ty + p.h)) {
+            ok = false; break;
+          }
+        }
+      }
+      if (!ok) continue;
+
+      for (let yy = ty; yy < ty + h; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) map[yy][xx] = T_WALL;
+      }
+      libraryProps.push({
+        kind:    rng() < 0.45 ? 'tableBroken' : 'table',
+        tx, ty, w, h,
+        orient:  horizontal ? 'h' : 'v',
+        seed:    Math.floor(rng() * 1e9),
+      });
+      placed++;
     }
   }
 }
