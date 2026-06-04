@@ -95,6 +95,11 @@ export function generateDungeon(floor, seed, biome) {
   const starCount = isRuinsStyle(styleKey) ? (1 + Math.floor(rng() * 2)) : 0;
   if (starCount > 0) expandStarRooms(rooms, map, rng, starCount);
 
+  // Pillars (broken stone columns inside roomy spaces). Only meaningful in
+  // ruins; other biomes feel different.
+  const isRuinsBiome = biome && biome.id === 'ruins';
+  if (isRuinsBiome) placePillars(rooms, map, rng);
+
   // Connect rooms using a Minimum Spanning Tree built from a complete
   // distance graph. Then add ~27% extra short edges to create loops and
   // shortcuts — much more interesting to navigate than a single chain.
@@ -125,6 +130,7 @@ export function generateDungeon(floor, seed, biome) {
   // sunbeam falling through a crack in the ceiling.
   const lights   = [];
   const sunbeams = [];
+  const puddles  = [];
   const isRuins  = biome && biome.id === 'ruins';
 
   for (const r of rooms) {
@@ -143,9 +149,10 @@ export function generateDungeon(floor, seed, biome) {
     placeCampfires(rooms, rng, lights);
     placeGlowMushrooms(map, rooms, rng, lights);
     placeMoonbeams(rooms, rng, sunbeams);
+    placePuddles(map, rooms, rng, puddles);
   }
 
-  return { map, rooms, lights, sunbeams, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+  return { map, rooms, lights, sunbeams, puddles, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
 }
 
 /**
@@ -388,6 +395,82 @@ function placeMoonbeams(rooms, rng, beams) {
     sb.crack = buildCrackPath(sb, rng);
     beams.push(sb);
     placed++;
+  }
+}
+
+/**
+ * Drop a few stone pillars (single wall tiles) inside roomy spaces. Each
+ * pillar gives tactical cover and visual texture. Skips small rooms,
+ * keeps a 2-tile buffer to room edges, never blocks the room centre or
+ * adjacent tiles to start/stairs.
+ * @private
+ */
+function placePillars(rooms, map, rng) {
+  for (const r of rooms) {
+    if (r.w * r.h < 60) continue;
+    if (r.isStartRoom) continue;
+    const target = r.isLarge ? (3 + Math.floor(rng() * 3))   // 3-5 in stars
+                             : (1 + Math.floor(rng() * 2));  // 1-2 elsewhere
+    let placed = 0, safety = 30;
+    while (placed < target && safety-- > 0) {
+      const tx = r.x + 2 + Math.floor(rng() * (r.w - 4));
+      const ty = r.y + 2 + Math.floor(rng() * (r.h - 4));
+      // Avoid blocking centre tile (where stairs may sit) and its neighbours.
+      if (Math.abs(tx - r.cx) <= 1 && Math.abs(ty - r.cy) <= 1) continue;
+      if (map[ty][tx] !== T_FLOOR) continue;
+      // Don't drop a pillar adjacent to another pillar (no walls of pillars).
+      let touching = false;
+      for (let dy = -1; dy <= 1 && !touching; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = tx + dx, ny = ty + dy;
+          if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+          // Only check inside the room (so room walls don't count).
+          if (nx < r.x || nx >= r.x + r.w || ny < r.y || ny >= r.y + r.h) continue;
+          if (map[ny][nx] === T_WALL) { touching = true; break; }
+        }
+      }
+      if (touching) continue;
+      map[ty][tx] = T_WALL;
+      placed++;
+    }
+  }
+}
+
+/**
+ * Place small puddles of water on floor tiles. Each puddle records its
+ * tile centre and a deterministic ellipse radius so render passes can
+ * paint it (and its specular highlight) consistently.
+ * @private
+ */
+function placePuddles(map, rooms, rng, puddles) {
+  for (const r of rooms) {
+    if (r.w < 4 || r.h < 4) continue;
+    const target = r.isLarge ? (2 + Math.floor(rng() * 2))  // 2-3 in stars
+                             : (rng() < 0.55 ? 1 : 0);      // ~55% chance else
+    let placed = 0, safety = 20;
+    while (placed < target && safety-- > 0) {
+      const tx = r.x + 1 + Math.floor(rng() * (r.w - 2));
+      const ty = r.y + 1 + Math.floor(rng() * (r.h - 2));
+      if (map[ty][tx] !== T_FLOOR) continue;
+      // Avoid stair tile and pathing centre.
+      if (tx === r.cx && ty === r.cy) continue;
+      // Don't stack puddles.
+      let tooClose = false;
+      for (const p of puddles) {
+        if (Math.abs(p.tx - tx) <= 1 && Math.abs(p.ty - ty) <= 1) { tooClose = true; break; }
+      }
+      if (tooClose) continue;
+      puddles.push({
+        tx, ty,
+        x:  tx * TILE + TILE / 2,
+        y:  ty * TILE + TILE / 2,
+        rx: 8 + rng() * 4,         // 8-12 px ellipse radius x
+        ry: 4 + rng() * 2,         // 4-6 px radius y
+        seed: Math.floor(rng() * 1e9),
+      });
+      placed++;
+    }
   }
 }
 

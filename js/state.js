@@ -14,6 +14,7 @@ export const state = {
   damageTexts: [],
   lights: [],             // torches
   sunbeams: [],           // tall light shafts (biome 'ruins')
+  puddles: [],            // water puddles on floor (biome 'ruins')
   cameraX: 0,
   cameraY: 0,
   shake: 0,

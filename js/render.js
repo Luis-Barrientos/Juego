@@ -59,6 +59,39 @@ export function rebuildMapCache() {
       if (sb.crack) drawCeilingCrack(ctx, sb);
     }
   }
+
+  // Static puddle bodies (dark water). The animated specular highlight is
+  // drawn per-frame in drawPuddles() so it can react to nearby lights.
+  if (state.puddles && state.puddles.length > 0) {
+    for (const p of state.puddles) drawPuddleBase(ctx, p);
+  }
+}
+
+/**
+ * Paint the static dark body of a water puddle into the map cache.
+ * @private
+ */
+function drawPuddleBase(ctx, p) {
+  ctx.save();
+  // Outer dark ring.
+  ctx.fillStyle = 'rgba(10, 18, 22, 0.55)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, p.rx + 1.2, p.ry + 1.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Water body — slightly blue-green.
+  ctx.fillStyle = 'rgba(35, 60, 70, 0.78)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, p.rx, p.ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Inner gradient for depth.
+  const grd = ctx.createRadialGradient(p.x - p.rx * 0.3, p.y - p.ry * 0.4, 1, p.x, p.y, p.rx);
+  grd.addColorStop(0, 'rgba(80, 120, 130, 0.35)');
+  grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = grd;
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, p.rx, p.ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 /**
@@ -762,6 +795,57 @@ export function drawSunbeams(ctx) {
         ctx.fillRect(dx, dy, size, size);
       }
     }
+  }
+  ctx.restore();
+}
+
+/**
+ * Draw an animated specular shimmer on each puddle. The highlight strength
+ * scales with proximity to the nearest warm light, the player aura, or any
+ * sunbeam covering the tile — so puddles only "wake up" when there is light
+ * to reflect.
+ */
+export function drawPuddles(ctx) {
+  if (!state.puddles || state.puddles.length === 0) return;
+  const t = state.time;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const p of state.puddles) {
+    const px = p.x - state.cameraX;
+    const py = p.y - state.cameraY;
+    if (px < -20 || px > VIEW_W + 20 || py < -20 || py > VIEW_H + 20) continue;
+
+    // Influence: nearest warm light or player.
+    let intensity = 0;
+    const player = state.player;
+    if (player) {
+      const d = Math.hypot(player.x - p.x, player.y - p.y);
+      intensity = Math.max(intensity, Math.max(0, 1 - d / 220));
+    }
+    for (const lt of state.lights) {
+      if (lt.type === 'glowMushroom') continue; // ignored: cool tone, weak
+      const range = lt.type === 'campfire' ? 200 : 130;
+      const d = Math.hypot(lt.x - p.x, lt.y - p.y);
+      const i = Math.max(0, 1 - d / range);
+      if (i > intensity) intensity = i;
+    }
+    if (intensity < 0.05) continue;
+
+    const wobble = Math.sin(t * 1.4 + p.seed) * 0.5 + 0.5;
+    const a = intensity * (0.45 + wobble * 0.35);
+
+    // Specular crescent — top of puddle catches the light.
+    ctx.fillStyle = `rgba(220, 235, 245, ${a})`;
+    ctx.beginPath();
+    ctx.ellipse(px - p.rx * 0.25, py - p.ry * 0.5, p.rx * 0.55, p.ry * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Thin rim highlight.
+    ctx.strokeStyle = `rgba(180, 210, 230, ${a * 0.7})`;
+    ctx.lineWidth   = 0.8;
+    ctx.beginPath();
+    ctx.ellipse(px, py, p.rx, p.ry, 0, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.stroke();
   }
   ctx.restore();
 }

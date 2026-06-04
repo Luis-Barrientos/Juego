@@ -44,7 +44,7 @@ import {
   updateLoot, drawLoot, spawnChest, openChest,
 }                                         from './loot.js';
 import {
-  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawMinimap,
+  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawPuddles, drawMinimap,
 }                                         from './render.js';
 import {
   updateHUD, showToast, hideAllOverlays, showMenu, showPause, hidePause,
@@ -98,6 +98,7 @@ function startGame() {
   state.damageTexts = [];
   state.lights      = [];
   state.sunbeams    = [];
+  state.puddles     = [];
   state.shake       = 0;
   state.cameraX     = 0;
   state.cameraY     = 0;
@@ -117,6 +118,7 @@ function buildFloor(floor) {
   state.rooms    = d.rooms;
   state.lights   = d.lights;
   state.sunbeams = d.sunbeams || [];
+  state.puddles  = d.puddles  || [];
 
   const start = d.startRoom;
   if (state.player) {
@@ -329,6 +331,7 @@ function render() {
   for (const prj of state.projectiles) drawProjectile(ctx, prj);
   drawParticles(ctx);
   drawDamageTexts(ctx);
+  drawPuddles(ctx);
   drawSunbeams(ctx);
   drawLighting(ctx);
 
