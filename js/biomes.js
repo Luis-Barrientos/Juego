@@ -34,21 +34,24 @@ export const BIOMES = {
     modifiers:     { hpRegenIdle: 0.6 },
   },
 
-  /* ── Piso 2 — bajamos a la cripta, vegetación moribunda ──────────── */
+  /* ── Piso 2 — catacumbas frías, dominio funerario ────────────────── */
   crypt: {
     id: 'crypt',
-    name: 'Cripta Sumergida',
+    name: 'Catacumbas',
     subtitle: 'II',
-    tagline: 'Los muertos guardan secretos bajo aguas estancadas',
-    floor: { base: [38, 32, 38], alt: [52, 44, 52], crackTint: 'rgba(0,0,0,0.4)' },
-    wall:  { top: '#2a1838', side: '#1a0e22', bottom: '#0a060c', edge: '#4a2868' },
-    accent: '#a060ff',
-    torchColor:    [180, 100, 220],
-    torchTint:     'rgba(160, 80, 220, 0.18)',
-    ambientAlpha:  0.84,
-    ambientTint:   'rgba(8, 4, 14, 0.84)',
+    tagline: 'Galerías estrechas y velas azules guardan a los muertos',
+    floor: { base: [34, 36, 42], alt: [48, 50, 58], crackTint: 'rgba(0,0,0,0.45)' },
+    wall:  { top: '#2a2e36', side: '#1a1d22', bottom: '#080a0c', edge: '#3c4250' },
+    accent: '#a8c8ff',
+    /** Cool blue-white candle flame. */
+    torchColor:    [180, 200, 255],
+    /** Subtle cool halo around candles. */
+    torchTint:     'rgba(160, 190, 240, 0.16)',
+    /** Slightly darker than ruins so candle pools really stand out. */
+    ambientAlpha:  0.78,
+    ambientTint:   'rgba(10, 14, 24, 0.78)',
     decorChance:   0.16,
-    decorations:   ['cobweb', 'skull', 'driedRoot', 'moss'],
+    decorations:   ['cobweb', 'skull', 'driedRoot'],
     modifiers:     {},
   },
 

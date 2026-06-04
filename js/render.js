@@ -459,6 +459,10 @@ export function drawLighting(ctx) {
       const pulse = 1 + Math.sin(state.time * 1.6 + (lt.phase || 0)) * 0.18;
       radius = lt.r * pulse;
       color  = lt.variant === 0 ? [120, 230, 200] : [120, 200, 255];
+    } else if (lt.type === 'candle') {
+      // Steady cool flame: small flicker, cool blue-white pool.
+      radius = lt.r + Math.sin(lt.flicker * 0.7) * 2 + Math.sin(lt.flicker * 1.9) * 1;
+      color  = [180, 200, 255];
     } else {
       radius = lt.r + Math.sin(lt.flicker) * 6;
     }
@@ -592,6 +596,25 @@ export function drawLighting(ctx) {
       drawCampfireSprite(ctx, lx, ly, lt.flicker);
     } else if (lt.type === 'glowMushroom') {
       drawGlowMushroomSprite(ctx, lx, ly, lt.variant, state.time + (lt.phase || 0));
+    } else if (lt.type === 'candle') {
+      // Wall niche candle: dark recess + thin candle + small cool flame.
+      const dir = lt.dir === 'left' ? -1 : 1;
+      // Niche carved into the wall (dark rectangle).
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(lx + (dir < 0 ? -6 : 0), ly - 5, 6, 9);
+      // Candle stick.
+      ctx.fillStyle = '#d8d0b8';
+      ctx.fillRect(lx + dir * 2 - 0.5, ly - 4, 1.4, 5);
+      // Small cool flame, gentle bob.
+      const cfl = Math.sin(lt.flicker * 0.9) * 0.6;
+      ctx.fillStyle = 'rgba(180, 210, 255, 0.95)';
+      ctx.beginPath();
+      ctx.ellipse(lx + dir * 2 + 0.2, ly - 5.5 + cfl, 1.2, 2.3 + cfl * 0.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+      ctx.beginPath();
+      ctx.ellipse(lx + dir * 2 + 0.2, ly - 5.5 + cfl, 0.5, 1.2, 0, 0, Math.PI * 2);
+      ctx.fill();
     } else {
       // Floor torch: stake + flame
       ctx.fillStyle = '#3a2010';

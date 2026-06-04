@@ -31,13 +31,19 @@ const STYLES = {
    * (ceiling cracks, sunbeams, set-piece encounters).
    */
   RUINS:    { depth: 5, minRoomW: 5, maxRoomW: 8,  minRoomH: 4, maxRoomH: 7,  splitMin: 0.40, splitMax: 0.60, torchDensity: 1.3, corridorW: 2 },
+  /**
+   * Floor 2 (catacombs). A web of small cubiculae (4-6 tiles) joined by
+   * 2-tile galleries; a single 'crypta' room is grown later to host the
+   * altar, awakable sarcophagi and the floor's set-piece event.
+   */
+  CATACOMBS:{ depth: 6, minRoomW: 4, maxRoomW: 6,  minRoomH: 4, maxRoomH: 5,  splitMin: 0.45, splitMax: 0.55, torchDensity: 1.6, corridorW: 2 },
 };
 
 /**
  * Style rotation per floor (index = floor - 1). Curve: intimate ruins →
  * medium → labyrinthine → open (boss).
  */
-const STYLE_KEYS = ['RUINS', 'BALANCED', 'COMPACT', 'SPARSE'];
+const STYLE_KEYS = ['RUINS', 'CATACOMBS', 'COMPACT', 'SPARSE'];
 
 /**
  * Generate a complete floor.
@@ -89,10 +95,12 @@ export function generateDungeon(floor, seed, biome) {
     }
   }
 
-  // Promote 1-2 rooms to 'star' rooms — larger than the rest, used to host
-  // the visual spectacle (ceiling cracks, sunbeams) and key encounters.
-  // Most rooms remain intimate; the contrast makes the big rooms read.
-  const starCount = isRuinsStyle(styleKey) ? (1 + Math.floor(rng() * 2)) : 0;
+  // Promote rooms to 'star' rooms — larger than the rest, used to host
+  // the visual spectacle and key encounters. Ruins gets 1-2 stars; the
+  // catacombs floor gets exactly one (the crypta).
+  const starCount = isRuinsStyle(styleKey)     ? (1 + Math.floor(rng() * 2))
+                  : isCatacombsStyle(styleKey) ? 1
+                  : 0;
   if (starCount > 0) expandStarRooms(rooms, map, rng, starCount);
 
   // Pillars (broken stone columns inside roomy spaces). Only meaningful in
@@ -125,17 +133,19 @@ export function generateDungeon(floor, seed, biome) {
   stairsRoom.isStairsRoom = true;
   startRoom.isStartRoom   = true;
 
-  // Place lights. Most biomes use floor torches in room corners; the
-  // 'ruins' biome instead uses wall-mounted sconces plus the occasional
-  // sunbeam falling through a crack in the ceiling.
+  // Place lights. Each biome uses a different fixture (warm sconces in
+  // ruins, cool wall candles in catacombs, plain floor torches elsewhere).
   const lights   = [];
   const sunbeams = [];
   const puddles  = [];
-  const isRuins  = biome && biome.id === 'ruins';
+  const isRuins      = biome && biome.id === 'ruins';
+  const isCatacombs  = biome && biome.id === 'crypt';
 
   for (const r of rooms) {
     if (isRuins) {
       placeWallSconces(map, r, rng, lights, style.torchDensity);
+    } else if (isCatacombs) {
+      placeWallCandles(map, r, rng, lights, style.torchDensity);
     } else {
       placeFloorTorches(r, rng, lights, style.torchDensity);
     }
@@ -228,6 +238,52 @@ function placeWallSconces(map, r, rng, lights, density) {
       x:    c.edge,
       y:    c.ty * TILE + TILE / 2,
       r:    120 + rng() * 30,
+      flicker: rng() * Math.PI * 2,
+    });
+  }
+}
+
+/**
+ * Place small wall candles in niches around a catacombs room. Mechanically
+ * identical to sconces but with a denser distribution and a smaller, cooler
+ * pool of light — the room never feels fully lit, just punctuated.
+ * @private
+ */
+function placeWallCandles(map, r, rng, lights, density) {
+  const candidates = [];
+  // Left wall (candle facing right into the room)
+  for (let y = r.y + 1; y < r.y + r.h - 1; y++) {
+    if (r.x - 1 >= 0 && map[y][r.x - 1] === T_WALL) {
+      candidates.push({ tx: r.x, ty: y, dir: 'right', edge: r.x * TILE + 2 });
+    }
+  }
+  // Right wall (candle facing left)
+  for (let y = r.y + 1; y < r.y + r.h - 1; y++) {
+    const wx = r.x + r.w;
+    if (wx < MAP_W && map[y][wx] === T_WALL) {
+      candidates.push({ tx: r.x + r.w - 1, ty: y, dir: 'left', edge: (r.x + r.w) * TILE - 2 });
+    }
+  }
+  if (candidates.length === 0) {
+    placeFloorTorches(r, rng, lights, density);
+    return;
+  }
+  // Catacombs are darker but more punctuated — pack candles tighter.
+  const perimeter = (r.w + r.h) * 2;
+  const target = Math.max(2, Math.round(density + perimeter / 4));
+  const n = Math.min(target, candidates.length);
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  for (let i = 0; i < n; i++) {
+    const c = candidates[i];
+    lights.push({
+      type: 'candle',
+      dir:  c.dir,
+      x:    c.edge,
+      y:    c.ty * TILE + TILE / 2,
+      r:    85 + rng() * 20,
       flicker: rng() * Math.PI * 2,
     });
   }
@@ -560,6 +616,14 @@ function buildBeamShape(sb, rng) {
  */
 function isRuinsStyle(key) {
   return key === 'RUINS';
+}
+
+/**
+ * True if the style key represents the floor-2 catacombs layout.
+ * @private
+ */
+function isCatacombsStyle(key) {
+  return key === 'CATACOMBS';
 }
 
 /**
