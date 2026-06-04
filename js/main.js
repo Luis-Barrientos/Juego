@@ -44,7 +44,7 @@ import {
   updateLoot, drawLoot, spawnChest, openChest,
 }                                         from './loot.js';
 import {
-  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawPuddles, drawMinimap,
+  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawPuddles, drawSarcophagiOverlay, drawMinimap,
 }                                         from './render.js';
 import {
   updateHUD, showToast, hideAllOverlays, showMenu, showPause, hidePause,
@@ -100,6 +100,7 @@ function startGame() {
   state.sunbeams    = [];
   state.puddles     = [];
   state.decorations = [];
+  state.sarcophagi  = [];
   state.shake       = 0;
   state.cameraX     = 0;
   state.cameraY     = 0;
@@ -121,6 +122,7 @@ function buildFloor(floor) {
   state.sunbeams = d.sunbeams || [];
   state.puddles     = d.puddles     || [];
   state.decorations = d.decorations || [];
+  state.sarcophagi  = d.sarcophagi  || [];
 
   const start = d.startRoom;
   if (state.player) {
@@ -334,6 +336,7 @@ function render() {
   drawParticles(ctx);
   drawDamageTexts(ctx);
   drawPuddles(ctx);
+  drawSarcophagiOverlay(ctx);
   drawSunbeams(ctx);
   drawLighting(ctx);
 

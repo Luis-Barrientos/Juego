@@ -73,6 +73,13 @@ export function rebuildMapCache() {
       else if (d.kind === 'web') drawWeb(ctx, d);
     }
   }
+
+  // Sarcophagi painted over the underlying wall tile so the tomb stone
+  // shows instead of the generic wall. Awakable (cracked) ones get an
+  // animated aura per-frame in drawSarcophagiOverlay().
+  if (state.sarcophagi && state.sarcophagi.length > 0) {
+    for (const s of state.sarcophagi) drawSarcophagusBase(ctx, s);
+  }
 }
 
 /**
@@ -136,6 +143,113 @@ function drawWeb(ctx, d) {
     ctx.beginPath();
     ctx.arc(ax, ay, r, baseAng - spread / 2, baseAng + spread / 2);
     ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Paint a sarcophagus over its wall tiles in the map cache. Three variants:
+ * - 'normal': solid stone tomb with grey lid.
+ * - 'cracked': solid stone tomb with a visible crack down the lid (the
+ *   awakable variant — also gets a runtime aura via drawSarcophagiOverlay).
+ * - 'altar': 2×2 raised altar block at the centre of the crypta.
+ * @private
+ */
+function drawSarcophagusBase(ctx, s) {
+  const px = s.tx * 32;
+  const py = s.ty * 32;
+  const w  = s.w * 32;
+  const h  = s.h * 32;
+  ctx.save();
+  if (s.variant === 'altar') {
+    // Stone block.
+    ctx.fillStyle = '#3e4250';
+    ctx.fillRect(px + 2, py + 2, w - 4, h - 4);
+    // Lighter top edge.
+    ctx.fillStyle = '#5a5e6e';
+    ctx.fillRect(px + 2, py + 2, w - 4, 4);
+    // Carved cross on top.
+    ctx.fillStyle = '#1a1c22';
+    ctx.fillRect(px + w * 0.5 - 1.5, py + 6, 3, h - 12);
+    ctx.fillRect(px + 8, py + h * 0.5 - 1, w - 16, 3);
+    // Drip shadow at base.
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(px + 2, py + h - 4, w - 4, 2);
+  } else {
+    const orient = s.orient || 'h';
+    // Body (slightly lighter than wall so it pops).
+    ctx.fillStyle = '#4a4e58';
+    ctx.fillRect(px + 2, py + 2, w - 4, h - 4);
+    // Top lid edge.
+    ctx.fillStyle = '#62677a';
+    if (orient === 'h') {
+      ctx.fillRect(px + 2, py + 2, w - 4, 5);
+    } else {
+      ctx.fillRect(px + 2, py + 2, 5, h - 4);
+    }
+    // Bottom shadow.
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    if (orient === 'h') ctx.fillRect(px + 2, py + h - 5, w - 4, 3);
+    else                ctx.fillRect(px + w - 5, py + 2, 3, h - 4);
+    // Engraved line on lid.
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    if (orient === 'h') ctx.fillRect(px + 6, py + h * 0.5, w - 12, 1);
+    else                ctx.fillRect(px + w * 0.5, py + 6, 1, h - 12);
+    // Crack signature for awakable variant.
+    if (s.variant === 'cracked') {
+      ctx.strokeStyle = 'rgba(20, 30, 40, 0.85)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      if (orient === 'h') {
+        ctx.moveTo(px + w * 0.30, py + 6);
+        ctx.lineTo(px + w * 0.40, py + 12);
+        ctx.lineTo(px + w * 0.55, py + 9);
+        ctx.lineTo(px + w * 0.70, py + h - 8);
+      } else {
+        ctx.moveTo(px + 6,         py + h * 0.30);
+        ctx.lineTo(px + 12,        py + h * 0.40);
+        ctx.lineTo(px + 9,         py + h * 0.55);
+        ctx.lineTo(px + w - 8,     py + h * 0.70);
+      }
+      ctx.stroke();
+      // Faint blue glow leaking from the crack (baked, additive look).
+      ctx.fillStyle = 'rgba(140, 180, 220, 0.25)';
+      if (orient === 'h') ctx.fillRect(px + w * 0.32, py + 6, w * 0.40, h - 12);
+      else                ctx.fillRect(px + 6,        py + h * 0.32, w - 12, h * 0.40);
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * Draw a per-frame pulsing aura over awakable (cracked) sarcophagi to
+ * signal they are interactable. Skips ones already awakened.
+ */
+export function drawSarcophagiOverlay(ctx) {
+  if (!state.sarcophagi || state.sarcophagi.length === 0) return;
+  const t = state.time;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const s of state.sarcophagi) {
+    if (!s.awakable || s.awakened) continue;
+    const px = s.tx * 32 - state.cameraX;
+    const py = s.ty * 32 - state.cameraY;
+    const w  = s.w * 32;
+    const h  = s.h * 32;
+    if (px + w < -16 || px > VIEW_W + 16 || py + h < -16 || py > VIEW_H + 16) continue;
+    const pulse = 0.55 + Math.sin(t * 1.8 + (s.tx + s.ty) * 0.4) * 0.35;
+    // Soft halo around the whole sarcophagus.
+    const cx = px + w * 0.5;
+    const cy = py + h * 0.5;
+    const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, Math.max(w, h) * 0.9);
+    grd.addColorStop(0, `rgba(140, 180, 230, ${0.18 * pulse})`);
+    grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(px - 6, py - 6, w + 12, h + 12);
+    // Bright crack shimmer.
+    ctx.fillStyle = `rgba(180, 220, 255, ${0.35 * pulse})`;
+    if ((s.orient || 'h') === 'h') ctx.fillRect(px + w * 0.32, py + 6, w * 0.36, h - 12);
+    else                            ctx.fillRect(px + 6, py + h * 0.32, w - 12, h * 0.36);
   }
   ctx.restore();
 }

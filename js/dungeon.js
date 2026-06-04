@@ -103,20 +103,9 @@ export function generateDungeon(floor, seed, biome) {
                   : 0;
   if (starCount > 0) expandStarRooms(rooms, map, rng, starCount);
 
-  // Pillars (broken stone columns inside roomy spaces). Only meaningful in
-  // ruins; other biomes feel different.
-  const isRuinsBiome = biome && biome.id === 'ruins';
-  if (isRuinsBiome) placePillars(rooms, map, rng);
-
-  // Connect rooms using a Minimum Spanning Tree built from a complete
-  // distance graph. Then add ~27% extra short edges to create loops and
-  // shortcuts — much more interesting to navigate than a single chain.
-  const connections = buildConnections(rooms, rng, 0.27);
-  for (const [i, j] of connections) {
-    carveCorridor(map, rooms[i], rooms[j], rooms, rng, style.corridorW);
-  }
-
-  // Pick start (top-left-most room) and stairs (farthest from start).
+  // Detect start (top-left-most) and stairs (farthest from start) rooms
+  // BEFORE placing pillars/sarcophagi so those placers can skip them.
+  // The actual T_STAIR tile is written later, after structural placers.
   let startRoom = rooms[0];
   for (const r of rooms) {
     if (r.cx + r.cy < startRoom.cx + startRoom.cy) startRoom = r;
@@ -127,11 +116,35 @@ export function generateDungeon(floor, seed, biome) {
     const d = Math.hypot(r.cx - startRoom.cx, r.cy - startRoom.cy);
     if (d > bestD) { bestD = d; stairsRoom = r; }
   }
+  stairsRoom.isStairsRoom = true;
+  startRoom.isStartRoom   = true;
+
+  // Pillars (broken stone columns inside roomy spaces). Only meaningful in
+  // ruins; other biomes feel different.
+  const isRuinsBiome = biome && biome.id === 'ruins';
+  if (isRuinsBiome) placePillars(rooms, map, rng);
+
+  // Sarcophagi: catacombs equivalent of pillars. Star room becomes the
+  // crypta (altar + awakable cracked sarcophagi). Need to place AFTER
+  // expandStarRooms (already ran above) and BEFORE corridor carving so
+  // tiles consumed by sarcophagi don't sit inside corridors.
+  const isCatacombsBiome = biome && biome.id === 'crypt';
+  const sarcophagi = [];
+  if (isCatacombsBiome) placeSarcophagi(rooms, map, rng, sarcophagi);
+
+  // Connect rooms using a Minimum Spanning Tree built from a complete
+  // distance graph. Then add ~27% extra short edges to create loops and
+  // shortcuts — much more interesting to navigate than a single chain.
+  const connections = buildConnections(rooms, rng, 0.27);
+  for (const [i, j] of connections) {
+    carveCorridor(map, rooms[i], rooms[j], rooms, rng, style.corridorW);
+  }
+
+  // Now that corridors are carved, place the stair tile. Its centre is
+  // protected from sarcophagi/pillars by the room flag check above.
   if (floor < MAX_FLOOR) {
     map[stairsRoom.cy][stairsRoom.cx] = T_STAIR;
   }
-  stairsRoom.isStairsRoom = true;
-  startRoom.isStartRoom   = true;
 
   // Place lights. Each biome uses a different fixture (warm sconces in
   // ruins, cool wall candles in catacombs, plain floor torches elsewhere).
@@ -169,7 +182,7 @@ export function generateDungeon(floor, seed, biome) {
     placeWebs(rooms, rng, decorations);
   }
 
-  return { map, rooms, lights, sunbeams, puddles, decorations, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
 }
 
 /**
@@ -597,6 +610,132 @@ function placePillars(rooms, map, rng) {
       placed++;
     }
   }
+}
+
+/**
+ * Place stone sarcophagi in catacombs rooms. Each sarcophagus occupies a
+ * 2×1 footprint (rotated 1×2 sometimes) of T_WALL tiles, blocking pathing
+ * just like a pillar but reading visually as a tomb.
+ *
+ * Cubiculae: 30-40% chance of a single normal sarcophagus.
+ * Crypta (star room): central 2×2 altar plus 2-3 'cracked' sarcophagi
+ * along the inner border. Cracked variants are highlighted with a faint
+ * blue aura at runtime — they are awakable/breakable in commit 5.
+ * @private
+ */
+function placeSarcophagi(rooms, map, rng, sarcophagi) {
+  for (const r of rooms) {
+    if (r.isStartRoom || r.isStairsRoom) continue;
+    if (r.w < 4 || r.h < 4) continue;
+
+    if (r.isLarge) {
+      placeAltar(r, map, sarcophagi);
+      placeCryptaSarcophagi(r, map, rng, sarcophagi);
+    } else {
+      // Cubicula: 35% chance of a normal sarcophagus.
+      if (rng() > 0.35) continue;
+      tryPlaceSarcophagus(r, map, rng, sarcophagi, 'normal');
+    }
+  }
+}
+
+/**
+ * Place the 2×2 altar at the centre of the crypta.
+ * @private
+ */
+function placeAltar(r, map, sarcophagi) {
+  const tx = r.cx - 1;
+  const ty = r.cy - 1;
+  // Verify all 4 tiles are floor.
+  for (let y = ty; y < ty + 2; y++) {
+    for (let x = tx; x < tx + 2; x++) {
+      if (map[y] === undefined || map[y][x] !== T_FLOOR) return;
+    }
+  }
+  for (let y = ty; y < ty + 2; y++) {
+    for (let x = tx; x < tx + 2; x++) map[y][x] = T_WALL;
+  }
+  sarcophagi.push({
+    tx, ty, w: 2, h: 2,
+    variant: 'altar',
+    awakable: false, awakened: false,
+  });
+}
+
+/**
+ * Place 2-3 awakable (cracked) sarcophagi along the inner border of the
+ * crypta. They are placed against the room walls but still inside the
+ * floor area, leaving the centre clear for the player.
+ * @private
+ */
+function placeCryptaSarcophagi(r, map, rng, sarcophagi) {
+  const target = 2 + Math.floor(rng() * 2); // 2-3
+  let placed = 0, safety = 40;
+  while (placed < target && safety-- > 0) {
+    if (tryPlaceSarcophagus(r, map, rng, sarcophagi, 'cracked', /*nearWall*/ true)) {
+      placed++;
+    }
+  }
+}
+
+/**
+ * Try to place a single 2×1 (or 1×2) sarcophagus in the room. Marks the
+ * occupied tiles as T_WALL and pushes an entry to `sarcophagi`. Returns
+ * true on success, false if no spot was found.
+ * @private
+ */
+function tryPlaceSarcophagus(r, map, rng, sarcophagi, variant, nearWall = false) {
+  const horizontal = rng() < 0.5;
+  const w = horizontal ? 2 : 1;
+  const h = horizontal ? 1 : 2;
+  // Random anchor within the room interior (with 1-tile buffer to room walls).
+  const minX = r.x + 1;
+  const maxX = r.x + r.w - 1 - w;
+  const minY = r.y + 1;
+  const maxY = r.y + r.h - 1 - h;
+  if (maxX < minX || maxY < minY) return false;
+
+  for (let attempt = 0; attempt < 12; attempt++) {
+    let tx, ty;
+    if (nearWall) {
+      // Bias toward the room border — pick a wall side.
+      const side = Math.floor(rng() * 4);
+      if (side === 0)      { tx = minX + Math.floor(rng() * (maxX - minX + 1)); ty = minY; }
+      else if (side === 1) { tx = maxX;                                        ty = minY + Math.floor(rng() * (maxY - minY + 1)); }
+      else if (side === 2) { tx = minX + Math.floor(rng() * (maxX - minX + 1)); ty = maxY; }
+      else                 { tx = minX;                                        ty = minY + Math.floor(rng() * (maxY - minY + 1)); }
+    } else {
+      tx = minX + Math.floor(rng() * (maxX - minX + 1));
+      ty = minY + Math.floor(rng() * (maxY - minY + 1));
+    }
+    // Avoid blocking the room centre.
+    let blocksCentre = false;
+    for (let yy = ty; yy < ty + h; yy++) {
+      for (let xx = tx; xx < tx + w; xx++) {
+        if (Math.abs(xx - r.cx) <= 0 && Math.abs(yy - r.cy) <= 0) blocksCentre = true;
+      }
+    }
+    if (blocksCentre) continue;
+    // Verify all target tiles are floor.
+    let ok = true;
+    for (let yy = ty; yy < ty + h && ok; yy++) {
+      for (let xx = tx; xx < tx + w; xx++) {
+        if (map[yy] === undefined || map[yy][xx] !== T_FLOOR) { ok = false; break; }
+      }
+    }
+    if (!ok) continue;
+    for (let yy = ty; yy < ty + h; yy++) {
+      for (let xx = tx; xx < tx + w; xx++) map[yy][xx] = T_WALL;
+    }
+    sarcophagi.push({
+      tx, ty, w, h, variant,
+      awakable: variant === 'cracked',
+      awakened: false,
+      orient: horizontal ? 'h' : 'v',
+    });
+    return true;
+  }
+  return false;
 }
 
 /**

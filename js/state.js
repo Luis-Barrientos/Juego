@@ -16,6 +16,7 @@ export const state = {
   sunbeams: [],           // tall light shafts (biome 'ruins')
   puddles: [],            // water puddles on floor (biome 'ruins')
   decorations: [],        // painted decorations: loculi, cobwebs, etc.
+  sarcophagi: [],         // catacombs sarcophagi (solid props, some awakable)
   cameraX: 0,
   cameraY: 0,
   shake: 0,
