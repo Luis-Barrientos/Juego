@@ -99,6 +99,7 @@ function startGame() {
   state.lights      = [];
   state.sunbeams    = [];
   state.puddles     = [];
+  state.decorations = [];
   state.shake       = 0;
   state.cameraX     = 0;
   state.cameraY     = 0;
@@ -118,7 +119,8 @@ function buildFloor(floor) {
   state.rooms    = d.rooms;
   state.lights   = d.lights;
   state.sunbeams = d.sunbeams || [];
-  state.puddles  = d.puddles  || [];
+  state.puddles     = d.puddles     || [];
+  state.decorations = d.decorations || [];
 
   const start = d.startRoom;
   if (state.player) {

@@ -15,6 +15,7 @@ export const state = {
   lights: [],             // torches
   sunbeams: [],           // tall light shafts (biome 'ruins')
   puddles: [],            // water puddles on floor (biome 'ruins')
+  decorations: [],        // painted decorations: loculi, cobwebs, etc.
   cameraX: 0,
   cameraY: 0,
   shake: 0,

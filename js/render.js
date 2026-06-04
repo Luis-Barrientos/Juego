@@ -65,6 +65,79 @@ export function rebuildMapCache() {
   if (state.puddles && state.puddles.length > 0) {
     for (const p of state.puddles) drawPuddleBase(ctx, p);
   }
+
+  // Decorations baked into the map (loculi niches, cobwebs).
+  if (state.decorations && state.decorations.length > 0) {
+    for (const d of state.decorations) {
+      if (d.kind === 'loculus') drawLoculus(ctx, d);
+      else if (d.kind === 'web') drawWeb(ctx, d);
+    }
+  }
+}
+
+/**
+ * Paint a burial niche carved into a corridor wall. The niche is a dark
+ * recess with a small skull silhouette inside, half-shrouded.
+ * @private
+ */
+function drawLoculus(ctx, d) {
+  const px = d.tx * 32;          // TILE = 32
+  const py = d.ty * 32;
+  ctx.save();
+  // Dark recess.
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+  ctx.fillRect(px + 6, py + 12, 20, 16);
+  // Inner gradient — darker at the back.
+  const grd = ctx.createLinearGradient(px + 6, py + 12, px + 6, py + 28);
+  grd.addColorStop(0, 'rgba(0,0,0,0.5)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(px + 6, py + 12, 20, 16);
+  // Skull bone fragment inside.
+  ctx.fillStyle = 'rgba(180, 170, 150, 0.65)';
+  ctx.beginPath(); ctx.ellipse(px + 16, py + 22, 4, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(px + 14, py + 21, 1.2, 1.2);
+  ctx.fillRect(px + 16.8, py + 21, 1.2, 1.2);
+  // Stone lip on top.
+  ctx.fillStyle = 'rgba(70, 75, 85, 0.9)';
+  ctx.fillRect(px + 5, py + 11, 22, 2);
+  ctx.restore();
+}
+
+/**
+ * Paint a cobweb in an inner room corner. `q` is 0=TL, 1=TR, 2=BL, 3=BR.
+ * @private
+ */
+function drawWeb(ctx, d) {
+  const px = d.tx * 32 + 16;
+  const py = d.ty * 32 + 16;
+  // Anchor offset toward the wall corner.
+  const dx = d.q === 0 || d.q === 2 ? -14 : 14;
+  const dy = d.q === 0 || d.q === 1 ? -14 : 14;
+  const ax = px + dx;
+  const ay = py + dy;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(220, 220, 220, 0.45)';
+  ctx.lineWidth = 0.6;
+  // Radial threads from the corner toward the room.
+  const spread = Math.PI / 2;
+  const baseAng = Math.atan2(py - ay, px - ax);
+  for (let i = 0; i < 5; i++) {
+    const a = baseAng - spread / 2 + (spread * i) / 4;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax + Math.cos(a) * 14, ay + Math.sin(a) * 14);
+    ctx.stroke();
+  }
+  // Two arc rings of the web.
+  ctx.strokeStyle = 'rgba(220, 220, 220, 0.35)';
+  for (let r = 5; r <= 11; r += 4) {
+    ctx.beginPath();
+    ctx.arc(ax, ay, r, baseAng - spread / 2, baseAng + spread / 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /**
@@ -459,6 +532,11 @@ export function drawLighting(ctx) {
       const pulse = 1 + Math.sin(state.time * 1.6 + (lt.phase || 0)) * 0.18;
       radius = lt.r * pulse;
       color  = lt.variant === 0 ? [120, 230, 200] : [120, 200, 255];
+    } else if (lt.type === 'skull') {
+      // Skull pedestal: cool blue-white pulse, very steady.
+      const pulse = 1 + Math.sin(state.time * 1.3 + (lt.phase || 0)) * 0.12;
+      radius = lt.r * pulse;
+      color  = [180, 200, 230];
     } else if (lt.type === 'candle') {
       // Steady cool flame: small flicker, cool blue-white pool.
       radius = lt.r + Math.sin(lt.flicker * 0.7) * 2 + Math.sin(lt.flicker * 1.9) * 1;
@@ -539,6 +617,7 @@ export function drawLighting(ctx) {
   const tint = (biome && biome.torchTint) || 'rgba(255,160,80,0.18)';
   for (const lt of state.lights) {
     if (lt.type === 'glowMushroom') continue;
+    if (lt.type === 'skull')        continue;
     const lx = lt.x - state.cameraX;
     const ly = lt.y - state.cameraY;
     if (lx < -120 || lx > VIEW_W + 120 || ly < -120 || ly > VIEW_H + 120) continue;
@@ -596,6 +675,8 @@ export function drawLighting(ctx) {
       drawCampfireSprite(ctx, lx, ly, lt.flicker);
     } else if (lt.type === 'glowMushroom') {
       drawGlowMushroomSprite(ctx, lx, ly, lt.variant, state.time + (lt.phase || 0));
+    } else if (lt.type === 'skull') {
+      drawSkullSprite(ctx, lx, ly, state.time + (lt.phase || 0));
     } else if (lt.type === 'candle') {
       // Wall niche candle: dark recess + thin candle + small cool flame.
       const dir = lt.dir === 'left' ? -1 : 1;
@@ -720,6 +801,45 @@ function drawGlowMushroomSprite(ctx, lx, ly, variant, t) {
   ctx.beginPath(); ctx.ellipse(lx, ly - 1.4, 2.4, 1.4, 0, Math.PI, 0); ctx.fill();
   ctx.fillStyle = cap.hi;
   ctx.fillRect(lx - 1, ly - 2, 1, 1);
+}
+
+/**
+ * Draw a luminous skull on a small stone pedestal (catacombs biome).
+ * @private
+ */
+function drawSkullSprite(ctx, lx, ly, t) {
+  const pulse = 0.7 + Math.sin(t * 1.6) * 0.3;
+  // Cool halo.
+  const haloR = 7 * pulse + 3;
+  const halo  = ctx.createRadialGradient(lx, ly - 2, 0, lx, ly - 2, haloR);
+  halo.addColorStop(0, `rgba(180, 210, 240, ${0.4 * pulse})`);
+  halo.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(lx, ly - 2, haloR, 0, Math.PI * 2); ctx.fill();
+
+  // Pedestal (square block).
+  ctx.fillStyle = '#3a3e46';
+  ctx.fillRect(lx - 4, ly + 2, 8, 4);
+  ctx.fillStyle = '#2a2d35';
+  ctx.fillRect(lx - 4, ly + 5, 8, 1);
+
+  // Skull (cranium + jaw).
+  ctx.fillStyle = '#d8d0b8';
+  ctx.beginPath(); ctx.ellipse(lx, ly - 1, 3.2, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillRect(lx - 2, ly + 1.2, 4, 1.6);
+
+  // Glowing eye sockets.
+  ctx.fillStyle = `rgba(180, 220, 255, ${0.85 * pulse})`;
+  ctx.fillRect(lx - 2, ly - 1.5, 1.4, 1.4);
+  ctx.fillRect(lx + 0.6, ly - 1.5, 1.4, 1.4);
+
+  // Nasal cavity.
+  ctx.fillStyle = '#3a3a3a';
+  ctx.fillRect(lx - 0.4, ly + 0.2, 0.8, 1);
+
+  // Tooth gap.
+  ctx.fillStyle = '#3a3a3a';
+  ctx.fillRect(lx - 0.4, ly + 1.6, 0.8, 0.6);
 }
 
 /**

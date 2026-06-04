@@ -135,9 +135,10 @@ export function generateDungeon(floor, seed, biome) {
 
   // Place lights. Each biome uses a different fixture (warm sconces in
   // ruins, cool wall candles in catacombs, plain floor torches elsewhere).
-  const lights   = [];
-  const sunbeams = [];
-  const puddles  = [];
+  const lights      = [];
+  const sunbeams    = [];
+  const puddles     = [];
+  const decorations = [];
   const isRuins      = biome && biome.id === 'ruins';
   const isCatacombs  = biome && biome.id === 'crypt';
 
@@ -162,7 +163,13 @@ export function generateDungeon(floor, seed, biome) {
     placePuddles(map, rooms, rng, puddles);
   }
 
-  return { map, rooms, lights, sunbeams, puddles, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+  if (isCatacombs) {
+    placeSkullPedestals(map, rooms, rng, lights);
+    placeLoculi(map, rooms, rng, decorations);
+    placeWebs(rooms, rng, decorations);
+  }
+
+  return { map, rooms, lights, sunbeams, puddles, decorations, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
 }
 
 /**
@@ -286,6 +293,105 @@ function placeWallCandles(map, r, rng, lights, density) {
       r:    85 + rng() * 20,
       flicker: rng() * Math.PI * 2,
     });
+  }
+}
+
+/**
+ * Drop a few luminous skull pedestals in catacombs rooms. Each emits a
+ * cool blue-white pulse and serves as the equivalent of glow mushrooms in
+ * the ruins biome. Pedestals sit on floor tiles, never on top of doorways
+ * or walls.
+ * @private
+ */
+function placeSkullPedestals(map, rooms, rng, lights) {
+  const GLOBAL_CAP = 10;
+  let placed = 0;
+  for (const r of rooms) {
+    if (placed >= GLOBAL_CAP) break;
+    if (r.w < 4 || r.h < 4) continue;
+    if (r.isStartRoom || r.isStairsRoom) continue;
+    // 50% chance per room. Star rooms (crypta) always try.
+    if (!r.isLarge && rng() > 0.50) continue;
+    const count = r.isLarge ? (2 + Math.floor(rng() * 2))   // crypta: 2-3
+                            : 1;                             // cubicula: 1
+    for (let i = 0; i < count && placed < GLOBAL_CAP; i++) {
+      // Place hugging an inner wall edge (1 tile inside the room border).
+      const wallSide = Math.floor(rng() * 4);
+      let tx, ty;
+      if (wallSide === 0)      { tx = r.x + 1 + Math.floor(rng() * (r.w - 2)); ty = r.y + 1; }
+      else if (wallSide === 1) { tx = r.x + r.w - 2;                            ty = r.y + 1 + Math.floor(rng() * (r.h - 2)); }
+      else if (wallSide === 2) { tx = r.x + 1 + Math.floor(rng() * (r.w - 2)); ty = r.y + r.h - 2; }
+      else                     { tx = r.x + 1;                                  ty = r.y + 1 + Math.floor(rng() * (r.h - 2)); }
+      if (map[ty][tx] !== T_FLOOR) continue;
+      lights.push({
+        type:  'skull',
+        x:     tx * TILE + TILE / 2,
+        y:     ty * TILE + TILE / 2,
+        r:     55 + rng() * 15,
+        phase: rng() * Math.PI * 2,
+      });
+      placed++;
+    }
+  }
+}
+
+/**
+ * Find painted-on loculi (burial niches) along walls bordering corridors.
+ * For every corridor-adjacent wall tile, with low probability, push a
+ * decoration entry that render.js will paint into the map cache.
+ * @private
+ */
+function placeLoculi(map, rooms, rng, decorations) {
+  const PER_TILE_CHANCE = 0.05;
+  const PER_FLOOR_CAP   = 28;
+  let placed = 0;
+  // We want loculi on walls that line corridors, not on room walls. A
+  // corridor tile is a floor tile that is NOT inside any room rect.
+  const inAnyRoom = (tx, ty) => {
+    for (const r of rooms) {
+      if (tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h) return true;
+    }
+    return false;
+  };
+  for (let y = 1; y < MAP_H - 1 && placed < PER_FLOOR_CAP; y++) {
+    for (let x = 1; x < MAP_W - 1 && placed < PER_FLOOR_CAP; x++) {
+      if (map[y][x] !== T_WALL) continue;
+      // Only walls whose tile below is a corridor floor. That way the
+      // niche faces the player as they walk past.
+      if (map[y + 1] && map[y + 1][x] === T_FLOOR && !inAnyRoom(x, y + 1)) {
+        if (rng() < PER_TILE_CHANCE) {
+          decorations.push({
+            kind:  'loculus',
+            tx, ty: y,
+            seed:  Math.floor(rng() * 1e9),
+          });
+          placed++;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Cobwebs in inner room corners. Decorative; ignored by collision and AI.
+ * @private
+ */
+function placeWebs(rooms, rng, decorations) {
+  for (const r of rooms) {
+    if (r.w < 4 || r.h < 4) continue;
+    if (r.isStartRoom) continue;
+    // Each of the 4 inner corners has an independent chance.
+    const corners = [
+      { tx: r.x + 1,         ty: r.y + 1,         q: 0 }, // TL
+      { tx: r.x + r.w - 2,   ty: r.y + 1,         q: 1 }, // TR
+      { tx: r.x + 1,         ty: r.y + r.h - 2,   q: 2 }, // BL
+      { tx: r.x + r.w - 2,   ty: r.y + r.h - 2,   q: 3 }, // BR
+    ];
+    for (const c of corners) {
+      if (rng() < 0.45) {
+        decorations.push({ kind: 'web', tx: c.tx, ty: c.ty, q: c.q });
+      }
+    }
   }
 }
 
