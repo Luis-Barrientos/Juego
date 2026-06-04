@@ -375,7 +375,7 @@ function placeLoculi(map, rooms, rng, decorations) {
         if (rng() < PER_TILE_CHANCE) {
           decorations.push({
             kind:  'loculus',
-            tx, ty: y,
+            tx: x, ty: y,
             seed:  Math.floor(rng() * 1e9),
           });
           placed++;
