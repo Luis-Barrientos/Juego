@@ -52,6 +52,7 @@ import {
   showFloorIntro,
 }                                         from './ui.js';
 import { save, load }                     from './storage.js';
+import { initChangelogUI }                from './changelog.js';
 
 /* ─────────────────────────── DOM bootstrap ─────────────────────────── */
 const canvas  = document.getElementById('game');
@@ -393,6 +394,8 @@ document.getElementById('winBtn').addEventListener('click', () => {
   hideAllOverlays();
   startGame();
 });
+
+initChangelogUI();
 
 state.lastTime = performance.now();
 document.body.classList.add('overlay-active');

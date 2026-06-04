@@ -727,3 +727,125 @@ body.overlay-active #toast { display: none; }
   50%      { box-shadow: 0 0 14px rgba(255, 200, 80, 0.95); }
 }
 
+
+/* ─── Changelog modal ─── */
+.changelog-overlay {
+  background: radial-gradient(ellipse at center, rgba(20, 10, 30, 0.96) 0%, rgba(0, 0, 0, 0.96) 100%);
+  z-index: 80;
+  padding: 20px;
+}
+
+.changelog-box {
+  position: relative;
+  width: min(560px, 92vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #1a0e22, #0a0612);
+  border: 2px solid #6a4020;
+  box-shadow: 0 0 32px rgba(200, 120, 40, 0.35);
+  padding: 24px 28px 28px;
+  text-align: left;
+}
+
+.changelog-box h2 {
+  text-align: center;
+  font-size: 32px;
+  letter-spacing: 6px;
+  color: #d0a060;
+  text-shadow: 0 0 14px rgba(180, 100, 40, 0.5);
+}
+
+.changelog-current {
+  text-align: center;
+  font-size: 14px;
+  letter-spacing: 3px;
+  color: #ffc870;
+  margin-top: 4px;
+  margin-bottom: 18px;
+}
+
+.changelog-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #c8a878;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 10px;
+  font-family: inherit;
+}
+.changelog-close:hover { color: #ffd890; text-shadow: 0 0 10px #ffaa30; }
+
+.changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.changelog-entry {
+  border-left: 2px solid #4a2818;
+  padding: 4px 0 4px 14px;
+}
+
+.changelog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+.changelog-ver  { color: #ffc870; font-weight: bold; }
+.changelog-date { color: #806848; font-style: italic; }
+
+.changelog-title {
+  margin-top: 4px;
+  font-size: 16px;
+  letter-spacing: 2px;
+  color: #d8c6a8;
+}
+
+.changelog-entry ul {
+  margin-top: 8px;
+  padding-left: 18px;
+  color: #aa9070;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.changelog-entry li { margin-bottom: 3px; }
+.changelog-entry li::marker { color: #6a4020; }
+
+/* Botón "NOVEDADES" en el menú principal */
+.changelog-btn {
+  margin-top: 6px !important;
+  padding: 8px 22px !important;
+  font-size: 12px !important;
+  letter-spacing: 3px !important;
+  background: linear-gradient(180deg, #1a1028, #0a0612) !important;
+  border-color: #4a2868 !important;
+  color: #c8a8e0 !important;
+}
+.changelog-btn:hover {
+  border-color: #8050b0 !important;
+  color: #e0c8ff !important;
+  box-shadow: 0 0 14px rgba(140, 80, 200, 0.5) !important;
+}
+
+/* Etiqueta de versión esquinera */
+#versionTag {
+  position: fixed;
+  bottom: 8px;
+  right: 10px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #806848;
+  z-index: 70;
+  cursor: pointer;
+  user-select: none;
+  text-shadow: 0 0 4px #000;
+  padding: 4px 8px;
+  transition: color 0.2s;
+}
+#versionTag:hover { color: #ffc870; }
