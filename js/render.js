@@ -174,6 +174,8 @@ function drawSarcophagusBase(ctx, s) {
 
   if (s.variant === 'altar') {
     drawAltar(ctx, px, py, w, h);
+  } else if (s.variant === 'opened') {
+    drawOpenedCoffin(ctx, px, py, w, h, s);
   } else {
     drawCoffin(ctx, px, py, w, h, s);
   }
@@ -290,6 +292,40 @@ function drawCoffin(ctx, px, py, w, h, s) {
   ctx.fillRect(ccx - 4, ccy - 1, 8, 2);
 
   // Outer outline so it pops against the dark wall behind it.
+  ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+  ctx.lineWidth   = 1;
+  roundedRect(ctx, bx + 0.5, by + 0.5, bw - 1, bh - 1, r);
+  ctx.stroke();
+}
+
+/**
+ * Same shape as drawCoffin but the lid is gone — the body is just a hollow
+ * stone shell. Drawn after a cracked sarcophagus awakens during the
+ * crypta challenge so the room reads as "the things are out, not in".
+ * @private
+ */
+function drawOpenedCoffin(ctx, px, py, w, h, s) {
+  const horizontal = (s.orient || 'h') === 'h';
+  const bx = px + 1, by = py + 1, bw = w - 2, bh = h - 2;
+  const r = horizontal ? Math.min(bh * 0.45, 10) : Math.min(bw * 0.45, 10);
+
+  ctx.fillStyle = '#3a3d44';
+  roundedRect(ctx, bx, by, bw, bh, r);
+  ctx.fill();
+
+  ctx.fillStyle = '#0a0c10';
+  roundedRect(ctx, bx + 3, by + 3, bw - 6, bh - 6, Math.max(0, r - 2));
+  ctx.fill();
+
+  ctx.fillStyle = '#5a5e6a';
+  if (horizontal) {
+    ctx.fillRect(bx + bw * 0.55, by - 1, bw * 0.35, 4);
+    ctx.fillRect(bx + bw * 0.10, by + bh - 3, bw * 0.30, 4);
+  } else {
+    ctx.fillRect(bx - 1, by + bh * 0.55, 4, bh * 0.35);
+    ctx.fillRect(bx + bw - 3, by + bh * 0.10, 4, bh * 0.30);
+  }
+
   ctx.strokeStyle = 'rgba(0,0,0,0.9)';
   ctx.lineWidth   = 1;
   roundedRect(ctx, bx + 0.5, by + 0.5, bw - 1, bh - 1, r);

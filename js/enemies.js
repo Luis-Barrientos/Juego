@@ -38,6 +38,17 @@ export const ENEMY_TYPES = {
     score: 18, gold: [2, 6],
     range: 22, attackCool: 0.6, behavior: 'melee',
   },
+  /**
+   * Sepulchral: heavy melee elite that emerges from cracked sarcophagi
+   * during the crypta challenge. Slow but tough; aura is cool blue so it
+   * reads as undead-from-the-crypt instead of a regular skeleton.
+   */
+  sepulchral: {
+    hp: 110, dmg: 22, speed: 55, r: 12,
+    color: '#cfd8e8', glow: '#a8c8ff',
+    score: 80, gold: [14, 26],
+    range: 28, attackCool: 1.0, behavior: 'melee',
+  },
 };
 
 /**
@@ -69,7 +80,30 @@ export function createEnemy(type, x, y, floor) {
     throwCool: t.throwCool ? 1 + Math.random() * 2 : 0,
     aimTime:   0,
     aimAng:    0,
+    /** Brief invulnerable rise-from-the-floor animation (seconds). */
+    emergeTime: 0,
   };
+}
+
+/**
+ * Spawn a sepulchral elite at a world-space position. Used by the crypta
+ * challenge when a cracked sarcophagus awakens. Marks the enemy with
+ * `emergeTime` so it plays a short rise animation and stays invulnerable
+ * until it finishes climbing out.
+ *
+ * @param {number} x        World pixel coords.
+ * @param {number} y
+ * @param {number} floor    Current floor (for stat scaling).
+ * @returns {object} the new enemy (already pushed to state.enemies).
+ */
+export function spawnSepulchralAt(x, y, floor) {
+  const e = createEnemy('sepulchral', x, y, floor);
+  e.emergeTime = 0.9;
+  e.state = 'emerging';
+  e.fromChallenge = true;
+  state.enemies.push(e);
+  spawnParticles(x, y + 6, '#a8c8ff', 24);
+  return e;
 }
 
 /**
@@ -124,6 +158,17 @@ export function enemyUpdate(e, dt, hooks) {
 
   if (e.behavior === 'boss') {
     bossAI(e, dt, dx, dy, d, hooks);
+    return;
+  }
+
+  // Sepulchrals climbing out of a sarcophagus: invulnerable, immobile,
+  // and deal no damage until the rise animation finishes.
+  if (e.emergeTime > 0) {
+    e.emergeTime -= dt;
+    if (e.emergeTime <= 0) {
+      e.state = 'idle';
+      Audio.hit && Audio.hit();
+    }
     return;
   }
 
@@ -262,6 +307,11 @@ function bossAI(b, dt, dx, dy, d, hooks) {
  * @param {object} hooks { onWin, onLootDrop }
  */
 export function damageEnemy(e, dmg, crit, hooks) {
+  if (e.emergeTime > 0) {
+    // Invulnerable while emerging: still ping the visual but eat the damage.
+    spawnParticles(e.x, e.y, '#a8c8ff', 4);
+    return;
+  }
   e.hp -= dmg;
   e.hurtTime = 0.15;
   spawnDamageText(e.x, e.y - e.r, dmg, !!crit);
@@ -369,6 +419,42 @@ export function drawEnemy(ctx, e) {
     ctx.fillStyle = e.glow;
     ctx.fillRect(x - 3, y - 3 + bob, 2, 2);
     ctx.fillRect(x + 1, y - 3 + bob, 2, 2);
+  } else if (e.type === 'sepulchral') {
+    // Tall hooded figure with a faint blue aura. Plays a vertical
+    // climb-out animation while emerging from a sarcophagus.
+    const rise   = e.emergeTime > 0 ? Math.max(0, e.emergeTime / 0.9) : 0;
+    const sinkY  = rise * 14;       // pixels still buried
+    const alpha  = 1 - rise * 0.4;
+    ctx.globalAlpha = alpha;
+    // Cool aura.
+    ctx.shadowColor = e.glow; ctx.shadowBlur = 18;
+    // Robe / body
+    ctx.fillStyle = flash ? '#fff' : '#3a4658';
+    ctx.beginPath();
+    ctx.moveTo(x - 10, y + 12 + bob);
+    ctx.lineTo(x - 8,  y - 6  + bob - sinkY * 0.3);
+    ctx.lineTo(x,      y - 14 + bob - sinkY * 0.5);
+    ctx.lineTo(x + 8,  y - 6  + bob - sinkY * 0.3);
+    ctx.lineTo(x + 10, y + 12 + bob);
+    ctx.closePath();
+    ctx.fill();
+    // Skull
+    ctx.fillStyle = flash ? '#fff' : e.color;
+    ctx.beginPath();
+    ctx.arc(x, y - 10 + bob - sinkY * 0.5, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Glowing eyes
+    if (rise < 0.5) {
+      ctx.fillStyle = '#a8c8ff';
+      ctx.shadowColor = '#a8c8ff'; ctx.shadowBlur = 10;
+      ctx.fillRect(x - 3, y - 11 + bob - sinkY * 0.5, 1.5, 1.5);
+      ctx.fillRect(x + 1.5, y - 11 + bob - sinkY * 0.5, 1.5, 1.5);
+    }
+    // Stone-dust particles while emerging.
+    if (e.emergeTime > 0 && Math.random() < 0.4) {
+      spawnParticles(e.x + (Math.random() - 0.5) * 14, e.y + 8, '#5a6678', 1);
+    }
+    ctx.globalAlpha = 1;
   } else if (e.type === 'bat') {
     ctx.fillStyle = flash ? '#fff' : e.color;
     ctx.shadowColor = e.glow; ctx.shadowBlur = 8;

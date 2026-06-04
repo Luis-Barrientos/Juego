@@ -15,6 +15,18 @@
 
 export const CHANGELOG = [
   {
+    version: '0.3.0',
+    date: '2026-06-04',
+    title: 'Desafío de la Cripta',
+    items: [
+      'Nuevo enemigo: Sepulcral. Élite encapuchado de la cripta, lento pero muy resistente.',
+      'El altar central de la crypta es ahora interactuable: pulsa E para iniciar el desafío.',
+      'Al activarlo, las puertas se sellan y los sarcófagos agrietados se abren uno a uno escupiendo Sepulcrales.',
+      'Mientras emergen son invulnerables: espera a que terminen de salir.',
+      'Al limpiar la sala, dos baúles raros aparecen junto al altar como recompensa.',
+    ],
+  },
+  {
     version: '0.2.0',
     date: '2026-06-04',
     title: 'Catacumbas (Piso 2)',

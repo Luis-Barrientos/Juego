@@ -17,6 +17,7 @@ export const state = {
   puddles: [],            // water puddles on floor (biome 'ruins')
   decorations: [],        // painted decorations: loculi, cobwebs, etc.
   sarcophagi: [],         // catacombs sarcophagi (solid props, some awakable)
+  challenge: null,        // crypta challenge state (see challenge.js)
   cameraX: 0,
   cameraY: 0,
   shake: 0,

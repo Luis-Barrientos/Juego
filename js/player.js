@@ -50,7 +50,7 @@ export function createPlayer(x, y) {
  * @param {(e: object, dmg: number, crit: boolean) => void} onEnemyHit
  */
 export function playerUpdate(p, dt, hooks) {
-  const { onStairs, onChest, onEnemyHit } = hooks;
+  const { onStairs, onChest, onEnemyHit, onAltar } = hooks;
 
   // Movement
   let mx = 0, my = 0;
@@ -126,6 +126,10 @@ export function playerUpdate(p, dt, hooks) {
         onChest(l);
         break;
       }
+    }
+    // Altar (crypta challenge). Consume the key only if the hook fires.
+    if (input.keys['KeyE'] && onAltar && onAltar()) {
+      input.keys['KeyE'] = false;
     }
   }
 }

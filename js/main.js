@@ -53,6 +53,7 @@ import {
 }                                         from './ui.js';
 import { save, load }                     from './storage.js';
 import { initChangelogUI }                from './changelog.js';
+import { tryStartChallenge, updateChallenge, resetChallenge, drawAltarPrompt } from './challenge.js';
 
 /* ─────────────────────────── DOM bootstrap ─────────────────────────── */
 const canvas  = document.getElementById('game');
@@ -124,6 +125,8 @@ function buildFloor(floor) {
   state.puddles     = d.puddles     || [];
   state.decorations = d.decorations || [];
   state.sarcophagi  = d.sarcophagi  || [];
+
+  resetChallenge();
 
   const start = d.startRoom;
   if (state.player) {
@@ -261,6 +264,7 @@ const playerHooks = {
   onStairs:    goToNextFloor,
   onChest:     c => openChest(c, showToast, grantBlessing),
   onEnemyHit:  (e, dmg, crit) => damageEnemy(e, dmg, crit, { onWin: triggerWin }),
+  onAltar:     () => tryStartChallenge(showToast),
 };
 
 /* ─────────────────────────── Update / render ─────────────────────────── */
@@ -304,6 +308,7 @@ function update(dt) {
 
   updateLoot(dt, showToast);
   updateParticles(dt);
+  updateChallenge(dt, showToast);
   updateCamera();
   updateHUD();
 }
@@ -338,6 +343,7 @@ function render() {
   drawDamageTexts(ctx);
   drawPuddles(ctx);
   drawSarcophagiOverlay(ctx);
+  drawAltarPrompt(ctx);
   drawSunbeams(ctx);
   drawLighting(ctx);
 
