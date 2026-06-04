@@ -25,13 +25,19 @@ const STYLES = {
   HALLWAYS: { depth: 5, minRoomW: 6, maxRoomW: 10, minRoomH: 4, maxRoomH: 8,  splitMin: 0.30, splitMax: 0.70, torchDensity: 1.2, corridorW: 2 },
   /** Balanced default. */
   BALANCED: { depth: 5, minRoomW: 6, maxRoomW: 11, minRoomH: 5, maxRoomH: 9,  splitMin: 0.40, splitMax: 0.60, torchDensity: 1.4, corridorW: 1 },
+  /**
+   * Floor 1 (ruins). Many small/medium intimate rooms; a post-pass picks
+   * 1-2 rooms and expands them into 'star' rooms that host the spectacle
+   * (ceiling cracks, sunbeams, set-piece encounters).
+   */
+  RUINS:    { depth: 5, minRoomW: 5, maxRoomW: 8,  minRoomH: 4, maxRoomH: 7,  splitMin: 0.40, splitMax: 0.60, torchDensity: 1.3, corridorW: 2 },
 };
 
 /**
- * Style rotation per floor (index = floor - 1). Curve: open → medium →
- * labyrinthine → open (boss). Matches the design pacing.
+ * Style rotation per floor (index = floor - 1). Curve: intimate ruins →
+ * medium → labyrinthine → open (boss).
  */
-const STYLE_KEYS = ['SPARSE', 'BALANCED', 'COMPACT', 'SPARSE'];
+const STYLE_KEYS = ['RUINS', 'BALANCED', 'COMPACT', 'SPARSE'];
 
 /**
  * Generate a complete floor.
@@ -82,6 +88,12 @@ export function generateDungeon(floor, seed, biome) {
       for (let x = rx; x < rx + rw; x++) map[y][x] = T_FLOOR;
     }
   }
+
+  // Promote 1-2 rooms to 'star' rooms — larger than the rest, used to host
+  // the visual spectacle (ceiling cracks, sunbeams) and key encounters.
+  // Most rooms remain intimate; the contrast makes the big rooms read.
+  const starCount = isRuinsStyle(styleKey) ? (1 + Math.floor(rng() * 2)) : 0;
+  if (starCount > 0) expandStarRooms(rooms, map, rng, starCount);
 
   // Connect rooms using a Minimum Spanning Tree built from a complete
   // distance graph. Then add ~27% extra short edges to create loops and
@@ -219,15 +231,12 @@ function placeWallSconces(map, r, rng, lights, density) {
  * @private
  */
 function placeSunbeams(rooms, rng, sunbeams) {
-  const HARD_CAP = 3;
-  const MIN_AREA = 55;          // medium+large rooms can host a crack
-  const PER_ROOM_CHANCE = 0.55; // ruins are atmospheric; cracks should feel present
-
-  // Sort eligible rooms by area desc and try the top few.
-  const eligible = rooms
-    .filter(r => r.w * r.h >= MIN_AREA)
-    .sort((a, b) => (b.w * b.h) - (a.w * a.h))
-    .slice(0, 5);
+  const HARD_CAP = 2;
+  // Only star rooms can host a ceiling crack — keeps the spectacle rare.
+  const eligible = rooms.filter(r => r.isLarge);
+  // High per-room chance: if the floor has a star room, it almost always
+  // has a beam through it. The contrast is the whole point.
+  const PER_ROOM_CHANCE = 0.85;
 
   for (const r of eligible) {
     if (sunbeams.length >= HARD_CAP) break;
@@ -336,6 +345,109 @@ function buildBeamShape(sb, rng) {
     pts.push([x, y]);
   }
   return pts;
+}
+
+/**
+ * True if the style key represents the floor-1 ruins layout.
+ * @private
+ */
+function isRuinsStyle(key) {
+  return key === 'RUINS';
+}
+
+/**
+ * Pick a few rooms and grow them outward into surrounding wall tiles so they
+ * become noticeably bigger than the rest. These 'star' rooms are where the
+ * spectacle (ceiling cracks, sunbeams, set-piece encounters) lives.
+ *
+ * Rooms grow one tile at a time in random directions, only into solid walls
+ * and only while a 1-tile buffer to other rooms is preserved. Capped by area.
+ * @private
+ */
+function expandStarRooms(rooms, map, rng, count) {
+  if (rooms.length === 0) return;
+  const sorted = rooms.slice().sort((a, b) => (b.w * b.h) - (a.w * a.h));
+  const targets = sorted.slice(0, Math.min(count, sorted.length));
+  const TARGET_AREA = 110;          // ~12x9
+  const MAX_DIM     = { w: 14, h: 11 };
+
+  for (const r of targets) {
+    let safety = 60;
+    const dirs = ['left', 'right', 'up', 'down'];
+    while (r.w * r.h < TARGET_AREA && safety-- > 0) {
+      // Shuffle directions each iteration so growth feels organic.
+      for (let i = dirs.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+      }
+      let grew = false;
+      for (const dir of dirs) {
+        if (tryExpand(r, map, dir, rooms, MAX_DIM)) { grew = true; break; }
+      }
+      if (!grew) break;
+    }
+    r.cx = r.x + (r.w >> 1);
+    r.cy = r.y + (r.h >> 1);
+    r.isLarge = true;
+  }
+}
+
+/**
+ * Try to grow a room by one tile in the given direction. Returns true on
+ * success. Refuses to grow into the map border, into another room's tiles,
+ * or to within 1 tile of another room (preserves a wall buffer).
+ * @private
+ */
+function tryExpand(r, map, dir, allRooms, maxDim) {
+  let nx = r.x, ny = r.y, nw = r.w, nh = r.h;
+  let strip; // [{x,y}] tiles to convert to floor
+
+  if (dir === 'left') {
+    if (r.w >= maxDim.w) return false;
+    if (r.x - 1 <= 1) return false;
+    strip = [];
+    for (let y = r.y; y < r.y + r.h; y++) strip.push({ x: r.x - 1, y });
+    nx = r.x - 1; nw = r.w + 1;
+  } else if (dir === 'right') {
+    if (r.w >= maxDim.w) return false;
+    if (r.x + r.w >= MAP_W - 1) return false;
+    strip = [];
+    for (let y = r.y; y < r.y + r.h; y++) strip.push({ x: r.x + r.w, y });
+    nw = r.w + 1;
+  } else if (dir === 'up') {
+    if (r.h >= maxDim.h) return false;
+    if (r.y - 1 <= 1) return false;
+    strip = [];
+    for (let x = r.x; x < r.x + r.w; x++) strip.push({ x, y: r.y - 1 });
+    ny = r.y - 1; nh = r.h + 1;
+  } else {
+    if (r.h >= maxDim.h) return false;
+    if (r.y + r.h >= MAP_H - 1) return false;
+    strip = [];
+    for (let x = r.x; x < r.x + r.w; x++) strip.push({ x, y: r.y + r.h });
+    nh = r.h + 1;
+  }
+
+  // Every tile in the strip must currently be a wall.
+  for (const t of strip) {
+    if (map[t.y][t.x] !== T_WALL) return false;
+  }
+  // Preserve a 1-tile buffer to any other room.
+  for (const other of allRooms) {
+    if (other === r) continue;
+    if (rectsOverlapWithBuffer(nx, ny, nw, nh, other, 1)) return false;
+  }
+  for (const t of strip) map[t.y][t.x] = T_FLOOR;
+  r.x = nx; r.y = ny; r.w = nw; r.h = nh;
+  return true;
+}
+
+/** Axis-aligned overlap test with a buffer in tiles. @private */
+function rectsOverlapWithBuffer(x, y, w, h, other, buf) {
+  return !(x + w + buf <= other.x ||
+           other.x + other.w + buf <= x ||
+           y + h + buf <= other.y ||
+           other.y + other.h + buf <= y);
 }
 
 /**
