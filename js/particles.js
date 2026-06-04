@@ -64,8 +64,14 @@ export function updateParticles(dt) {
     const p = state.particles[i];
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    p.vx *= 0.92;
-    p.vy *= 0.92;
+    if (p.kind === 'soul') {
+      // Souls drift slowly upward without friction and wobble side-to-side.
+      p.phase = (p.phase || 0) + dt;
+      p.x += Math.sin(p.phase * 2.2 + (p.seed || 0)) * 8 * dt;
+    } else {
+      p.vx *= 0.92;
+      p.vy *= 0.92;
+    }
     p.life -= dt;
     if (p.life <= 0) state.particles.splice(i, 1);
   }
@@ -82,10 +88,29 @@ export function updateParticles(dt) {
 export function drawParticles(ctx) {
   for (const p of state.particles) {
     const a = Math.max(0, p.life / p.maxLife);
+    const x = p.x - state.cameraX;
+    const y = p.y - state.cameraY;
+    if (p.kind === 'soul') {
+      // Soul: outer halo + bright core.
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = a * 0.55;
+      ctx.fillStyle = 'rgba(140,200,255,1)';
+      ctx.beginPath();
+      ctx.arc(x, y, p.r * 2.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = '#e8f4ff';
+      ctx.beginPath();
+      ctx.arc(x, y, p.r * a, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
     ctx.fillStyle = p.color;
     ctx.globalAlpha = a;
     ctx.beginPath();
-    ctx.arc(p.x - state.cameraX, p.y - state.cameraY, p.r * a, 0, Math.PI * 2);
+    ctx.arc(x, y, p.r * a, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;

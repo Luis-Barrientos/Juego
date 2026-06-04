@@ -15,6 +15,16 @@
 
 export const CHANGELOG = [
   {
+    version: '0.4.0',
+    date: '2026-06-04',
+    title: 'Susurros de la cripta',
+    items: [
+      'Las catacumbas (piso 2) ahora tienen almas flotantes que ascienden lentamente desde sarcófagos agrietados, el altar y rincones de las salas.',
+      'Susurros procedurales de fondo que aparecen cada 18–30 segundos solo en este piso, reforzando la atmósfera.',
+      'Las almas no aparecen en el piso 1 ni en los siguientes biomas: son exclusivas de la cripta.',
+    ],
+  },
+  {
     version: '0.3.1',
     date: '2026-06-04',
     title: 'Más vida en los muros',

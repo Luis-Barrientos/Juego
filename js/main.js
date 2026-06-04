@@ -103,6 +103,8 @@ function startGame() {
   state.puddles     = [];
   state.decorations = [];
   state.sarcophagi  = [];
+  state.soulSpawners = [];
+  state._whisperTimer = 6;
   state.shake       = 0;
   state.cameraX     = 0;
   state.cameraY     = 0;
@@ -125,6 +127,8 @@ function buildFloor(floor) {
   state.puddles     = d.puddles     || [];
   state.decorations = d.decorations || [];
   state.sarcophagi  = d.sarcophagi  || [];
+  state.soulSpawners = d.soulSpawners || [];
+  state._whisperTimer = 6 + Math.random() * 6;
 
   resetChallenge();
 
@@ -291,6 +295,38 @@ function applyBiomeModifiers(dt) {
   }
 }
 
+/**
+ * Catacombs-only ambient layer: drifting soul wisps from anchor spawners
+ * plus an occasional procedural whisper. No-op on other biomes.
+ */
+function updateAmbient(dt) {
+  if (!state.biome || state.biome.id !== 'crypt') return;
+
+  for (const s of state.soulSpawners) {
+    s.timer -= dt;
+    if (s.timer > 0) continue;
+    s.timer = 1.6 + Math.random() * 2.8;
+    state.particles.push({
+      kind: 'soul',
+      x: s.x + (Math.random() - 0.5) * 10,
+      y: s.y + (Math.random() - 0.5) * 6,
+      vx: (Math.random() - 0.5) * 6,
+      vy: -10 - Math.random() * 12,
+      life: 2.4 + Math.random() * 0.9,
+      maxLife: 3.3,
+      r: 1.8 + Math.random() * 1.2,
+      color: 'rgba(160,200,240,1)',
+      seed: Math.random() * Math.PI * 2,
+    });
+  }
+
+  state._whisperTimer -= dt;
+  if (state._whisperTimer <= 0) {
+    Audio.whisper();
+    state._whisperTimer = 18 + Math.random() * 12;
+  }
+}
+
 function update(dt) {
   if (state.state !== STATE_PLAY) return;
   state.time += dt;
@@ -309,6 +345,7 @@ function update(dt) {
   updateLoot(dt, showToast);
   updateParticles(dt);
   updateChallenge(dt, showToast);
+  updateAmbient(dt);
   updateCamera();
   updateHUD();
 }

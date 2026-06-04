@@ -100,4 +100,25 @@ export const Audio = {
   upgrade:    () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone({ freq: f, type: 'sine', dur: 0.22, vol: 0.18 }), i * 60)); },
   win:        () => { [523, 659, 784, 1047, 1318].forEach((f, i) => setTimeout(() => tone({ freq: f, type: 'sine', dur: 0.35, vol: 0.22 }), i * 130)); },
   death:      () => { tone({ freq: 440, type: 'sawtooth', dur: 1.2, vol: 0.3, slide: -380 }); },
+  whisper:    () => {
+    if (!actx) return;
+    const dur = 1.6 + Math.random() * 1.2;
+    const buf = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      const t = i / data.length;
+      const env = Math.sin(Math.PI * t) * (0.6 + 0.4 * Math.sin(t * 18));
+      data[i] = (Math.random() * 2 - 1) * env;
+    }
+    const src = actx.createBufferSource();
+    const f1  = actx.createBiquadFilter();
+    const f2  = actx.createBiquadFilter();
+    const gain = actx.createGain();
+    src.buffer = buf;
+    f1.type = 'bandpass'; f1.frequency.value = 320; f1.Q.value = 6;
+    f2.type = 'bandpass'; f2.frequency.value = 780; f2.Q.value = 5;
+    gain.gain.value = 0.09;
+    src.connect(f1).connect(f2).connect(gain).connect(masterGain);
+    src.start();
+  },
 };

@@ -18,6 +18,8 @@ export const state = {
   decorations: [],        // painted decorations: loculi, cobwebs, etc.
   sarcophagi: [],         // catacombs sarcophagi (solid props, some awakable)
   challenge: null,        // crypta challenge state (see challenge.js)
+  soulSpawners: [],       // catacombs ambient soul anchors (see main.js)
+  _whisperTimer: 0,       // seconds until the next whisper sound
   cameraX: 0,
   cameraY: 0,
   shake: 0,

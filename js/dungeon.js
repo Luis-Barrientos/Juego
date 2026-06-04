@@ -189,7 +189,10 @@ export function generateDungeon(floor, seed, biome) {
       ['namePlate', 'clawMarks', 'wallSkull']);
   }
 
-  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+  const soulSpawners = [];
+  if (isCatacombs) placeSoulSpawners(rooms, rng, soulSpawners, sarcophagi);
+
+  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, soulSpawners, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
 }
 
 /**
@@ -682,6 +685,41 @@ function placePillars(rooms, map, rng) {
  * blue aura at runtime — they are awakable/breakable in commit 5.
  * @private
  */
+/**
+ * Anchor 5–8 ambient soul spawners across the catacombs floor. Each anchor
+ * stores world coordinates that main.js uses to emit drifting soul wisps.
+ * Anchors prefer cracked sarcophagi (and the altar) for thematic effect,
+ * filling the rest with random non-start, non-stairs room centres.
+ *
+ * @private
+ */
+function placeSoulSpawners(rooms, rng, soulSpawners, sarcophagi) {
+  // Cracked sarcophagi and the altar are the strongest narrative anchors.
+  for (const s of (sarcophagi || [])) {
+    if (s.variant === 'cracked' || s.variant === 'altar') {
+      soulSpawners.push({
+        x: s.tx * TILE + (s.w * TILE) / 2,
+        y: s.ty * TILE + (s.h * TILE) / 2,
+        timer: rng() * 2.5,
+      });
+    }
+  }
+  // Top up with random rooms until we have 5–8 anchors.
+  const target = 5 + Math.floor(rng() * 4);
+  const candidates = rooms.filter(r => !r.isStartRoom && !r.isStairsRoom);
+  let safety = 40;
+  while (soulSpawners.length < target && candidates.length && safety-- > 0) {
+    const r = candidates[Math.floor(rng() * candidates.length)];
+    const ox = r.x + 1 + Math.floor(rng() * Math.max(1, r.w - 2));
+    const oy = r.y + 1 + Math.floor(rng() * Math.max(1, r.h - 2));
+    soulSpawners.push({
+      x: ox * TILE + TILE / 2,
+      y: oy * TILE + TILE / 2,
+      timer: rng() * 2.5,
+    });
+  }
+}
+
 function placeSarcophagi(rooms, map, rng, sarcophagi, lights) {
   for (const r of rooms) {
     if (r.isStartRoom || r.isStairsRoom) continue;
