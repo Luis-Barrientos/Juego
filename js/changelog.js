@@ -15,6 +15,16 @@
 
 export const CHANGELOG = [
   {
+    version: '0.5.0',
+    date: '2026-06-04',
+    title: 'Reordenando el descenso',
+    items: [
+      'Pisos reordenados: I Ruinas → II Biblioteca Maldita → III Catacumbas → IV Núcleo Profundo.',
+      'La identidad de cada bioma (sarcófagos, almas, susurros, sesgo de esqueletos) viaja con la biblioteca/catacumbas, no con el número de piso.',
+      'Próxima parada: rellenar la Biblioteca con su propia personalidad.',
+    ],
+  },
+  {
     version: '0.4.0',
     date: '2026-06-04',
     title: 'Susurros de la cripta',

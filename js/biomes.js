@@ -34,11 +34,11 @@ export const BIOMES = {
     modifiers:     { hpRegenIdle: 0.6 },
   },
 
-  /* ── Piso 2 — catacumbas frías, dominio funerario ────────────────── */
+  /* ── Piso 3 — catacumbas frías, dominio funerario ────────────── */
   crypt: {
     id: 'crypt',
     name: 'Catacumbas',
-    subtitle: 'II',
+    subtitle: 'III',
     tagline: 'Galerías estrechas y velas azules guardan a los muertos',
     floor: { base: [34, 36, 42], alt: [48, 50, 58], crackTint: 'rgba(0,0,0,0.45)' },
     wall:  { top: '#2a2e36', side: '#1a1d22', bottom: '#080a0c', edge: '#3c4250' },
@@ -55,11 +55,11 @@ export const BIOMES = {
     modifiers:     {},
   },
 
-  /* ── Piso 3 — biblioteca de magia perdida ────────────────────────── */
+  /* ── Piso 2 — biblioteca de magia perdida ────────────────── */
   library: {
     id: 'library',
     name: 'Biblioteca Maldita',
-    subtitle: 'III',
+    subtitle: 'II',
     tagline: 'Conocimiento prohibido escrito con tinta de sombra',
     floor: { base: [40, 30, 22], alt: [56, 42, 28], crackTint: 'rgba(255,200,80,0.18)' },
     wall:  { top: '#3a2818', side: '#22180c', bottom: '#0a0604', edge: '#806030' },
@@ -93,7 +93,7 @@ export const BIOMES = {
 };
 
 /** Order of biomes per floor. Index = floor - 1. */
-export const BIOMES_BY_FLOOR = ['ruins', 'crypt', 'library', 'core'];
+export const BIOMES_BY_FLOOR = ['ruins', 'library', 'crypt', 'core'];
 
 /**
  * Resolve the biome for a given (1-based) floor number.

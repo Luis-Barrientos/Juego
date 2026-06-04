@@ -547,7 +547,7 @@ export function populateFloor(floor, maxFloor, spawnChest) {
   }
 
   const pool = floor === 1 ? ['slime', 'bat']
-             : floor === 2 ? ['skeleton', 'skeleton', 'skeleton', 'slime', 'bat']
+             : floor === 3 ? ['skeleton', 'skeleton', 'skeleton', 'slime', 'bat']
              : ['skeleton', 'mage', 'bat', 'slime'];
 
   for (const r of state.rooms) {

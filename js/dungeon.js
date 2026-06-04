@@ -43,7 +43,7 @@ const STYLES = {
  * Style rotation per floor (index = floor - 1). Curve: intimate ruins →
  * medium → labyrinthine → open (boss).
  */
-const STYLE_KEYS = ['RUINS', 'CATACOMBS', 'COMPACT', 'SPARSE'];
+const STYLE_KEYS = ['RUINS', 'BALANCED', 'CATACOMBS', 'SPARSE'];
 
 /**
  * Generate a complete floor.
