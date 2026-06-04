@@ -270,50 +270,30 @@ function drawCoffin(ctx, px, py, w, h, s) {
   if (horizontal) ctx.fillRect(lx + 4, ly + lh * 0.5 - 0.5, lw - 8, 1);
   else            ctx.fillRect(lx + lw * 0.5 - 0.5, ly + 4, 1, lh - 8);
 
-  // Engraved cross at one end (head of the coffin).
-  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  // Engraved cross at one end (head of the coffin). Black for normal
+  // tombs, blue for the awakable 'cracked' variant — the colour swap is
+  // the whole interactive tell, no extra glow rectangle needed.
+  const isCracked = s.variant === 'cracked';
+  let ccx, ccy;
   if (horizontal) {
-    // Cross at left third.
-    const ccx = lx + lw * 0.30;
-    const ccy = ly + lh * 0.5;
-    ctx.fillRect(ccx - 1, ccy - 5, 2, 11);
-    ctx.fillRect(ccx - 4, ccy - 1, 8, 2);
+    ccx = lx + lw * 0.30;
+    ccy = ly + lh * 0.5;
   } else {
-    const ccx = lx + lw * 0.5;
-    const ccy = ly + lh * 0.30;
-    ctx.fillRect(ccx - 1, ccy - 5, 2, 11);
-    ctx.fillRect(ccx - 4, ccy - 1, 8, 2);
+    ccx = lx + lw * 0.5;
+    ccy = ly + lh * 0.30;
   }
+  // Stash cross centre so the per-frame overlay can pulse it.
+  s._crossX = ccx;
+  s._crossY = ccy;
+  ctx.fillStyle = isCracked ? 'rgba(80, 140, 210, 1)' : 'rgba(0, 0, 0, 0.78)';
+  ctx.fillRect(ccx - 1, ccy - 5, 2, 11);
+  ctx.fillRect(ccx - 4, ccy - 1, 8, 2);
 
   // Outer outline so it pops against the dark wall behind it.
   ctx.strokeStyle = 'rgba(0,0,0,0.9)';
   ctx.lineWidth   = 1;
   roundedRect(ctx, bx + 0.5, by + 0.5, bw - 1, bh - 1, r);
   ctx.stroke();
-
-  if (s.variant === 'cracked') {
-    // Bright jagged crack.
-    ctx.strokeStyle = 'rgba(20, 28, 38, 0.95)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    if (horizontal) {
-      ctx.moveTo(lx + lw * 0.55, ly + 3);
-      ctx.lineTo(lx + lw * 0.62, ly + lh * 0.45);
-      ctx.lineTo(lx + lw * 0.74, ly + lh * 0.55);
-      ctx.lineTo(lx + lw * 0.85, ly + lh - 3);
-    } else {
-      ctx.moveTo(lx + 3,           ly + lh * 0.55);
-      ctx.lineTo(lx + lw * 0.45,   ly + lh * 0.62);
-      ctx.lineTo(lx + lw * 0.55,   ly + lh * 0.74);
-      ctx.lineTo(lx + lw - 3,      ly + lh * 0.85);
-    }
-    ctx.stroke();
-
-    // Baked blue tint inside the lid (tells the player 'something glows here').
-    ctx.fillStyle = 'rgba(140, 180, 220, 0.30)';
-    if (horizontal) ctx.fillRect(lx + lw * 0.50, ly + 4, lw * 0.40, lh - 8);
-    else            ctx.fillRect(lx + 4, ly + lh * 0.50, lw - 8, lh * 0.40);
-  }
 }
 
 /** @private */
@@ -332,8 +312,9 @@ function roundedRect(ctx, x, y, w, h, r) {
 }
 
 /**
- * Draw a per-frame pulsing aura over awakable (cracked) sarcophagi to
- * signal they are interactable. Skips ones already awakened.
+ * Per-frame pulse on the cross of awakable (cracked) sarcophagi. The
+ * cross is already painted blue in the cache; here we add a soft halo
+ * and a brighter pulse on top so the player can spot 'this one is alive'.
  */
 export function drawSarcophagiOverlay(ctx) {
   if (!state.sarcophagi || state.sarcophagi.length === 0) return;
@@ -342,24 +323,21 @@ export function drawSarcophagiOverlay(ctx) {
   ctx.globalCompositeOperation = 'lighter';
   for (const s of state.sarcophagi) {
     if (!s.awakable || s.awakened) continue;
-    const px = s.tx * 32 - state.cameraX;
-    const py = s.ty * 32 - state.cameraY;
-    const w  = s.w * 32;
-    const h  = s.h * 32;
-    if (px + w < -16 || px > VIEW_W + 16 || py + h < -16 || py > VIEW_H + 16) continue;
+    if (s._crossX == null) continue;       // cache hasn't painted it yet
+    const cx = s._crossX - state.cameraX;
+    const cy = s._crossY - state.cameraY;
+    if (cx < -20 || cx > VIEW_W + 20 || cy < -20 || cy > VIEW_H + 20) continue;
     const pulse = 0.55 + Math.sin(t * 1.8 + (s.tx + s.ty) * 0.4) * 0.35;
-    // Soft halo around the whole sarcophagus.
-    const cx = px + w * 0.5;
-    const cy = py + h * 0.5;
-    const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, Math.max(w, h) * 0.9);
-    grd.addColorStop(0, `rgba(140, 180, 230, ${0.18 * pulse})`);
+    // Soft halo behind the cross.
+    const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, 14);
+    grd.addColorStop(0, `rgba(140, 200, 255, ${0.55 * pulse})`);
     grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = grd;
-    ctx.fillRect(px - 6, py - 6, w + 12, h + 12);
-    // Bright crack shimmer.
-    ctx.fillStyle = `rgba(180, 220, 255, ${0.35 * pulse})`;
-    if ((s.orient || 'h') === 'h') ctx.fillRect(px + w * 0.32, py + 6, w * 0.36, h - 12);
-    else                            ctx.fillRect(px + 6, py + h * 0.32, w - 12, h * 0.36);
+    ctx.fillRect(cx - 14, cy - 14, 28, 28);
+    // Bright pulse on the cross arms.
+    ctx.fillStyle = `rgba(190, 220, 255, ${0.9 * pulse})`;
+    ctx.fillRect(cx - 1, cy - 5, 2, 11);
+    ctx.fillRect(cx - 4, cy - 1, 8, 2);
   }
   ctx.restore();
 }
