@@ -158,21 +158,26 @@ function drawWeb(ctx, d) {
 function drawPlaque(ctx, d) {
   const px = d.tx * 32, py = d.ty * 32;
   ctx.save();
-  // Plaque slab.
-  ctx.fillStyle = '#5e5446';
-  ctx.fillRect(px + 7, py + 18, 18, 11);
-  ctx.fillStyle = '#7a6e5a';
-  ctx.fillRect(px + 7, py + 18, 18, 1);
-  ctx.fillStyle = '#3a3328';
-  ctx.fillRect(px + 7, py + 28, 18, 1);
-  // Engraved lines (illegible).
-  ctx.fillStyle = '#2a2418';
-  ctx.fillRect(px + 9,  py + 21, 8, 1);
-  ctx.fillRect(px + 9,  py + 24, 12, 1);
-  ctx.fillRect(px + 9,  py + 27, 6, 1);
-  // Subtle highlight on top edge.
-  ctx.fillStyle = 'rgba(255,220,160,0.18)';
-  ctx.fillRect(px + 8, py + 19, 16, 1);
+  // Drop shadow under the plaque so it lifts off the wall.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(px + 5, py + 17, 22, 14);
+  // Plaque slab — warmer, brighter sandstone tone.
+  ctx.fillStyle = '#9a8458';
+  ctx.fillRect(px + 6, py + 16, 20, 13);
+  // Top bevel (light) and bottom bevel (dark) for relief.
+  ctx.fillStyle = '#c8b078';
+  ctx.fillRect(px + 6, py + 16, 20, 2);
+  ctx.fillStyle = '#3a2e18';
+  ctx.fillRect(px + 6, py + 28, 20, 1);
+  ctx.fillRect(px + 25, py + 17, 1, 12);
+  // Engraved illegible lines.
+  ctx.fillStyle = '#2a1f10';
+  ctx.fillRect(px + 8,  py + 20, 10, 1);
+  ctx.fillRect(px + 8,  py + 23, 14, 1);
+  ctx.fillRect(px + 8,  py + 26, 8,  1);
+  // Subtle rim highlight.
+  ctx.fillStyle = 'rgba(255, 235, 180, 0.30)';
+  ctx.fillRect(px + 7, py + 17, 18, 1);
   ctx.restore();
 }
 
@@ -180,23 +185,31 @@ function drawPlaque(ctx, d) {
 function drawCrack(ctx, d) {
   const px = d.tx * 32, py = d.ty * 32;
   ctx.save();
-  // Crack line — a hand-traced jagged path.
-  ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-  ctx.lineWidth = 1.3;
+  // Lighter "stone exposed" stroke behind so the crack reads on dark walls.
+  ctx.strokeStyle = 'rgba(170, 160, 140, 0.55)';
+  ctx.lineWidth = 2.6;
+  ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(px + 16, py + 14);
-  ctx.lineTo(px + 14, py + 18);
-  ctx.lineTo(px + 17, py + 22);
-  ctx.lineTo(px + 13, py + 26);
+  ctx.moveTo(px + 16, py + 12);
+  ctx.lineTo(px + 13, py + 17);
+  ctx.lineTo(px + 18, py + 22);
+  ctx.lineTo(px + 12, py + 27);
   ctx.lineTo(px + 16, py + 30);
   ctx.stroke();
-  // Moss tufts along the crack.
-  ctx.fillStyle = '#4a6630';
-  ctx.fillRect(px + 12, py + 25, 3, 2);
-  ctx.fillRect(px + 17, py + 21, 2, 2);
-  ctx.fillStyle = '#6a8a3a';
-  ctx.fillRect(px + 13, py + 26, 1, 1);
-  ctx.fillRect(px + 17, py + 22, 1, 1);
+  // Black inner crack on top.
+  ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // Moss tufts with bright dot on top.
+  ctx.fillStyle = '#4f7530';
+  ctx.fillRect(px + 11, py + 25, 4, 3);
+  ctx.fillRect(px + 17, py + 20, 3, 3);
+  ctx.fillStyle = '#88b048';
+  ctx.fillRect(px + 12, py + 26, 2, 1);
+  ctx.fillRect(px + 18, py + 21, 1, 1);
+  // Tiny moss patch at the base for grounding.
+  ctx.fillStyle = '#3a5820';
+  ctx.fillRect(px + 14, py + 30, 5, 1);
   ctx.restore();
 }
 
@@ -204,24 +217,37 @@ function drawCrack(ctx, d) {
 function drawSconceBroken(ctx, d) {
   const px = d.tx * 32, py = d.ty * 32;
   ctx.save();
-  // Mounting plate.
-  ctx.fillStyle = '#2a1810';
-  ctx.fillRect(px + 14, py + 16, 4, 8);
-  // Bracket.
-  ctx.fillStyle = '#3a2a18';
-  ctx.fillRect(px + 11, py + 22, 10, 2);
-  // Tilted bowl (rim broken, dangling).
+  // Sooty smear on the wall above (the long-gone smoke).
+  const grd = ctx.createLinearGradient(px + 16, py + 8, px + 16, py + 22);
+  grd.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  grd.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(px + 9, py + 8, 14, 14);
+  // Mounting plate (lighter so it shows on dark wall).
+  ctx.fillStyle = '#5a4838';
+  ctx.fillRect(px + 13, py + 14, 6, 9);
+  ctx.fillStyle = '#8a6a48';
+  ctx.fillRect(px + 13, py + 14, 6, 1);
+  // Bracket arm.
+  ctx.fillStyle = '#6a4a30';
+  ctx.fillRect(px + 10, py + 21, 12, 2);
+  // Tilted broken bowl — dark cast iron with lighter rim chip.
   ctx.fillStyle = '#1a0e08';
   ctx.beginPath();
-  ctx.moveTo(px + 9,  py + 24);
-  ctx.lineTo(px + 23, py + 26);
-  ctx.lineTo(px + 21, py + 30);
-  ctx.lineTo(px + 11, py + 30);
+  ctx.moveTo(px + 8,  py + 23);
+  ctx.lineTo(px + 24, py + 25);
+  ctx.lineTo(px + 22, py + 30);
+  ctx.lineTo(px + 10, py + 30);
   ctx.closePath();
   ctx.fill();
-  // Soot streaks under it.
-  ctx.fillStyle = 'rgba(0,0,0,0.6)';
-  ctx.fillRect(px + 12, py + 30, 8, 1);
+  // Highlight on the broken rim.
+  ctx.fillStyle = '#7a5838';
+  ctx.fillRect(px + 8, py + 23, 16, 1);
+  // Cold ash trickle.
+  ctx.fillStyle = 'rgba(60, 50, 40, 0.85)';
+  ctx.fillRect(px + 13, py + 30, 6, 1);
+  ctx.fillStyle = 'rgba(120, 100, 80, 0.55)';
+  ctx.fillRect(px + 14, py + 31, 4, 1);
   ctx.restore();
 }
 
