@@ -177,12 +177,16 @@ export function generateDungeon(floor, seed, biome) {
     placeGlowMushrooms(map, rooms, rng, lights);
     placeMoonbeams(rooms, rng, sunbeams);
     placePuddles(map, rooms, rng, puddles);
+    placeRoomWallDecorations(map, rooms, rng, decorations, lights,
+      ['plaque', 'crack', 'sconceBroken']);
   }
 
   if (isCatacombs) {
     placeSkullPedestals(map, rooms, rng, lights);
     placeLoculi(map, rooms, rng, decorations);
     placeWebs(rooms, rng, decorations);
+    placeRoomWallDecorations(map, rooms, rng, decorations, lights,
+      ['namePlate', 'clawMarks', 'wallSkull']);
   }
 
   return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
@@ -406,6 +410,58 @@ function placeWebs(rooms, rng, decorations) {
     for (const c of corners) {
       if (rng() < 0.45) {
         decorations.push({ kind: 'web', tx: c.tx, ty: c.ty, q: c.q });
+      }
+    }
+  }
+}
+
+/**
+ * Place biome-specific flat decorations on the inward face of the **top**
+ * wall of each room — i.e. wall tiles whose tile below is room floor.
+ * That is the face the player sees head-on with a top-down camera, which
+ * is why it looks "ambient" instead of buried (same rule that made the
+ * loculus work). One kind per pick, randomised from `kinds`.
+ *
+ * @param {Array<number[]>} map
+ * @param {object[]} rooms
+ * @param {() => number} rng
+ * @param {object[]} decorations  Output: each entry `{kind, tx, ty, face:'S', seed}`.
+ * @param {object[]} lights       Existing lights (to avoid placing on top of sconces/candles).
+ * @param {string[]} kinds        Decoration kinds for this biome.
+ * @private
+ */
+function placeRoomWallDecorations(map, rooms, rng, decorations, lights, kinds) {
+  const PER_TILE_CHANCE = 0.18;
+  const PER_ROOM_CAP    = 2;
+
+  // Quick lookup for tiles already taken by something visible on the wall.
+  const tileTaken = (tx, ty) => {
+    if (decorations.some(d => d.tx === tx && d.ty === ty)) return true;
+    if (lights && lights.some(l =>
+      Math.floor(l.x / TILE) === tx && Math.floor(l.y / TILE) === ty)) return true;
+    return false;
+  };
+
+  for (const r of rooms) {
+    if (r.isStartRoom) continue;
+    if (r.w < 4 || r.h < 3) continue;
+    const y = r.y - 1;
+    if (y < 1) continue;
+
+    let placedHere = 0;
+    // Skip the two corner tiles so decorations don't fight with the
+    // corner cobwebs / corner torches.
+    for (let x = r.x + 1; x < r.x + r.w - 1 && placedHere < PER_ROOM_CAP; x++) {
+      if (!map[y] || map[y][x] !== T_WALL) continue;
+      if (!map[y + 1] || map[y + 1][x] !== T_FLOOR) continue;
+      if (tileTaken(x, y)) continue;
+      if (rng() < PER_TILE_CHANCE) {
+        const kind = kinds[Math.floor(rng() * kinds.length)];
+        decorations.push({
+          kind, tx: x, ty: y, face: 'S',
+          seed: Math.floor(rng() * 1e9),
+        });
+        placedHere++;
       }
     }
   }

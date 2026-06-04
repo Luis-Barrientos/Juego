@@ -15,6 +15,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.3.1',
+    date: '2026-06-04',
+    title: 'Más vida en los muros',
+    items: [
+      'Nuevas decoraciones empotradas en muros visibles desde el interior de las salas.',
+      'Ruinas (piso 1): placas grabadas, grietas con musgo y antorcheras rotas.',
+      'Catacumbas (piso 2): lápidas pequeñas, marcas de garras y calaveras empotradas.',
+      'Aplican la misma regla que el loculus: solo en muros que la cámara ve, nunca en muros traseros.',
+    ],
+  },
+  {
     version: '0.3.0',
     date: '2026-06-04',
     title: 'Desafío de la Cripta',

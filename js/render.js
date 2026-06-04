@@ -71,6 +71,12 @@ export function rebuildMapCache() {
     for (const d of state.decorations) {
       if (d.kind === 'loculus') drawLoculus(ctx, d);
       else if (d.kind === 'web') drawWeb(ctx, d);
+      else if (d.kind === 'plaque')       drawPlaque(ctx, d);
+      else if (d.kind === 'crack')        drawCrack(ctx, d);
+      else if (d.kind === 'sconceBroken') drawSconceBroken(ctx, d);
+      else if (d.kind === 'namePlate')    drawNamePlate(ctx, d);
+      else if (d.kind === 'clawMarks')    drawClawMarks(ctx, d);
+      else if (d.kind === 'wallSkull')    drawWallSkull(ctx, d);
     }
   }
 
@@ -139,11 +145,160 @@ function drawWeb(ctx, d) {
   }
   // Two arc rings of the web.
   ctx.strokeStyle = 'rgba(220, 220, 220, 0.35)';
-  for (let r = 5; r <= 11; r += 4) {
+  ctx.restore();
+}
+
+/* ─── Wall-face decorations ────────────────────────────────────────────
+ * All of these paint into the bottom strip (~22..30) of the wall tile so
+ * they read as carved/etched into the wall just above the floor as the
+ * top-down camera sees them. Coordinates assume face === 'S' (floor below).
+ */
+
+/** Stone plaque with engraved illegible script (ruins). */
+function drawPlaque(ctx, d) {
+  const px = d.tx * 32, py = d.ty * 32;
+  ctx.save();
+  // Plaque slab.
+  ctx.fillStyle = '#5e5446';
+  ctx.fillRect(px + 7, py + 18, 18, 11);
+  ctx.fillStyle = '#7a6e5a';
+  ctx.fillRect(px + 7, py + 18, 18, 1);
+  ctx.fillStyle = '#3a3328';
+  ctx.fillRect(px + 7, py + 28, 18, 1);
+  // Engraved lines (illegible).
+  ctx.fillStyle = '#2a2418';
+  ctx.fillRect(px + 9,  py + 21, 8, 1);
+  ctx.fillRect(px + 9,  py + 24, 12, 1);
+  ctx.fillRect(px + 9,  py + 27, 6, 1);
+  // Subtle highlight on top edge.
+  ctx.fillStyle = 'rgba(255,220,160,0.18)';
+  ctx.fillRect(px + 8, py + 19, 16, 1);
+  ctx.restore();
+}
+
+/** Vertical crack with moss tufts (ruins). */
+function drawCrack(ctx, d) {
+  const px = d.tx * 32, py = d.ty * 32;
+  ctx.save();
+  // Crack line — a hand-traced jagged path.
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(px + 16, py + 14);
+  ctx.lineTo(px + 14, py + 18);
+  ctx.lineTo(px + 17, py + 22);
+  ctx.lineTo(px + 13, py + 26);
+  ctx.lineTo(px + 16, py + 30);
+  ctx.stroke();
+  // Moss tufts along the crack.
+  ctx.fillStyle = '#4a6630';
+  ctx.fillRect(px + 12, py + 25, 3, 2);
+  ctx.fillRect(px + 17, py + 21, 2, 2);
+  ctx.fillStyle = '#6a8a3a';
+  ctx.fillRect(px + 13, py + 26, 1, 1);
+  ctx.fillRect(px + 17, py + 22, 1, 1);
+  ctx.restore();
+}
+
+/** Broken iron sconce (ruins). Empty bowl, no flame. */
+function drawSconceBroken(ctx, d) {
+  const px = d.tx * 32, py = d.ty * 32;
+  ctx.save();
+  // Mounting plate.
+  ctx.fillStyle = '#2a1810';
+  ctx.fillRect(px + 14, py + 16, 4, 8);
+  // Bracket.
+  ctx.fillStyle = '#3a2a18';
+  ctx.fillRect(px + 11, py + 22, 10, 2);
+  // Tilted bowl (rim broken, dangling).
+  ctx.fillStyle = '#1a0e08';
+  ctx.beginPath();
+  ctx.moveTo(px + 9,  py + 24);
+  ctx.lineTo(px + 23, py + 26);
+  ctx.lineTo(px + 21, py + 30);
+  ctx.lineTo(px + 11, py + 30);
+  ctx.closePath();
+  ctx.fill();
+  // Soot streaks under it.
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(px + 12, py + 30, 8, 1);
+  ctx.restore();
+}
+
+/** Small upright tombstone-ish plate with engraved cross (catacombs). */
+function drawNamePlate(ctx, d) {
+  const px = d.tx * 32, py = d.ty * 32;
+  ctx.save();
+  // Slab body.
+  ctx.fillStyle = '#3a4350';
+  ctx.fillRect(px + 11, py + 17, 10, 13);
+  // Rounded top.
+  ctx.beginPath();
+  ctx.arc(px + 16, py + 17, 5, Math.PI, 0);
+  ctx.fill();
+  // Engraved cross.
+  ctx.fillStyle = 'rgba(20, 25, 32, 0.85)';
+  ctx.fillRect(px + 15, py + 18, 2, 8);
+  ctx.fillRect(px + 13, py + 21, 6, 2);
+  // Top-edge highlight.
+  ctx.fillStyle = 'rgba(180,200,230,0.22)';
+  ctx.fillRect(px + 12, py + 17, 8, 1);
+  ctx.restore();
+}
+
+/** Three diagonal claw scratches (catacombs). */
+function drawClawMarks(ctx, d) {
+  const px = d.tx * 32, py = d.ty * 32;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.78)';
+  ctx.lineWidth = 1.2;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    const ox = i * 4;
     ctx.beginPath();
-    ctx.arc(ax, ay, r, baseAng - spread / 2, baseAng + spread / 2);
+    ctx.moveTo(px + 9 + ox,  py + 17);
+    ctx.lineTo(px + 13 + ox, py + 29);
     ctx.stroke();
   }
+  // Pale stone exposed beneath each scratch.
+  ctx.strokeStyle = 'rgba(200, 210, 220, 0.18)';
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 3; i++) {
+    const ox = i * 4;
+    ctx.beginPath();
+    ctx.moveTo(px + 10 + ox, py + 18);
+    ctx.lineTo(px + 14 + ox, py + 30);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** Skull embedded into the wall (catacombs). Smaller variant of the
+ *  pedestal skull, with no candle on top. */
+function drawWallSkull(ctx, d) {
+  const px = d.tx * 32, py = d.ty * 32;
+  ctx.save();
+  // Recess shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  ctx.ellipse(px + 16, py + 24, 7, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Skull dome.
+  ctx.fillStyle = 'rgba(190, 180, 160, 0.85)';
+  ctx.beginPath();
+  ctx.arc(px + 16, py + 22, 5, Math.PI, 0);
+  ctx.fill();
+  ctx.fillRect(px + 11, py + 22, 10, 4);
+  // Jaw.
+  ctx.fillStyle = 'rgba(160, 150, 130, 0.85)';
+  ctx.fillRect(px + 13, py + 26, 6, 2);
+  ctx.fillRect(px + 14, py + 28, 4, 1);
+  // Eye sockets.
+  ctx.fillStyle = '#000';
+  ctx.fillRect(px + 13, py + 22, 2, 2);
+  ctx.fillRect(px + 17, py + 22, 2, 2);
+  // Nose.
+  ctx.fillRect(px + 15.5, py + 25, 1, 1);
   ctx.restore();
 }
 
