@@ -157,12 +157,15 @@ export function generateDungeon(floor, seed, biome) {
   const decorations = [];
   const isRuins      = biome && biome.id === 'ruins';
   const isCatacombs  = biome && biome.id === 'crypt';
+  const isLibrary    = biome && biome.id === 'library';
 
   for (const r of rooms) {
     if (isRuins) {
       placeWallSconces(map, r, rng, lights, style.torchDensity);
     } else if (isCatacombs) {
       placeWallCandles(map, r, rng, lights, style.torchDensity);
+    } else if (isLibrary) {
+      placeWallSconces(map, r, rng, lights, style.torchDensity);
     } else {
       placeFloorTorches(r, rng, lights, style.torchDensity);
     }
@@ -191,6 +194,10 @@ export function generateDungeon(floor, seed, biome) {
 
   const soulSpawners = [];
   if (isCatacombs) placeSoulSpawners(rooms, rng, soulSpawners, sarcophagi);
+
+  if (isLibrary) {
+    placeMagicFlames(rooms, rng, lights);
+  }
 
   return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, soulSpawners, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
 }
@@ -717,6 +724,44 @@ function placeSoulSpawners(rooms, rng, soulSpawners, sarcophagi) {
       y: oy * TILE + TILE / 2,
       timer: rng() * 2.5,
     });
+  }
+}
+
+/**
+ * Library biome: place 1–3 floating magic flames per non-start room. Each
+ * flame oscillates between two anchor points inside the room, drifting
+ * irregularly so two flames never feel synced. Colour alternates between
+ * arcane purple and crimson per spawn for variety.
+ *
+ * @private
+ */
+function placeMagicFlames(rooms, rng, lights) {
+  for (const r of rooms) {
+    if (r.isStartRoom) continue;
+    if (r.w < 4 || r.h < 3) continue;
+
+    const count = 1 + Math.floor(rng() * 2) + (r.isLarge ? 1 : 0);
+    for (let i = 0; i < count; i++) {
+      // Anchor A and B inside the room, kept away from the walls.
+      const ax = (r.x + 1 + rng() * (r.w - 2)) * TILE;
+      const ay = (r.y + 1 + rng() * (r.h - 2)) * TILE;
+      const bx = (r.x + 1 + rng() * (r.w - 2)) * TILE;
+      const by = (r.y + 1 + rng() * (r.h - 2)) * TILE;
+      const purple = rng() < 0.65;
+      lights.push({
+        type:    'magicFlame',
+        ax, ay, bx, by,
+        x:       ax,
+        y:       ay,
+        // Independent phase + frequency so flames desync.
+        phase:   rng() * Math.PI * 2,
+        speed:   0.25 + rng() * 0.35,
+        wobble:  rng() * Math.PI * 2,
+        color:   purple ? [180, 120, 255] : [255,  90, 110],
+        r:       70 + rng() * 25,
+        flicker: rng() * Math.PI * 2,
+      });
+    }
   }
 }
 

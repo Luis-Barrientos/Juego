@@ -762,29 +762,51 @@ function drawDecoration(ctx, px, py, biome, rng) {
       break;
     }
     case 'books': {
-      const colors = ['#8a3010', '#3a3060', '#2a5a30', '#604010'];
-      for (let i = 0; i < 3; i++) {
+      // 2-3 fallen books, varied tilt and binding hue, with a faint shadow.
+      const colors = ['#8a3010', '#3a3060', '#2a5a30', '#604010', '#5a2a48'];
+      const n = 2 + Math.floor(rng() * 2);
+      for (let i = 0; i < n; i++) {
+        const bx = px + 4 + i * 7 + (rng() - 0.5) * 3;
+        const by = py + TILE - 9 + (rng() - 0.5) * 3;
+        const w  = 5 + Math.floor(rng() * 2);
+        const h  = 5 + Math.floor(rng() * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillRect(bx + 1, by + 1, w, h);
         ctx.fillStyle = colors[Math.floor(rng() * colors.length)];
-        ctx.fillRect(px + 4 + i * 6, py + TILE - 8, 5, 6);
+        ctx.fillRect(bx, by, w, h);
+        // Page edge.
+        ctx.fillStyle = 'rgba(220,200,160,0.85)';
+        ctx.fillRect(bx, by + h - 1, w, 1);
       }
       break;
     }
-    case 'rune': {
-      ctx.fillStyle = 'rgba(120,180,255,0.55)';
-      ctx.fillRect(cx - 4, cy, 8, 1);
-      ctx.fillRect(cx, cy - 4, 1, 8);
-      ctx.fillRect(cx - 3, cy - 3, 1, 1);
-      ctx.fillRect(cx + 3, cy - 3, 1, 1);
-      ctx.fillRect(cx - 3, cy + 3, 1, 1);
-      ctx.fillRect(cx + 3, cy + 3, 1, 1);
+    case 'paper': {
+      // Crumpled parchment scrap with a couple of ink lines.
+      ctx.fillStyle = 'rgba(0,0,0,0.30)';
+      ctx.fillRect(cx - 3, cy - 1, 8, 6);
+      ctx.fillStyle = 'rgba(225,205,165,0.85)';
+      ctx.fillRect(cx - 4, cy - 2, 8, 6);
+      ctx.fillStyle = 'rgba(70,40,12,0.7)';
+      ctx.fillRect(cx - 3, cy, 5, 1);
+      ctx.fillRect(cx - 3, cy + 2, 4, 1);
+      ctx.fillStyle = 'rgba(180,140,60,0.4)';
+      ctx.fillRect(cx + 1, cy - 2, 1, 2);
       break;
     }
-    case 'paper': {
-      ctx.fillStyle = 'rgba(220,200,160,0.5)';
-      ctx.fillRect(cx - 3, cy - 2, 6, 5);
-      ctx.fillStyle = 'rgba(60,40,10,0.5)';
-      ctx.fillRect(cx - 2, cy - 1, 4, 1);
-      ctx.fillRect(cx - 2, cy + 1, 3, 1);
+    case 'pages': {
+      // 3-4 loose paper sheets, scattered, slightly translucent.
+      for (let i = 0; i < 4; i++) {
+        const sx = px + 4 + rng() * (TILE - 10);
+        const sy = py + 4 + rng() * (TILE - 10);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(sx + 0.5, sy + 0.5, 5, 4);
+        ctx.fillStyle = 'rgba(230,210,170,0.85)';
+        ctx.fillRect(sx, sy, 5, 4);
+        if (rng() < 0.5) {
+          ctx.fillStyle = 'rgba(60,40,10,0.55)';
+          ctx.fillRect(sx + 1, sy + 1, 3, 1);
+        }
+      }
       break;
     }
     case 'bones': {
@@ -964,6 +986,24 @@ export function drawLighting(ctx) {
       // Strong cool altar flame, lively flicker.
       radius = lt.r + Math.sin(lt.flicker * 0.8) * 6 + Math.sin(lt.flicker * 2.1) * 3;
       color  = [170, 210, 255];
+    } else if (lt.type === 'magicFlame') {
+      // Floating arcane flame: drifts between two anchors with irregular
+      // speed, pulses and breathes. Position is updated here so the light
+      // pool, the sprite pass and any other consumer see the same xy.
+      const t = state.time * lt.speed + lt.phase;
+      // Smoothstep-like ease so it slows near the anchors.
+      const k = 0.5 - 0.5 * Math.cos(t);
+      // Add a small perpendicular wobble so the path is not a straight line.
+      const dx = lt.bx - lt.ax;
+      const dy = lt.by - lt.ay;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len, ny = dx / len;
+      const wob = Math.sin(state.time * 1.3 + lt.wobble) * 6;
+      lt.x = lt.ax + dx * k + nx * wob;
+      lt.y = lt.ay + dy * k + ny * wob - 2;
+      const pulse = 1 + Math.sin(state.time * 2 + lt.phase) * 0.10;
+      radius = lt.r * pulse;
+      color  = lt.color || [180, 120, 255];
     } else {
       radius = lt.r + Math.sin(lt.flicker) * 6;
     }
@@ -1121,6 +1161,38 @@ export function drawLighting(ctx) {
       ctx.beginPath();
       ctx.ellipse(lx + dir * 2 + 0.2, ly - 5.5 + cfl, 0.5, 1.2, 0, 0, Math.PI * 2);
       ctx.fill();
+    } else if (lt.type === 'magicFlame') {
+      // Floating arcane orb: outer halo, inner glow, bright core. Two thin
+      // tendrils licking upward give it a flame feel without a wick.
+      const c   = lt.color || [180, 120, 255];
+      const bob = Math.sin(state.time * 2 + lt.phase) * 1.2;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      // Outer halo.
+      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},0.35)`;
+      ctx.beginPath();
+      ctx.arc(lx, ly + bob, 8, 0, Math.PI * 2);
+      ctx.fill();
+      // Inner glow.
+      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},0.85)`;
+      ctx.beginPath();
+      ctx.arc(lx, ly + bob, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      // Bright core.
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      ctx.arc(lx, ly + bob, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      // Upward tendrils.
+      ctx.strokeStyle = `rgba(${c[0]},${c[1]},${c[2]},0.55)`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(lx - 1.5, ly + bob - 2);
+      ctx.quadraticCurveTo(lx - 0.5, ly + bob - 6, lx + 0.5, ly + bob - 9);
+      ctx.moveTo(lx + 1.6, ly + bob - 1);
+      ctx.quadraticCurveTo(lx + 1.0, ly + bob - 5, lx - 0.4, ly + bob - 8);
+      ctx.stroke();
+      ctx.restore();
     } else {
       // Floor torch: stake + flame
       ctx.fillStyle = '#3a2010';

@@ -15,6 +15,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.6.0',
+    date: '2026-06-04',
+    title: 'Biblioteca: ecos de magia',
+    items: [
+      'Nueva paleta del piso 2: marrón cálido con acentos arcanos.',
+      'Iluminación mixta: velas/sconces cálidos en muros + fuegos mágicos flotantes (azul-violeta y rojo) que derivan irregularmente entre dos puntos.',
+      'Decoraciones de suelo nuevas: libros caídos con sombra, pergaminos arrugados con tinta y hojas sueltas.',
+      'Pendiente: estanterías y mesas sólidas (commit 2).',
+    ],
+  },
+  {
     version: '0.5.0',
     date: '2026-06-04',
     title: 'Reordenando el descenso',
