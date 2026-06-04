@@ -124,15 +124,12 @@ export function generateDungeon(floor, seed, biome) {
   const isRuinsBiome = biome && biome.id === 'ruins';
   if (isRuinsBiome) placePillars(rooms, map, rng);
 
-  // Sarcophagi: catacombs equivalent of pillars. Star room becomes the
-  // crypta (altar + awakable cracked sarcophagi). Need to place AFTER
-  // expandStarRooms (already ran above) and BEFORE corridor carving so
-  // tiles consumed by sarcophagi don't sit inside corridors.
+  // Sarcophagi placement is deferred until AFTER corridor carving so the
+  // pasillos no las pisan (carveCorridor convierte tiles a T_FLOOR sin
+  // mirar lo que había antes).
   const isCatacombsBiome = biome && biome.id === 'crypt';
   const sarcophagi = [];
-  // Pre-create lights so placeSarcophagi can append the altar's flame.
-  const lights      = [];
-  if (isCatacombsBiome) placeSarcophagi(rooms, map, rng, sarcophagi, lights);
+  const lights     = [];
 
   // Connect rooms using a Minimum Spanning Tree built from a complete
   // distance graph. Then add ~27% extra short edges to create loops and
@@ -141,6 +138,9 @@ export function generateDungeon(floor, seed, biome) {
   for (const [i, j] of connections) {
     carveCorridor(map, rooms[i], rooms[j], rooms, rng, style.corridorW);
   }
+
+  // Catacombs structural decor (after corridors so tombs survive).
+  if (isCatacombsBiome) placeSarcophagi(rooms, map, rng, sarcophagi, lights);
 
   // Now that corridors are carved, place the stair tile. Its centre is
   // protected from sarcophagi/pillars by the room flag check above.
