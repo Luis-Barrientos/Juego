@@ -64,18 +64,20 @@ export function rebuildMapCache() {
 /**
  * Paint a long jagged ceiling fissure with a bright leaking edge.
  * The crack is a polyline already computed in dungeon.js.
+ * Thin moonbeams use a smaller, cooler highlight.
  * @private
  */
 function drawCeilingCrack(ctx, sb) {
   const pts = sb.crack;
   if (!pts || pts.length < 2) return;
+  const isThin = sb.kind === 'thin';
   ctx.save();
 
   // Soft glow around the crack so it reads as light leaking through.
-  ctx.shadowColor = 'rgba(255, 240, 180, 0.55)';
-  ctx.shadowBlur  = 8;
-  ctx.strokeStyle = 'rgba(255, 245, 200, 0.35)';
-  ctx.lineWidth   = 4;
+  ctx.shadowColor = isThin ? 'rgba(200, 220, 255, 0.45)' : 'rgba(255, 240, 180, 0.55)';
+  ctx.shadowBlur  = isThin ? 4 : 8;
+  ctx.strokeStyle = isThin ? 'rgba(220, 235, 255, 0.30)' : 'rgba(255, 245, 200, 0.35)';
+  ctx.lineWidth   = isThin ? 2 : 4;
   ctx.lineCap     = 'round';
   ctx.lineJoin    = 'round';
   ctx.beginPath();
@@ -86,15 +88,17 @@ function drawCeilingCrack(ctx, sb) {
 
   // Dark fissure body (the actual gap in the stone).
   ctx.strokeStyle = 'rgba(8, 6, 4, 0.95)';
-  ctx.lineWidth   = 2.2;
+  ctx.lineWidth   = isThin ? 1.2 : 2.2;
   ctx.beginPath();
   ctx.moveTo(pts[0][0], pts[0][1]);
   for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
   ctx.stroke();
 
   // Bright inner highlight — sunlight breaking through.
-  ctx.strokeStyle = 'rgba(255, 248, 210, 0.85)';
-  ctx.lineWidth   = 0.9;
+  ctx.strokeStyle = isThin
+    ? 'rgba(220, 240, 255, 0.7)'
+    : 'rgba(255, 248, 210, 0.85)';
+  ctx.lineWidth   = isThin ? 0.6 : 0.9;
   ctx.beginPath();
   ctx.moveTo(pts[0][0], pts[0][1] - 0.4);
   for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1] - 0.4);
@@ -402,21 +406,37 @@ export function drawLighting(ctx) {
     lctx.fill();
   }
 
-  // Torches
+  // Torches, sconces, campfires and glowing mushrooms — each emits a
+  // radial cut into the ambient overlay, with size and colour by type.
   const tc = (biome && biome.torchColor) || [255, 200, 140];
   for (const lt of state.lights) {
-    lt.flicker += 0.15;
+    lt.flicker = (lt.flicker || 0) + 0.15;
     const lx = lt.x - state.cameraX;
     const ly = lt.y - state.cameraY;
     if (lx < -lt.r || lx > VIEW_W + lt.r || ly < -lt.r || ly > VIEW_H + lt.r) continue;
-    const r = lt.r + Math.sin(lt.flicker) * 6;
-    const grad = lctx.createRadialGradient(lx, ly, 5, lx, ly, r);
-    grad.addColorStop(0,   `rgba(${tc[0]},${tc[1]},${tc[2]},1)`);
-    grad.addColorStop(0.6, `rgba(${tc[0]},${tc[1]},${tc[2]},0.5)`);
+
+    let color = tc;
+    let radius = lt.r;
+    if (lt.type === 'campfire') {
+      // Big warm ember glow with strong flicker.
+      radius = lt.r + Math.sin(lt.flicker) * 10 + Math.sin(lt.flicker * 2.3) * 4;
+      color  = [255, 180, 90];
+    } else if (lt.type === 'glowMushroom') {
+      // Cool, almost steady cyan/teal pulse.
+      const pulse = 1 + Math.sin(state.time * 1.6 + (lt.phase || 0)) * 0.18;
+      radius = lt.r * pulse;
+      color  = lt.variant === 0 ? [120, 230, 200] : [120, 200, 255];
+    } else {
+      radius = lt.r + Math.sin(lt.flicker) * 6;
+    }
+
+    const grad = lctx.createRadialGradient(lx, ly, 5, lx, ly, radius);
+    grad.addColorStop(0,   `rgba(${color[0]},${color[1]},${color[2]},1)`);
+    grad.addColorStop(0.6, `rgba(${color[0]},${color[1]},${color[2]},0.5)`);
     grad.addColorStop(1,   'rgba(0,0,0,0)');
     lctx.fillStyle = grad;
     lctx.beginPath();
-    lctx.arc(lx, ly, r, 0, Math.PI * 2);
+    lctx.arc(lx, ly, radius, 0, Math.PI * 2);
     lctx.fill();
   }
 
@@ -436,7 +456,8 @@ export function drawLighting(ctx) {
 
   // Sunbeams cut the ambient overlay so the floor under the ceiling crack
   // actually receives sunlight. Each beam carries a deterministic irregular
-  // polygon (the crack shape) precomputed at level generation.
+  // polygon (the crack shape) precomputed at level generation. Thin
+  // moonbeams cut a smaller hole.
   if (state.sunbeams && state.sunbeams.length > 0) {
     for (const sb of state.sunbeams) {
       const sx = sb.x - state.cameraX;
@@ -456,10 +477,17 @@ export function drawLighting(ctx) {
       lctx.closePath();
       lctx.clip();
 
+      const isThin = sb.kind === 'thin';
       const grad = lctx.createLinearGradient(0, sy, 0, sy + sb.h);
-      grad.addColorStop(0,    'rgba(255,255,255,0.95)');
-      grad.addColorStop(0.55, 'rgba(255,255,255,0.55)');
-      grad.addColorStop(1,    'rgba(255,255,255,0)');
+      if (isThin) {
+        grad.addColorStop(0,    'rgba(255,255,255,0.45)');
+        grad.addColorStop(0.6,  'rgba(255,255,255,0.20)');
+        grad.addColorStop(1,    'rgba(255,255,255,0)');
+      } else {
+        grad.addColorStop(0,    'rgba(255,255,255,0.95)');
+        grad.addColorStop(0.55, 'rgba(255,255,255,0.55)');
+        grad.addColorStop(1,    'rgba(255,255,255,0)');
+      }
       lctx.fillStyle = grad;
       lctx.fillRect(sx - halfBBox, sy, halfBBox * 2, sb.h);
       lctx.restore();
@@ -468,19 +496,22 @@ export function drawLighting(ctx) {
 
   ctx.drawImage(lightCanvas, 0, 0);
 
-  // Warm tint over torches and stairs (additive).
+  // Warm tint over fire-based lights and stairs (additive). Glow mushrooms
+  // are cool-toned and skip this pass.
   ctx.globalCompositeOperation = 'lighter';
   const tint = (biome && biome.torchTint) || 'rgba(255,160,80,0.18)';
   for (const lt of state.lights) {
+    if (lt.type === 'glowMushroom') continue;
     const lx = lt.x - state.cameraX;
     const ly = lt.y - state.cameraY;
     if (lx < -120 || lx > VIEW_W + 120 || ly < -120 || ly > VIEW_H + 120) continue;
-    const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, 80);
-    grad.addColorStop(0, tint);
+    const tintRadius = lt.type === 'campfire' ? 130 : 80;
+    const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, tintRadius);
+    grad.addColorStop(0, lt.type === 'campfire' ? 'rgba(255,140,60,0.28)' : tint);
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(lx, ly, 80, 0, Math.PI * 2);
+    ctx.arc(lx, ly, tintRadius, 0, Math.PI * 2);
     ctx.fill();
   }
   for (const r of state.rooms) {
@@ -524,6 +555,10 @@ export function drawLighting(ctx) {
       ctx.beginPath();
       ctx.ellipse(lx + dir * 3, ly - 7 + fl, 1, 2.4, 0, 0, Math.PI * 2);
       ctx.fill();
+    } else if (lt.type === 'campfire') {
+      drawCampfireSprite(ctx, lx, ly, lt.flicker);
+    } else if (lt.type === 'glowMushroom') {
+      drawGlowMushroomSprite(ctx, lx, ly, lt.variant, state.time + (lt.phase || 0));
     } else {
       // Floor torch: stake + flame
       ctx.fillStyle = '#3a2010';
@@ -534,6 +569,101 @@ export function drawLighting(ctx) {
       ctx.beginPath(); ctx.ellipse(lx, ly - 6 + fl, 1.5, 3, 0, 0, Math.PI * 2); ctx.fill();
     }
   }
+}
+
+/**
+ * Draw a traveller campfire: a stone ring, two crossed charred logs and a
+ * lively flame with a couple of layers. Slight ash patch underneath sells
+ * the 'someone camped here' vibe.
+ * @private
+ */
+function drawCampfireSprite(ctx, lx, ly, flicker) {
+  // Ash circle on the ground.
+  ctx.fillStyle = 'rgba(40, 30, 25, 0.55)';
+  ctx.beginPath();
+  ctx.ellipse(lx, ly + 4, 11, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ring of stones (6 stones around the fire).
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    const sx = lx + Math.cos(a) * 9;
+    const sy = ly + Math.sin(a) * 4 + 3;
+    ctx.fillStyle = '#5a5450';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, 2.5, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#7a7470';
+    ctx.fillRect(sx - 1, sy - 1.5, 1, 1);
+  }
+
+  // Crossed logs.
+  ctx.strokeStyle = '#3a2410';
+  ctx.lineWidth   = 3;
+  ctx.lineCap     = 'round';
+  ctx.beginPath();
+  ctx.moveTo(lx - 6, ly + 3);
+  ctx.lineTo(lx + 6, ly - 1);
+  ctx.moveTo(lx - 6, ly - 1);
+  ctx.lineTo(lx + 6, ly + 3);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+
+  // Flame layers (3 ellipses for depth) with flicker.
+  const fl = Math.sin(flicker * 1.3) * 1.2 + Math.sin(flicker * 3.7) * 0.6;
+  ctx.fillStyle = '#a02810';
+  ctx.beginPath();
+  ctx.ellipse(lx, ly - 4 + fl * 0.3, 5.5, 7 + fl, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ff7028';
+  ctx.beginPath();
+  ctx.ellipse(lx, ly - 5 + fl * 0.5, 3.5, 5.5 + fl * 0.7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffd070';
+  ctx.beginPath();
+  ctx.ellipse(lx, ly - 6 + fl * 0.7, 1.8, 3 + fl * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tiny ember rising above (one pixel).
+  if ((Math.floor(flicker * 20) % 7) === 0) {
+    ctx.fillStyle = 'rgba(255, 200, 100, 0.9)';
+    const ey = ly - 12 - (flicker % 6);
+    ctx.fillRect(lx + Math.sin(flicker) * 2, ey, 1, 1);
+  }
+}
+
+/**
+ * Draw a small bioluminescent mushroom: thin pale stalk with a coloured
+ * dome cap and a soft glow halo. Variant 0 = teal/green, 1 = blue/cyan.
+ * @private
+ */
+function drawGlowMushroomSprite(ctx, lx, ly, variant, t) {
+  const cap = variant === 0
+    ? { dim: '#1e5a48', mid: '#3aaa78', hi: '#a8ffd6' }
+    : { dim: '#1e487a', mid: '#3a78aa', hi: '#a8d8ff' };
+  const pulse = 0.7 + Math.sin(t * 2.4) * 0.3;
+
+  // Halo
+  const haloR = 6 * pulse + 3;
+  const halo  = ctx.createRadialGradient(lx, ly - 2, 0, lx, ly - 2, haloR);
+  halo.addColorStop(0, variant === 0 ? `rgba(160, 255, 220, ${0.45 * pulse})` : `rgba(160, 220, 255, ${0.45 * pulse})`);
+  halo.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(lx, ly - 2, haloR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Stalk
+  ctx.fillStyle = '#d8d0b8';
+  ctx.fillRect(lx - 0.5, ly - 1, 1, 4);
+
+  // Cap (3 layers for shading)
+  ctx.fillStyle = cap.dim;
+  ctx.beginPath(); ctx.ellipse(lx, ly - 1, 3, 2, 0, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = cap.mid;
+  ctx.beginPath(); ctx.ellipse(lx, ly - 1.4, 2.4, 1.4, 0, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = cap.hi;
+  ctx.fillRect(lx - 1, ly - 2, 1, 1);
 }
 
 /**
@@ -567,31 +697,43 @@ export function drawSunbeams(ctx) {
     ctx.clip();
 
     // Main body — warm vertical gradient.
+    const isThin = sb.kind === 'thin';
     const grad = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
-    grad.addColorStop(0,    'rgba(255, 240, 180, 0.26)');
-    grad.addColorStop(0.55, 'rgba(255, 230, 160, 0.12)');
-    grad.addColorStop(1,    'rgba(255, 220, 140, 0.00)');
+    if (isThin) {
+      // Cool, delicate, no god-rays or dust — just a sliver of moonlight.
+      grad.addColorStop(0,    'rgba(220, 230, 255, 0.18)');
+      grad.addColorStop(0.7,  'rgba(220, 230, 255, 0.06)');
+      grad.addColorStop(1,    'rgba(220, 230, 255, 0)');
+    } else {
+      grad.addColorStop(0,    'rgba(255, 240, 180, 0.26)');
+      grad.addColorStop(0.55, 'rgba(255, 230, 160, 0.12)');
+      grad.addColorStop(1,    'rgba(255, 220, 140, 0.00)');
+    }
     ctx.fillStyle = grad;
     ctx.fillRect(sx - halfBBox, sy, halfBBox * 2, sb.h);
 
-    // Parallel god-rays: 3 thin vertical bands drifting horizontally so the
-    // beam feels volumetric instead of flat.
-    const rayCount = 3;
-    const rayHalf  = sb.length * 0.42;
-    for (let k = 0; k < rayCount; k++) {
-      const phase  = (sb.seed * 0.0001) + k * 1.7;
-      const drift  = Math.sin(t * 0.35 + phase) * (sb.splay * 0.35);
-      const baseX  = sx + ((k - (rayCount - 1) / 2) / (rayCount)) * rayHalf * 1.4 + drift;
-      const width  = 6 + Math.sin(t * 0.7 + phase) * 1.5;
-      const alpha  = 0.05 + (Math.sin(t * 0.9 + phase) * 0.5 + 0.5) * 0.06;
-      const rgrad  = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
-      rgrad.addColorStop(0,   `rgba(255, 245, 200, ${alpha * 1.3})`);
-      rgrad.addColorStop(0.7, `rgba(255, 235, 170, ${alpha * 0.6})`);
-      rgrad.addColorStop(1,   'rgba(255, 220, 140, 0)');
-      ctx.fillStyle = rgrad;
-      ctx.fillRect(baseX - width / 2, sy, width, sb.h);
+    if (!isThin) {
+      // Parallel god-rays: 3 thin vertical bands drifting horizontally so the
+      // beam feels volumetric instead of flat.
+      const rayCount = 3;
+      const rayHalf  = sb.length * 0.42;
+      for (let k = 0; k < rayCount; k++) {
+        const phase  = (sb.seed * 0.0001) + k * 1.7;
+        const drift  = Math.sin(t * 0.35 + phase) * (sb.splay * 0.35);
+        const baseX  = sx + ((k - (rayCount - 1) / 2) / (rayCount)) * rayHalf * 1.4 + drift;
+        const width  = 6 + Math.sin(t * 0.7 + phase) * 1.5;
+        const alpha  = 0.05 + (Math.sin(t * 0.9 + phase) * 0.5 + 0.5) * 0.06;
+        const rgrad  = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
+        rgrad.addColorStop(0,   `rgba(255, 245, 200, ${alpha * 1.3})`);
+        rgrad.addColorStop(0.7, `rgba(255, 235, 170, ${alpha * 0.6})`);
+        rgrad.addColorStop(1,   'rgba(255, 220, 140, 0)');
+        ctx.fillStyle = rgrad;
+        ctx.fillRect(baseX - width / 2, sy, width, sb.h);
+      }
     }
     ctx.restore();
+
+    if (isThin) continue;            // No dust on thin moonbeams.
 
     // Dust motes — fall with gravity, twinkle, respawn at the crack.
     // Drawn UNCLIPPED so a few escape past the floor edge for realism.

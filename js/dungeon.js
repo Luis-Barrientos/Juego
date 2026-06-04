@@ -140,6 +140,9 @@ export function generateDungeon(floor, seed, biome) {
   // a hard cap so the floor never feels like an open courtyard.
   if (isRuins) {
     placeSunbeams(rooms, rng, sunbeams);
+    placeCampfires(rooms, rng, lights);
+    placeGlowMushrooms(map, rooms, rng, lights);
+    placeMoonbeams(rooms, rng, sunbeams);
   }
 
   return { map, rooms, lights, sunbeams, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
@@ -264,6 +267,127 @@ function placeSunbeams(rooms, rng, sunbeams) {
     sb.shape = buildBeamShape(sb, rng);
     sb.crack = buildCrackPath(sb, rng);
     sunbeams.push(sb);
+  }
+}
+
+/**
+ * Place 1-2 traveller campfires across the floor in non-star, non-stairs
+ * rooms. Each campfire emits a wide warm light and is decorated with a
+ * stone ring + crossed logs, giving the impression that someone camped
+ * here before. Skips small rooms (no space for the ring).
+ * @private
+ */
+function placeCampfires(rooms, rng, lights) {
+  const HARD_CAP = 2;
+  const eligible = rooms.filter(r =>
+    !r.isLarge && !r.isStairsRoom && !r.isStartRoom &&
+    r.w >= 5 && r.h >= 5
+  );
+  // Shuffle and pick.
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+  const target = Math.min(HARD_CAP, eligible.length, 1 + Math.floor(rng() * 2));
+  for (let i = 0; i < target; i++) {
+    const r = eligible[i];
+    // Place near centre with a small offset so it doesn't sit on the
+    // exact pathing midpoint.
+    const ox = (rng() - 0.5) * Math.min(r.w - 4, 4);
+    const oy = (rng() - 0.5) * Math.min(r.h - 4, 3);
+    lights.push({
+      type:    'campfire',
+      x:       (r.x + r.w / 2 + ox) * TILE,
+      y:       (r.y + r.h / 2 + oy) * TILE,
+      r:       170 + rng() * 30,
+      flicker: rng() * Math.PI * 2,
+    });
+  }
+}
+
+/**
+ * Drop clusters of glowing mushrooms hugging the inside of room walls.
+ * Each mushroom emits a faint cool light, evoking the 'green ruins'
+ * biome. Total light count is capped to keep the lighting overlay cheap.
+ * @private
+ */
+function placeGlowMushrooms(map, rooms, rng, lights) {
+  const GLOBAL_CAP = 14;
+  let placed = 0;
+  for (const r of rooms) {
+    if (placed >= GLOBAL_CAP) break;
+    // Skip the smallest rooms; clusters need a wall edge with space.
+    if (r.w < 5 || r.h < 4) continue;
+    if (rng() > 0.65) continue;     // not every room
+    const clusterCount = 1 + Math.floor(rng() * 2); // 1-2 clusters
+    for (let c = 0; c < clusterCount && placed < GLOBAL_CAP; c++) {
+      const wallSide = Math.floor(rng() * 4); // 0=top 1=right 2=bot 3=left
+      // Pick anchor 1 tile inside the wall.
+      let ax, ay;
+      if (wallSide === 0)      { ax = r.x + 1 + Math.floor(rng() * (r.w - 2)); ay = r.y; }
+      else if (wallSide === 1) { ax = r.x + r.w - 1; ay = r.y + 1 + Math.floor(rng() * (r.h - 2)); }
+      else if (wallSide === 2) { ax = r.x + 1 + Math.floor(rng() * (r.w - 2)); ay = r.y + r.h - 1; }
+      else                     { ax = r.x; ay = r.y + 1 + Math.floor(rng() * (r.h - 2)); }
+      const groupSize = 2 + Math.floor(rng() * 3); // 2-4
+      for (let g = 0; g < groupSize && placed < GLOBAL_CAP; g++) {
+        const jx = ax + (rng() - 0.5) * 1.6;
+        const jy = ay + (rng() - 0.5) * 1.6;
+        // Skip if anchor isn't on a floor tile (safety).
+        const tx = Math.round(jx), ty = Math.round(jy);
+        if (ty < 0 || ty >= MAP_H || tx < 0 || tx >= MAP_W) continue;
+        if (map[ty][tx] !== T_FLOOR) continue;
+        lights.push({
+          type:    'glowMushroom',
+          x:       jx * TILE + TILE / 2,
+          y:       jy * TILE + TILE / 2,
+          r:       42 + rng() * 14,
+          // Variant 0 = blue-green, 1 = teal — picked deterministically.
+          variant: (placed + g) & 1,
+          phase:   rng() * Math.PI * 2,
+        });
+        placed++;
+      }
+    }
+  }
+}
+
+/**
+ * Thin moonbeams: small, fine shafts of light coming through tiny holes
+ * in the ceiling on rooms that are NOT star rooms. No god-rays or dust,
+ * just a delicate vertical sliver — gives texture to medium rooms.
+ * Re-uses the sunbeam container/render path with a `kind: 'thin'` tag.
+ * @private
+ */
+function placeMoonbeams(rooms, rng, beams) {
+  const HARD_CAP = 4;
+  const eligible = rooms.filter(r =>
+    !r.isLarge && r.w >= 5 && r.h >= 4
+  );
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+  let placed = 0;
+  for (const r of eligible) {
+    if (placed >= HARD_CAP) break;
+    if (rng() > 0.30) continue;
+    // Tiny crack: 8-14 px wide, slightly off-centre horizontally.
+    const length = 8 + Math.floor(rng() * 7);
+    const ox     = (rng() - 0.5) * (r.w - 2) * TILE * 0.6;
+    const sb = {
+      kind: 'thin',
+      x:    (r.x + r.w / 2) * TILE + ox,
+      y:    r.y * TILE,
+      h:    r.h * TILE,
+      length,
+      splay: 6 + rng() * 6,
+      seed:  Math.floor(rng() * 1e9),
+      wallRow: r.y - 1,
+    };
+    sb.shape = buildBeamShape(sb, rng);
+    sb.crack = buildCrackPath(sb, rng);
+    beams.push(sb);
+    placed++;
   }
 }
 
