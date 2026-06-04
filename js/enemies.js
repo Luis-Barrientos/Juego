@@ -400,8 +400,13 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     const base = Math.ceil(area / 28);
     const n    = Math.max(2, Math.min(4 + floor, base + irand(0, 1 + Math.floor(floor / 2))));
     for (let i = 0; i < n; i++) {
-      const ex = (r.x + irand(1, r.w - 2)) * TILE + TILE / 2;
-      const ey = (r.y + irand(1, r.h - 2)) * TILE + TILE / 2;
+      let ex, ey, safety = 12;
+      do {
+        ex = (r.x + irand(1, r.w - 2)) * TILE + TILE / 2;
+        ey = (r.y + irand(1, r.h - 2)) * TILE + TILE / 2;
+        safety--;
+      } while (isWall(state.map, Math.floor(ex / TILE), Math.floor(ey / TILE)) && safety > 0);
+      if (safety <= 0) continue;
       const e = createEnemy(choice(pool), ex, ey, floor);
       e.room = r;
       state.enemies.push(e);

@@ -3,7 +3,7 @@
  */
 
 import { state } from './state.js';
-import { tryMove } from './dungeon.js';
+import { tryMove, isWall } from './dungeon.js';
 import { Audio } from './audio.js';
 import { spawnParticles } from './particles.js';
 import { spawnFloatText } from './particles.js';
@@ -226,17 +226,55 @@ function drawChest(ctx, l, x, y) {
   }
 }
 
-/** Place a chest at the centre of `room`. */
+/** Place a chest at the centre of `room` (or the closest free floor tile
+ *  if the centre is occupied by props/walls). */
 export function spawnChest(room, opts = {}) {
   const rare = !!opts.rare;
+  const { tx, ty } = findFreeTileNear(room, room.cx, room.cy);
   state.loot.push({
     type: 'chest', opened: false,
     rare,
     cost: rare ? 50 : 0,
-    x: room.cx * TILE + TILE / 2,
-    y: room.cy * TILE + TILE / 2,
+    x: tx * TILE + TILE / 2,
+    y: ty * TILE + TILE / 2,
     age: 0, r: 12, vx: 0, vy: 0,
   });
+}
+
+/**
+ * Spiral outward from (cx, cy) looking for the first walkable floor tile
+ * inside the room that is not already occupied by another chest. Falls
+ * back to (cx, cy) if nothing is found.
+ * @private
+ */
+function findFreeTileNear(room, cx, cy) {
+  const isOccupied = (tx, ty) => {
+    if (state.map && isWall(state.map, tx, ty)) return true;
+    for (const l of state.loot) {
+      if (l.type !== 'chest') continue;
+      const lx = Math.floor(l.x / TILE);
+      const ly = Math.floor(l.y / TILE);
+      if (lx === tx && ly === ty) return true;
+    }
+    // Also avoid stair tile.
+    if (state.map && state.map[ty] && state.map[ty][tx] === 3) return true;
+    return false;
+  };
+  const inRoom = (tx, ty) =>
+    tx >= room.x && tx < room.x + room.w &&
+    ty >= room.y && ty < room.y + room.h;
+  for (let radius = 0; radius < 6; radius++) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius && radius !== 0) continue;
+        const tx = cx + dx;
+        const ty = cy + dy;
+        if (!inRoom(tx, ty)) continue;
+        if (!isOccupied(tx, ty)) return { tx, ty };
+      }
+    }
+  }
+  return { tx: cx, ty: cy };
 }
 
 /**
