@@ -403,7 +403,7 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     }
   }
   for (const r of state.rooms) {
-    if (r.isStartRoom) continue;
+    if (r.isStartRoom || r.isStairsRoom) continue;
     if (Math.random() < 0.32) {
       spawnChest(r, { rare: Math.random() < 0.18 });
     }
