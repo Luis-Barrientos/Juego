@@ -23,6 +23,8 @@ export const ENEMY_TYPES = {
     color: '#e0e0d0', glow: '#ffffff',
     score: 25, gold: [5, 12],
     range: 26, attackCool: 0.7, behavior: 'melee',
+    /** Bone-throw range band (min, max) and cooldown seconds. */
+    throwMin: 110, throwMax: 220, throwCool: 3.2,
   },
   mage: {
     hp: 40, dmg: 16, speed: 65, r: 10,
@@ -63,6 +65,10 @@ export function createEnemy(type, x, y, floor) {
     walkAnim: Math.random() * Math.PI * 2,
     gold: t.gold,
     room: null,
+    // Skeleton-specific bone throw timers/state (unused by other types).
+    throwCool: t.throwCool ? 1 + Math.random() * 2 : 0,
+    aimTime:   0,
+    aimAng:    0,
   };
 }
 
@@ -83,6 +89,13 @@ export function createBoss(x, y) {
     gold: [100, 200],
     isBoss: true,
   };
+}
+
+/** @private Wrap an angle to (-π, π]. */
+function wrapAngle(a) {
+  while (a > Math.PI)  a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
 }
 
 /**
@@ -112,6 +125,45 @@ export function enemyUpdate(e, dt, hooks) {
   if (e.behavior === 'boss') {
     bossAI(e, dt, dx, dy, d, hooks);
     return;
+  }
+
+  // Skeleton-only: bone throw with telegraph. Replaces the chase frame
+  // when winding up so the player can read the attack and dodge.
+  if (e.type === 'skeleton') {
+    const t = ENEMY_TYPES.skeleton;
+    e.throwCool = Math.max(0, e.throwCool - dt);
+    if (e.aimTime > 0) {
+      e.aimTime -= dt;
+      // Stay still and keep updating the aim angle slightly so the
+      // player feels tracked but can still side-step.
+      const wantAng = Math.atan2(dy, dx);
+      const da = wrapAngle(wantAng - e.aimAng);
+      e.aimAng += Math.max(-0.6 * dt, Math.min(0.6 * dt, da));
+      if (e.aimTime <= 0) {
+        // Release the bone.
+        const speed = 220;
+        state.projectiles.push({
+          friendly: false, x: e.x, y: e.y, r: 5,
+          vx: Math.cos(e.aimAng) * speed,
+          vy: Math.sin(e.aimAng) * speed,
+          life: 1.6, dmg: e.dmg,
+          color: '#e4dcc4', glow: '#fff',
+          type: 'bone', spin: Math.random() * Math.PI * 2,
+        });
+        Audio.magicShoot && Audio.magicShoot();
+        e.throwCool = t.throwCool + Math.random() * 1.0;
+        e.state = 'attack';
+      } else {
+        e.state = 'telegraph';
+      }
+      return;
+    }
+    if (e.throwCool <= 0 && d > t.throwMin && d < t.throwMax) {
+      e.aimTime = 0.7;
+      e.aimAng  = Math.atan2(dy, dx);
+      e.state   = 'telegraph';
+      return;
+    }
   }
 
   if (e.behavior === 'melee') {
@@ -283,6 +335,27 @@ export function drawEnemy(ctx, e) {
     ctx.shadowColor = '#f00'; ctx.shadowBlur = 6;
     ctx.fillRect(x - 3, y - 9 + bob, 1.5, 1.5);
     ctx.fillRect(x + 1.5, y - 9 + bob, 1.5, 1.5);
+    // Bone-throw telegraph: raised arm and a flickering aim line so the
+    // player can read the wind-up and side-step before the bone flies.
+    if (e.aimTime > 0) {
+      // Raised arm.
+      ctx.fillStyle = e.color;
+      const ax = x + Math.cos(e.aimAng) * 7;
+      const ay = y - 1 + bob + Math.sin(e.aimAng) * 4;
+      ctx.fillRect(ax - 1.5, ay - 1.5, 3, 3);
+      // Flickering dotted aim line (amber → white as it fires).
+      const t01 = 1 - e.aimTime / 0.7;
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = `rgba(255, ${200 + t01 * 55}, ${120 + t01 * 135}, ${0.7 + 0.3 * Math.sin(state.time * 30)})`;
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([4, 4]);
+      ctx.lineDashOffset = -state.time * 60;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(ax + Math.cos(e.aimAng) * 80, ay + Math.sin(e.aimAng) * 80);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   } else if (e.type === 'mage') {
     ctx.fillStyle = flash ? '#fff' : '#3a1058';
     ctx.shadowColor = e.glow; ctx.shadowBlur = 12;
@@ -388,7 +461,7 @@ export function populateFloor(floor, maxFloor, spawnChest) {
   }
 
   const pool = floor === 1 ? ['slime', 'bat']
-             : floor === 2 ? ['slime', 'skeleton', 'bat']
+             : floor === 2 ? ['skeleton', 'skeleton', 'skeleton', 'slime', 'bat']
              : ['skeleton', 'mage', 'bat', 'slime'];
 
   for (const r of state.rooms) {

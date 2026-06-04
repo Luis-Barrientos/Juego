@@ -61,6 +61,21 @@ export function drawProjectile(ctx, prj) {
   const x = prj.x - state.cameraX;
   const y = prj.y - state.cameraY;
   ctx.save();
+  if (prj.type === 'bone') {
+    // Spinning bone: thin shaft + two knobs at the ends. Rotates as it
+    // travels so it reads as a tossed object rather than a magic blob.
+    const ang = (prj.spin = (prj.spin || 0) + 0.4);
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    ctx.shadowColor = '#fff';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#e4dcc4';
+    ctx.fillRect(-7, -1.4, 14, 2.8);
+    ctx.beginPath(); ctx.arc(-7, 0, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc( 7, 0, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    return;
+  }
   ctx.shadowColor = prj.glow;
   ctx.shadowBlur = 16;
   ctx.fillStyle = prj.color;
