@@ -50,7 +50,7 @@ export function createPlayer(x, y) {
  * @param {(e: object, dmg: number, crit: boolean) => void} onEnemyHit
  */
 export function playerUpdate(p, dt, hooks) {
-  const { onStairs, onChest, onEnemyHit, onAltar } = hooks;
+  const { onStairs, onChest, onEnemyHit, onAltar, onCircle } = hooks;
 
   // Movement
   let mx = 0, my = 0;
@@ -129,6 +129,10 @@ export function playerUpdate(p, dt, hooks) {
     }
     // Altar (crypta challenge). Consume the key only if the hook fires.
     if (input.keys['KeyE'] && onAltar && onAltar()) {
+      input.keys['KeyE'] = false;
+    }
+    // Library summoning circle (Great Library event).
+    if (input.keys['KeyE'] && onCircle && onCircle()) {
       input.keys['KeyE'] = false;
     }
   }

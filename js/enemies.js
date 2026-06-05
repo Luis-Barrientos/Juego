@@ -49,6 +49,19 @@ export const ENEMY_TYPES = {
     score: 80, gold: [14, 26],
     range: 28, attackCool: 1.0, behavior: 'melee',
   },
+  /**
+   * Guardian of the Library: stone-and-rune mini-boss summoned from the
+   * library's runestone circle. Roughly twice a Sepulchral's HP, hits
+   * harder, and periodically lobs a fan of three rune projectiles.
+   */
+  guardian: {
+    hp: 240, dmg: 28, speed: 50, r: 18,
+    color: '#5a5a64', glow: '#b890ff',
+    score: 220, gold: [40, 70],
+    range: 34, attackCool: 1.2, behavior: 'guardian',
+    /** Rune-burst cooldown band (seconds). */
+    runeCool: 3.6, runeMin: 80, runeMax: 320,
+  },
 };
 
 /**
@@ -103,6 +116,28 @@ export function spawnSepulchralAt(x, y, floor) {
   e.fromChallenge = true;
   state.enemies.push(e);
   spawnParticles(x, y + 6, '#a8c8ff', 24);
+  return e;
+}
+
+/**
+ * Spawn the Guardian of the Library at a world-space position. Used by
+ * the library set-piece when the player activates the summoning circle.
+ * Plays a brief invulnerable assemble animation while the rune stones
+ * coalesce into him.
+ *
+ * @param {number} x        World pixel coords.
+ * @param {number} y
+ * @param {number} floor    Current floor (for stat scaling).
+ * @returns {object} the new enemy (already pushed to state.enemies).
+ */
+export function spawnGuardianAt(x, y, floor) {
+  const e = createEnemy('guardian', x, y, floor);
+  e.emergeTime  = 1.2;
+  e.state       = 'emerging';
+  e.fromLibrary = true;
+  e.runeCool    = ENEMY_TYPES.guardian.runeCool;
+  state.enemies.push(e);
+  spawnParticles(x, y, '#b890ff', 36);
   return e;
 }
 
@@ -163,6 +198,7 @@ export function enemyUpdate(e, dt, hooks) {
 
   // Sepulchrals climbing out of a sarcophagus: invulnerable, immobile,
   // and deal no damage until the rise animation finishes.
+  // The library Guardian shares the same emerge gate (fromLibrary).
   if (e.emergeTime > 0) {
     e.emergeTime -= dt;
     if (e.emergeTime <= 0) {
@@ -216,6 +252,39 @@ export function enemyUpdate(e, dt, hooks) {
       const sp = e.speed;
       tryMove(state.map, e, (dx / d) * sp * dt, (dy / d) * sp * dt);
       e.state = 'chase';
+    } else {
+      e.state = 'attack';
+      if (e.attackCool <= 0) {
+        e.attackCool = e.attackRate;
+        hooks.onPlayerHit(e.dmg, e);
+      }
+    }
+  } else if (e.behavior === 'guardian') {
+    // Slow stone golem with periodic 3-rune fan attack. Approaches in
+    // melee but never lets the cooldown drop the rune burst at any range.
+    const t = ENEMY_TYPES.guardian;
+    e.runeCool = Math.max(0, (e.runeCool || 0) - dt);
+    if (e.runeCool <= 0 && d > t.runeMin && d < t.runeMax) {
+      e.runeCool = t.runeCool + Math.random() * 0.6;
+      const a = Math.atan2(dy, dx);
+      const speed = 200;
+      for (let i = -1; i <= 1; i++) {
+        const ang = a + i * 0.22;
+        state.projectiles.push({
+          friendly: false, x: e.x, y: e.y, r: 6,
+          vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
+          life: 2.4, dmg: e.dmg * 0.7,
+          color: '#b890ff', glow: '#e0c0ff',
+          type: 'magic',
+        });
+      }
+      Audio.magicShoot && Audio.magicShoot();
+      e.state = 'attack';
+    }
+    if (d > e.range + p.r) {
+      const sp = e.speed;
+      tryMove(state.map, e, (dx / d) * sp * dt, (dy / d) * sp * dt);
+      if (e.state !== 'attack') e.state = 'chase';
     } else {
       e.state = 'attack';
       if (e.attackCool <= 0) {
@@ -453,6 +522,50 @@ export function drawEnemy(ctx, e) {
     // Stone-dust particles while emerging.
     if (e.emergeTime > 0 && Math.random() < 0.4) {
       spawnParticles(e.x + (Math.random() - 0.5) * 14, e.y + 8, '#5a6678', 1);
+    }
+    ctx.globalAlpha = 1;
+  } else if (e.type === 'guardian') {
+    // Hulking rune golem. Plays an "assemble" rise during emergeTime
+    // (rune stones fly into him from the circle, see set-piece module).
+    const rise   = e.emergeTime > 0 ? Math.max(0, e.emergeTime / 1.2) : 0;
+    const sinkY  = rise * 18;
+    const alpha  = 1 - rise * 0.35;
+    ctx.globalAlpha = alpha;
+    // Purple aura.
+    ctx.shadowColor = e.glow; ctx.shadowBlur = 22;
+    // Legs / base block.
+    ctx.fillStyle = flash ? '#fff' : '#3a3a44';
+    ctx.fillRect(x - 12, y + 4 + bob - sinkY * 0.2, 24, 10);
+    // Torso block.
+    ctx.fillStyle = flash ? '#fff' : e.color;
+    ctx.fillRect(x - 14, y - 12 + bob - sinkY * 0.4, 28, 18);
+    // Shoulder pads.
+    ctx.fillStyle = flash ? '#fff' : '#4a4a54';
+    ctx.fillRect(x - 18, y - 10 + bob - sinkY * 0.4, 6, 10);
+    ctx.fillRect(x + 12, y - 10 + bob - sinkY * 0.4, 6, 10);
+    // Head (smaller stone block).
+    ctx.fillStyle = flash ? '#fff' : '#6a6a74';
+    ctx.fillRect(x - 7, y - 22 + bob - sinkY * 0.5, 14, 10);
+    // Carved cracks (darker line) on torso.
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(20, 12, 28, 0.65)';
+    ctx.fillRect(x - 10, y - 6 + bob - sinkY * 0.4, 1, 6);
+    ctx.fillRect(x + 4,  y - 8 + bob - sinkY * 0.4, 1, 8);
+    // Glowing runes carved into the torso (pulse).
+    if (rise < 0.6) {
+      const pulse = 0.55 + 0.45 * Math.sin(state.time * 3 + e.walkAnim);
+      ctx.fillStyle = `rgba(184,144,255,${pulse})`;
+      ctx.shadowColor = '#b890ff'; ctx.shadowBlur = 8;
+      ctx.fillRect(x - 6, y - 5  + bob - sinkY * 0.4, 2, 6);
+      ctx.fillRect(x - 1, y - 8  + bob - sinkY * 0.4, 2, 4);
+      ctx.fillRect(x + 4, y - 5  + bob - sinkY * 0.4, 2, 6);
+      ctx.fillRect(x - 4, y - 1  + bob - sinkY * 0.4, 8, 2);
+      // Eye slit on the head.
+      ctx.fillRect(x - 5, y - 19 + bob - sinkY * 0.5, 10, 1.5);
+    }
+    // Stone dust while emerging.
+    if (e.emergeTime > 0 && Math.random() < 0.5) {
+      spawnParticles(e.x + (Math.random() - 0.5) * 22, e.y + 12, '#3a2c4a', 1);
     }
     ctx.globalAlpha = 1;
   } else if (e.type === 'bat') {

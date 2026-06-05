@@ -44,7 +44,7 @@ import {
   updateLoot, drawLoot, spawnChest, openChest,
 }                                         from './loot.js';
 import {
-  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawPuddles, drawSarcophagiOverlay, drawMinimap,
+  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawPuddles, drawSarcophagiOverlay, drawLibrarySetPiece, drawMinimap,
 }                                         from './render.js';
 import {
   updateHUD, showToast, hideAllOverlays, showMenu, showPause, hidePause,
@@ -54,6 +54,7 @@ import {
 import { save, load }                     from './storage.js';
 import { initChangelogUI }                from './changelog.js';
 import { tryStartChallenge, updateChallenge, resetChallenge, drawAltarPrompt } from './challenge.js';
+import { tryStartLibraryEvent, updateLibraryEvent, resetLibraryEvent, drawCirclePrompt } from './librarySetPiece.js';
 
 /* ─────────────────────────── DOM bootstrap ─────────────────────────── */
 const canvas  = document.getElementById('game');
@@ -104,6 +105,7 @@ function startGame() {
   state.decorations = [];
   state.sarcophagi  = [];
   state.libraryProps = [];
+  state.librarySetPiece = null;
   state.soulSpawners = [];
   state._whisperTimer = 6;
   state.shake       = 0;
@@ -129,10 +131,12 @@ function buildFloor(floor) {
   state.decorations = d.decorations || [];
   state.sarcophagi  = d.sarcophagi  || [];
   state.libraryProps = d.libraryProps || [];
+  state.librarySetPiece = d.librarySetPiece || null;
   state.soulSpawners = d.soulSpawners || [];
   state._whisperTimer = 6 + Math.random() * 6;
 
   resetChallenge();
+  resetLibraryEvent();
 
   const start = d.startRoom;
   if (state.player) {
@@ -254,6 +258,47 @@ function updateBestStats(stats, won) {
   return records;
 }
 
+/**
+ * Spawn the Library Guardian rewards near the rune circle: 2 rare chests
+ * (free, since the player already paid in blood) + 1 legendary chest.
+ * Free as in `cost = 0`, like the catacombs challenge.
+ */
+function spawnLibraryRewards(room, circle) {
+  const cx = circle.tx + Math.floor(circle.w / 2);
+  const cy = circle.ty + Math.floor(circle.h / 2);
+  // Offsets around the circle, ordered so the legendary lands "in front".
+  const slots = [
+    { dx:  0, dy:  2, legendary: true  },
+    { dx: -3, dy:  0, legendary: false },
+    { dx:  3, dy:  0, legendary: false },
+    { dx:  0, dy: -3, legendary: false },
+    { dx: -2, dy:  2, legendary: false },
+    { dx:  2, dy:  2, legendary: false },
+  ];
+  let rare = 0, legendary = 0;
+  for (const s of slots) {
+    if (rare >= 2 && legendary >= 1) break;
+    const tx = cx + s.dx;
+    const ty = cy + s.dy;
+    if (!state.map[ty] || state.map[ty][tx] !== 1) continue;        // T_FLOOR
+    const wantLegendary = s.legendary && legendary < 1;
+    const wantRare      = !wantLegendary && rare < 2;
+    if (!wantLegendary && !wantRare) continue;
+    state.loot.push({
+      type: 'chest', opened: false,
+      rare: wantRare,
+      legendary: wantLegendary,
+      cost: 0,
+      x: tx * TILE + TILE / 2,
+      y: ty * TILE + TILE / 2,
+      age: 0, r: 12, vx: 0, vy: 0,
+      fromLibrary: true,
+    });
+    if (wantLegendary) legendary++;
+    else if (wantRare)  rare++;
+  }
+}
+
 /* ─────────────────────────── Hooks ─────────────────────────── */
 
 const enemyHooks = {
@@ -271,6 +316,7 @@ const playerHooks = {
   onChest:     c => openChest(c, showToast, grantBlessing),
   onEnemyHit:  (e, dmg, crit) => damageEnemy(e, dmg, crit, { onWin: triggerWin }),
   onAltar:     () => tryStartChallenge(showToast),
+  onCircle:    () => tryStartLibraryEvent(showToast),
 };
 
 /* ─────────────────────────── Update / render ─────────────────────────── */
@@ -347,6 +393,7 @@ function update(dt) {
   updateLoot(dt, showToast);
   updateParticles(dt);
   updateChallenge(dt, showToast);
+  updateLibraryEvent(dt, showToast, spawnLibraryRewards);
   updateAmbient(dt);
   updateCamera();
   updateHUD();
@@ -382,7 +429,9 @@ function render() {
   drawDamageTexts(ctx);
   drawPuddles(ctx);
   drawSarcophagiOverlay(ctx);
+  drawLibrarySetPiece(ctx);
   drawAltarPrompt(ctx);
+  drawCirclePrompt(ctx);
   drawSunbeams(ctx);
   drawLighting(ctx);
 

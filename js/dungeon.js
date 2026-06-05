@@ -203,13 +203,18 @@ export function generateDungeon(floor, seed, biome) {
   const soulSpawners = [];
   if (isCatacombs) placeSoulSpawners(rooms, rng, soulSpawners, sarcophagi);
 
+  let librarySetPiece = null;
   if (isLibrary) {
     placeMagicFlames(rooms, rng, lights);
     placeRoomWallDecorations(map, rooms, rng, decorations, lights,
       ['wallShelf', 'scrollHanging', 'runeSymbol', 'darkPortrait', 'noticeBoard']);
+    // 70% chance to spawn the Great Library set-piece on a star room.
+    if (rng() < 0.70) {
+      librarySetPiece = placeLibrarySetPiece(rooms, map, rng, libraryProps);
+    }
   }
 
-  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, libraryProps, soulSpawners, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, libraryProps, soulSpawners, librarySetPiece, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
 }
 
 /**
@@ -899,6 +904,92 @@ function placeTables(rooms, map, rng, libraryProps) {
       placed++;
     }
   }
+}
+
+/**
+ * Place the Great Library set-piece in a star room: a 2×2 summoning circle
+ * at the centre, plus four floating rune stones around it. The circle is
+ * a walkable decoration (no T_WALL writes) so the player can step onto it
+ * to trigger the encounter via E.
+ *
+ * Picks the largest non-start, non-stairs star room. Returns the set-piece
+ * descriptor or null if no eligible room exists.
+ *
+ * @private
+ */
+function placeLibrarySetPiece(rooms, map, rng, libraryProps) {
+  // Star rooms first; pick the largest by area.
+  const stars = rooms.filter(r =>
+    r.isLarge && !r.isStartRoom && !r.isStairsRoom &&
+    r.w >= 7 && r.h >= 7,
+  );
+  if (!stars.length) return null;
+  stars.sort((a, b) => (b.w * b.h) - (a.w * a.h));
+  const room = stars[0];
+  room.isGreatLibrary = true;
+
+  // Centre 2×2 circle on the room centre.
+  const cx = Math.floor(room.x + room.w / 2);
+  const cy = Math.floor(room.y + room.h / 2);
+  const circle = { tx: cx - 1, ty: cy - 1, w: 2, h: 2, seed: Math.floor(rng() * 1e9) };
+
+  // If a previously-placed shelf/table happens to overlap the circle
+  // footprint, remove it and restore the underlying floor so the circle
+  // stays walkable.
+  for (let i = libraryProps.length - 1; i >= 0; i--) {
+    const p = libraryProps[i];
+    if (p.tx + p.w <= circle.tx || p.tx >= circle.tx + circle.w) continue;
+    if (p.ty + p.h <= circle.ty || p.ty >= circle.ty + circle.h) continue;
+    for (let yy = p.ty; yy < p.ty + p.h; yy++) {
+      for (let xx = p.tx; xx < p.tx + p.w; xx++) {
+        if (map[yy] && map[yy][xx] === T_WALL) map[yy][xx] = T_FLOOR;
+      }
+    }
+    libraryProps.splice(i, 1);
+  }
+
+  // Bake the circle as a flag on the libraryProps array so it renders into
+  // the cached map (drawLibraryProp dispatches on `kind`). We do NOT write
+  // T_WALL here — the circle is walkable.
+  libraryProps.push({ kind: 'summoningCircle', tx: circle.tx, ty: circle.ty,
+                      w: circle.w, h: circle.h, seed: circle.seed });
+
+  // Four rune stones at NE/NW/SE/SW around the centre, ~2 tiles out so
+  // they stay inside even the smallest 7×7 star room. World pixel coords
+  // go to set-piece state so we can animate them later from
+  // librarySetPiece.js.
+  const radius = 2;
+  const wx = (circle.tx + circle.w / 2) * TILE;
+  const wy = (circle.ty + circle.h / 2) * TILE;
+  const candidates = [
+    { dx: -radius, dy: -radius },
+    { dx:  radius, dy: -radius },
+    { dx: -radius, dy:  radius },
+    { dx:  radius, dy:  radius },
+  ];
+  const stones = [];
+  for (const c of candidates) {
+    stones.push({
+      x: wx + c.dx * TILE,
+      y: wy + c.dy * TILE,
+      seed: Math.floor(rng() * 1e9),
+      phase: rng() * Math.PI * 2,
+    });
+  }
+
+  return {
+    room,
+    circle,
+    stones,
+    active: false,
+    completed: false,
+    timer: 0,
+    sealedTiles: [],
+    guardian: null,
+    guardianSpawned: false,
+    rewardGiven: false,
+    stonesHidden: false,
+  };
 }
 
 function placeSarcophagi(rooms, map, rng, sarcophagi, lights) {

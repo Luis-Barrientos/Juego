@@ -15,6 +15,19 @@
 
 export const CHANGELOG = [
   {
+    version: '0.7.0',
+    date: '2026-06-05',
+    title: 'Biblioteca: Gran Biblioteca y Guardián',
+    items: [
+      'Set-piece aleatorio en la sala estrella del piso 2: círculo de invocación con 4 piedras rúnicas flotantes alrededor.',
+      'Pulsa E sobre el círculo para sellar la sala y las piedras convergen hacia el centro formando al Guardián de la Biblioteca.',
+      'Guardián: golem de piedra rúnica con ~240 HP, ataque cuerpo a cuerpo + ráfaga de 3 runas a distancia.',
+      'Al vencerlo caen 2 cofres morados gratis + 1 cofre amarillo legendario (nuevo tier).',
+      'Cofre legendario: garantiza bendición + 2 pociones HP + 2 pociones MP + monto grueso de oro.',
+      'Probabilidad 70% por piso de Biblioteca; cuando no genera, sigue siendo una sala normal con sus estanterías.',
+    ],
+  },
+  {
     version: '0.6.2',
     date: '2026-06-04',
     title: 'Biblioteca: decoraciones de muro',

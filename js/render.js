@@ -763,6 +763,13 @@ function drawLibraryProp(ctx, p) {
   const w  = p.w  * TILE;
   const h  = p.h  * TILE;
 
+  // The summoning circle is a walkable floor decoration — it should NOT
+  // wipe the underlying floor tile to a wall tone like the solid props do.
+  if (p.kind === 'summoningCircle') {
+    drawSummoningCircle(ctx, px, py, w, h, p);
+    return;
+  }
+
   // Wipe the underlying wall tile back to floor tone so the prop has its
   // own silhouette instead of inheriting the dark wall fill.
   ctx.fillStyle = 'rgba(40, 28, 18, 1)';
@@ -927,6 +934,73 @@ function drawTable(ctx, px, py, w, h, p, broken) {
   }
 }
 
+/** Painted summoning circle: dark glyph ring + rune dots inside a 2x2 area. */
+function drawSummoningCircle(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  const r  = Math.min(w, h) * 0.46;
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+
+  ctx.save();
+  // Subtle dark base disk (paint over floor) so the runes pop.
+  ctx.fillStyle = 'rgba(20, 14, 30, 0.45)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 2, 0, Math.PI * 2);
+  ctx.fill();
+  // Outer painted ring (purple).
+  ctx.strokeStyle = 'rgba(184, 144, 255, 0.85)';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+  // Inner thinner ring.
+  ctx.strokeStyle = 'rgba(220, 180, 255, 0.65)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 4, 0, Math.PI * 2);
+  ctx.stroke();
+  // Inscribed pentagram-ish star (5 strokes between 5 points on outer ring).
+  const points = [];
+  for (let i = 0; i < 5; i++) {
+    const ang = -Math.PI / 2 + i * (Math.PI * 2 / 5);
+    points.push({ x: cx + Math.cos(ang) * (r - 1), y: cy + Math.sin(ang) * (r - 1) });
+  }
+  ctx.strokeStyle = 'rgba(184, 144, 255, 0.55)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = points[i];
+    const b = points[(i + 2) % 5];
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+  }
+  ctx.stroke();
+  // Rune dots on the outer ring.
+  ctx.fillStyle = 'rgba(220, 180, 255, 0.80)';
+  for (let i = 0; i < 8; i++) {
+    const ang = i * (Math.PI / 4) + rnd() * 0.1;
+    const dx = cx + Math.cos(ang) * (r - 1);
+    const dy = cy + Math.sin(ang) * (r - 1);
+    ctx.fillRect(dx - 0.5, dy - 0.5, 1.5, 1.5);
+  }
+  // Cracks on the floor under the circle.
+  ctx.strokeStyle = 'rgba(40, 24, 14, 0.55)';
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 4; i++) {
+    const a = rnd() * Math.PI * 2;
+    const x1 = cx + Math.cos(a) * (r * 0.3);
+    const y1 = cy + Math.sin(a) * (r * 0.3);
+    const x2 = cx + Math.cos(a) * (r * 0.95);
+    const y2 = cy + Math.sin(a) * (r * 0.95);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /**
  * Per-frame pulse on the cross of awakable (cracked) sarcophagi. The
  * cross is already painted blue in the cache; here we add a soft halo
@@ -956,6 +1030,80 @@ export function drawSarcophagiOverlay(ctx) {
     ctx.fillRect(cx - 4, cy - 1, 8, 2);
   }
   ctx.restore();
+}
+
+/**
+ * Per-frame overlay for the library Great-Library set-piece:
+ *   - Pulsing purple halo on the rune circle (always while alive).
+ *   - Floating rune stones around the circle (with bob & sigil glow),
+ *     animated inward when the event starts (`librarySetPiece.js` moves
+ *     their world coords each frame).
+ */
+export function drawLibrarySetPiece(ctx) {
+  const sp = state.librarySetPiece;
+  if (!sp) return;
+
+  const t  = state.time;
+  const cx = (sp.circle.tx + sp.circle.w / 2) * TILE - state.cameraX;
+  const cy = (sp.circle.ty + sp.circle.h / 2) * TILE - state.cameraY;
+
+  // Halo on the circle (skip once the encounter is completed).
+  if (!sp.completed) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const pulse = 0.55 + Math.sin(t * 2.2) * 0.35;
+    const grd = ctx.createRadialGradient(cx, cy, 1, cx, cy, 36);
+    grd.addColorStop(0, `rgba(184, 144, 255, ${0.55 * pulse})`);
+    grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(cx - 36, cy - 36, 72, 72);
+    ctx.restore();
+  }
+
+  // Rune stones (hidden once the guardian has materialised).
+  if (sp.stones && !sp.stonesHidden) {
+    ctx.save();
+    for (const s of sp.stones) {
+      const sx = s.x - state.cameraX;
+      const sy = s.y - state.cameraY;
+      if (sx < -20 || sx > VIEW_W + 20 || sy < -20 || sy > VIEW_H + 20) continue;
+      const bob = Math.sin(t * 2 + s.phase) * 2;
+      // Drop shadow.
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy + 7, 7, 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Stone body (hex-ish shape, dark grey with purple sheen).
+      ctx.fillStyle = '#3a3540';
+      ctx.beginPath();
+      ctx.moveTo(sx - 5, sy - 2 + bob);
+      ctx.lineTo(sx - 3, sy - 6 + bob);
+      ctx.lineTo(sx + 3, sy - 6 + bob);
+      ctx.lineTo(sx + 5, sy - 2 + bob);
+      ctx.lineTo(sx + 3, sy + 4 + bob);
+      ctx.lineTo(sx - 3, sy + 4 + bob);
+      ctx.closePath();
+      ctx.fill();
+      // Top highlight.
+      ctx.fillStyle = '#5a4a68';
+      ctx.beginPath();
+      ctx.moveTo(sx - 3, sy - 6 + bob);
+      ctx.lineTo(sx + 3, sy - 6 + bob);
+      ctx.lineTo(sx + 2, sy - 4 + bob);
+      ctx.lineTo(sx - 2, sy - 4 + bob);
+      ctx.closePath();
+      ctx.fill();
+      // Glowing rune (pulses).
+      const pulse = 0.55 + 0.45 * Math.sin(t * 3 + s.phase);
+      ctx.fillStyle = `rgba(184, 144, 255, ${pulse})`;
+      ctx.shadowColor = '#b890ff';
+      ctx.shadowBlur  = 8;
+      ctx.fillRect(sx - 1, sy - 3 + bob, 2, 4);
+      ctx.fillRect(sx - 2, sy + 0 + bob, 4, 1);
+      ctx.shadowBlur = 0;
+    }
+    ctx.restore();
+  }
 }
 
 /**

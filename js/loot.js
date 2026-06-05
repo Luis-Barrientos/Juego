@@ -96,6 +96,7 @@ export function drawLoot(ctx) {
  */
 function drawChest(ctx, l, x, y) {
   const rare = !!l.rare;
+  const legendary = !!l.legendary;
   const near = !l.opened && dist(l, state.player) < 50;
   const bob  = l.opened ? 0 : Math.sin(l.age * 3) * 0.8;
   const cy   = y + bob;
@@ -103,24 +104,29 @@ function drawChest(ctx, l, x, y) {
   // Halo / glow only while the chest still holds loot.
   if (!l.opened) {
     const pulse = 0.55 + Math.sin(l.age * 4) * 0.25;
-    const glow  = ctx.createRadialGradient(x, cy, 2, x, cy, 26);
-    glow.addColorStop(0, rare
+    const glow  = ctx.createRadialGradient(x, cy, 2, x, cy, legendary ? 34 : 26);
+    glow.addColorStop(0, legendary
+      ? `rgba(255,210,80,${0.55 * pulse})`
+      : rare
       ? `rgba(160,140,255,${0.35 * pulse})`
       : `rgba(255,200,80,${0.30 * pulse})`);
     glow.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.arc(x, cy, 26, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, cy, legendary ? 34 : 26, 0, Math.PI * 2); ctx.fill();
   }
 
   // Palette per chest tier.
   const woodMain   = l.opened ? '#2a1a0c'
-                              : (rare ? '#3a2a5a' : '#6a4220');
+                              : (legendary ? '#5a3a08'
+                                : (rare ? '#3a2a5a' : '#6a4220'));
   const woodLight  = l.opened ? '#3a2614'
-                              : (rare ? '#5a48a0' : '#8a5828');
+                              : (legendary ? '#a07820'
+                                : (rare ? '#5a48a0' : '#8a5828'));
   const woodDark   = l.opened ? '#140a04'
-                              : (rare ? '#1a1230' : '#3a2010');
-  const trim       = rare ? '#c0a0ff' : '#ffd060';
-  const trimDark   = rare ? '#604080' : '#a07020';
+                              : (legendary ? '#2a1a04'
+                                : (rare ? '#1a1230' : '#3a2010'));
+  const trim       = legendary ? '#ffe060' : (rare ? '#c0a0ff' : '#ffd060');
+  const trimDark   = legendary ? '#a06010' : (rare ? '#604080' : '#a07020');
 
   if (l.opened) {
     /* ── Open chest: lid tilted back, dark interior ─────────────── */
@@ -137,7 +143,7 @@ function drawChest(ctx, l, x, y) {
     ctx.fillRect(x - 11, cy + 1, 22, 1);
     ctx.fillRect(x - 11, cy + 5, 22, 1);
     // Iron bands (dim, rare keeps purple tint)
-    ctx.fillStyle = rare ? '#403260' : '#3a2a18';
+    ctx.fillStyle = legendary ? '#604010' : (rare ? '#403260' : '#3a2a18');
     ctx.fillRect(x - 1, cy - 2, 2, 12);
     // Lid leaning back (parallelogram going up-left)
     ctx.fillStyle = woodLight;
@@ -190,7 +196,7 @@ function drawChest(ctx, l, x, y) {
   ctx.closePath();
   ctx.fill();
   // Iron bands across body
-  ctx.fillStyle = rare ? '#1a1230' : '#2a1810';
+  ctx.fillStyle = legendary ? '#3a2008' : (rare ? '#1a1230' : '#2a1810');
   ctx.fillRect(x - 11, cy + 4, 22, 1);
   ctx.fillRect(x - 1,  cy - 6, 2, 12);
   // Gold/rune trim
@@ -204,6 +210,21 @@ function drawChest(ctx, l, x, y) {
     ctx.fillRect(x - 6, cy - 7, 1, 3);
     ctx.fillRect(x - 1, cy - 9, 1, 3);
     ctx.fillRect(x + 4, cy - 7, 1, 3);
+  }
+  // Legendary crown ornament + bright sun runes on the lid.
+  if (legendary) {
+    const t = l.age * 2;
+    // Crown points along the lid.
+    ctx.fillStyle = '#ffe060';
+    ctx.fillRect(x - 8, cy - 9, 2, 3);
+    ctx.fillRect(x - 1, cy - 11, 2, 5);
+    ctx.fillRect(x + 6, cy - 9, 2, 3);
+    // Sparkling rune dots.
+    ctx.fillStyle = `rgba(255,240,180,${0.6 + Math.sin(t) * 0.35})`;
+    ctx.shadowColor = '#ffd060'; ctx.shadowBlur = 6;
+    ctx.fillRect(x - 5, cy - 6, 1, 2);
+    ctx.fillRect(x + 4, cy - 6, 1, 2);
+    ctx.shadowBlur = 0;
   }
   // Lock plate
   ctx.fillStyle = trim;
@@ -219,7 +240,7 @@ function drawChest(ctx, l, x, y) {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    const label = rare
+    const label = (rare && l.cost > 0)
       ? `[E] ${l.cost}g`
       : '[E]';
     ctx.fillText(label, x, cy - 16);
@@ -230,11 +251,12 @@ function drawChest(ctx, l, x, y) {
  *  if the centre is occupied by props/walls). */
 export function spawnChest(room, opts = {}) {
   const rare = !!opts.rare;
+  const legendary = !!opts.legendary;
   const { tx, ty } = findFreeTileNear(room, room.cx, room.cy);
   state.loot.push({
     type: 'chest', opened: false,
-    rare,
-    cost: rare ? 50 : 0,
+    rare, legendary,
+    cost: legendary ? 0 : (rare ? 50 : 0),
     x: tx * TILE + TILE / 2,
     y: ty * TILE + TILE / 2,
     age: 0, r: 12, vx: 0, vy: 0,
@@ -285,13 +307,16 @@ function findFreeTileNear(room, cx, cy) {
  *   • Rare chests cost gold and drop premium loot. They also have a 30%
  *     chance to grant a permanent BLESSING (a random upgrade) on top of
  *     the loot.
+ *   • Legendary chests are unique reward chests dropped by mini-bosses
+ *     (e.g. the Library Guardian). Free, lavish: a guaranteed blessing,
+ *     two potions of each kind, and a fat coin pile.
  *
  * @param {object} c           Chest entity.
  * @param {(text:string)=>void} toast
  * @param {(id:string)=>void} [grantBlessing] Applies a permanent upgrade by id.
  */
 export function openChest(c, toast, grantBlessing) {
-  if (c.rare) {
+  if (c.rare && c.cost > 0) {
     if (state.gold < c.cost) {
       toast(`Necesitas ${c.cost} oro`);
       Audio.hit && Audio.hit();
@@ -301,7 +326,11 @@ export function openChest(c, toast, grantBlessing) {
   }
   c.opened = true;
   Audio.pickup();
-  spawnParticles(c.x, c.y - 6, c.rare ? '#c0a0ff' : '#ffd040', c.rare ? 32 : 18);
+  spawnParticles(
+    c.x, c.y - 6,
+    c.legendary ? '#ffe060' : (c.rare ? '#c0a0ff' : '#ffd040'),
+    c.legendary ? 44 : (c.rare ? 32 : 18),
+  );
 
   /* Local helpers to record drops so we can summarise them at the end. */
   const summary = { coins: 0, gold: 0, hp: 0, mp: 0, blessing: null };
@@ -311,6 +340,23 @@ export function openChest(c, toast, grantBlessing) {
   };
   const dropHp   = () => { state.loot.push(spawnItem('hp_potion', c)); summary.hp++; };
   const dropMp   = () => { state.loot.push(spawnItem('mp_potion', c)); summary.mp++; };
+
+  if (c.legendary) {
+    // Legendary: always grants a blessing + heavy resources.
+    dropHp(); dropHp();
+    dropMp(); dropMp();
+    const nCoins = irand(10, 14);
+    for (let i = 0; i < nCoins; i++) dropCoin(irand(20, 40));
+    if (grantBlessing) {
+      const id = pickRandomBlessingId();
+      grantBlessing(id);
+      summary.blessing = BLESSING_NAMES[id] || id;
+      spawnParticles(c.x, c.y - 6, '#ffe060', 32);
+      Audio.upgrade && Audio.upgrade();
+    }
+    revealLoot(c, summary, 'legendary', toast);
+    return;
+  }
 
   if (c.rare) {
     dropHp(); dropMp();
@@ -323,7 +369,7 @@ export function openChest(c, toast, grantBlessing) {
       spawnParticles(c.x, c.y - 6, '#ffe0a0', 24);
       Audio.upgrade && Audio.upgrade();
     }
-    revealLoot(c, summary, true, toast);
+    revealLoot(c, summary, 'rare', toast);
     return;
   }
 
@@ -339,14 +385,16 @@ export function openChest(c, toast, grantBlessing) {
     else if (r < 0.78) dropHp();
     else               dropMp();
   }
-  revealLoot(c, summary, false, toast);
+  revealLoot(c, summary, 'common', toast);
 }
 
 /**
  * Spawn floating labels above the chest summarising what fell out.
  * Lines are staggered vertically so the player can read them.
+ *
+ * @param {string} tier  'common' | 'rare' | 'legendary'
  */
-function revealLoot(c, s, rare, toast) {
+function revealLoot(c, s, tier, toast) {
   const lines = [];
   if (s.gold > 0)     lines.push({ t: `+${s.gold} oro`, c: '#ffd040' });
   if (s.hp > 0)       lines.push({ t: `+${s.hp} poción HP`, c: '#ff7070' });
@@ -360,9 +408,10 @@ function revealLoot(c, s, rare, toast) {
     offsetY -= 16;
   }
 
-  if (rare && s.blessing) toast(`¡Bendición rara! ${s.blessing}`);
-  else if (rare)          toast('¡Tesoro raro!');
-  else                    toast('¡Baúl abierto!');
+  if (tier === 'legendary')                    toast(`¡Cofre legendario! ★ ${s.blessing}`);
+  else if (tier === 'rare' && s.blessing)      toast(`¡Bendición rara! ${s.blessing}`);
+  else if (tier === 'rare')                    toast('¡Tesoro raro!');
+  else                                         toast('¡Baúl abierto!');
 }
 
 /** Friendly names for blessings shown in toasts when a chest grants one. */
