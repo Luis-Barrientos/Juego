@@ -2697,14 +2697,16 @@ export function drawObservatoryFog(ctx) {
   ctx.rect(rx, ry, rw, rh);
   ctx.clip();
 
-  // 1. Soft semi-transparent veil — slightly darker toward the centre and
-  //    fading at the edges so the room's perimeter still reads clearly.
+  // 1. Atmospheric veil — dense enough to mask the underlying cobbles
+  //    while still letting the room outline read through. Stays opaque
+  //    almost to the wall so no "gray tile" patches show at the edges.
   const ccx = rx + rw / 2;
   const ccy = ry + rh / 2;
-  const veil = ctx.createRadialGradient(ccx, ccy, 0, ccx, ccy, Math.max(rw, rh) * 0.65);
-  veil.addColorStop(0,    'rgba(20, 18, 50, 0.34)');
-  veil.addColorStop(0.55, 'rgba(16, 14, 40, 0.22)');
-  veil.addColorStop(1,    'rgba(8, 6, 22, 0.00)');
+  const veil = ctx.createRadialGradient(ccx, ccy, 0, ccx, ccy, Math.max(rw, rh) * 0.85);
+  veil.addColorStop(0,    'rgba(22, 18, 56, 0.62)');
+  veil.addColorStop(0.55, 'rgba(18, 14, 46, 0.55)');
+  veil.addColorStop(0.85, 'rgba(14, 10, 38, 0.42)');
+  veil.addColorStop(1,    'rgba(10, 8, 28, 0.20)');
   ctx.fillStyle = veil;
   ctx.fillRect(rx, ry, rw, rh);
 
