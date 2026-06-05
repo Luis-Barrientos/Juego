@@ -411,6 +411,50 @@ function applyObservatoryBuff(dt) {
 }
 
 /**
+ * Sunbeam regen: while the player stands inside one of the wide ceiling
+ * cracks (floor-1 ruins), the sunlight slowly heals HP. Excludes the
+ * thin moonbeams (crypts) and the observatory starlight column, which
+ * has its own buff.
+ *
+ * Uses a point-in-polygon test against `sb.shape`, the same irregular
+ * polygon the renderer uses to draw the beam — so the buff edge matches
+ * the visible light exactly.
+ */
+function applySunbeamRegen(dt) {
+  if (!state.sunbeams || state.sunbeams.length === 0) return;
+  const p = state.player;
+  if (!p || p.hp >= p.maxHp) return;
+  for (const sb of state.sunbeams) {
+    if (sb.kind === 'thin' || sb.kind === 'observatory') continue;
+    if (!sb.shape) continue;
+    // Quick AABB reject so we don't run point-in-polygon every frame
+    // against every beam.
+    const halfBBox = sb.length * 0.5 + sb.splay + 8;
+    const dx = p.x - sb.x;
+    const dy = p.y - sb.y;
+    if (dx < -halfBBox || dx > halfBBox)   continue;
+    if (dy < -10        || dy > sb.h + 10) continue;
+    if (pointInPolygon(dx, dy, sb.shape)) {
+      p.hp = Math.min(p.maxHp, p.hp + 4 * dt);
+      return; // one beam is enough
+    }
+  }
+}
+
+/** Ray-casting point-in-polygon for an array of [x,y] tuples. */
+function pointInPolygon(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1];
+    const xj = poly[j][0], yj = poly[j][1];
+    const intersect = ((yi > y) !== (yj > y)) &&
+      (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-9) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+/**
  * Per-biome ambient layer.
  * - Catacombs: drifting soul wisps + procedural whispers.
  * - Library:   drifting leaves / paper scraps + occasional wood creaks.
@@ -486,6 +530,7 @@ function update(dt) {
   playerUpdate(state.player, dt, playerHooks);
   applyBiomeModifiers(dt);
   applyObservatoryBuff(dt);
+  applySunbeamRegen(dt);
   state.currentRoom = getRoomAt(state.rooms, state.player);
 
   for (const e of state.enemies) enemyUpdate(e, dt, enemyHooks);

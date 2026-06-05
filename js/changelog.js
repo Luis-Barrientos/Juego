@@ -15,6 +15,16 @@
 
 export const CHANGELOG = [
   {
+    version: '0.7.5',
+    date: '2026-06-05',
+    title: 'Luz que cura en las Ruinas',
+    items: [
+      'Las grietas del techo en las Ruinas dejan pasar luz solar real: si te quedas plantado dentro de un rayo, tu vida se regenera lentamente.',
+      'El efecto solo cubre exactamente la silueta visible del rayo — sal un paso fuera y el efecto se corta al instante.',
+      'No afecta a los rayos finos de la luna en las Catacumbas ni a la columna estelar del Observatorio (que ya tiene su propio santuario).',
+    ],
+  },
+  {
     version: '0.7.4',
     date: '2026-06-05',
     title: 'El Observatorio',
