@@ -19,11 +19,10 @@ export const CHANGELOG = [
     date: '2026-06-05',
     title: 'El santuario del Gran Tomo',
     items: [
-      'La Sala del Gran Tomo ya no es una habitación vacía: ahora es un auténtico santuario arcano.',
-      'El tomo levita más grande sobre el pedestal, ahora abierto en dos páginas con runas brillando en cada una.',
-      'Bajo el pedestal aparece un enorme círculo rúnico con dos triángulos entrelazados y marcas cardinales.',
-      'Cuatro braseros de piedra con llama violeta iluminan las esquinas y bañan la sala en luz arcana.',
-      'Estanterías rodean el perímetro y libros abiertos y pergaminos descansan tirados por el suelo entre la magia.',
+      'La Sala del Gran Tomo es ahora una sala simétrica más amplia, con el pedestal y el círculo rúnico perfectamente alineados en el centro.',
+      'El pedestal crece a un monolito de tres bloques de altura con runa central y rivets en las esquinas; el tomo flota claramente por encima.',
+      'Cuatro braseros de piedra con llama violeta marcan las esquinas y bañan la sala en luz arcana.',
+      'Estanterías cubren todo el perímetro dejando un hueco simétrico hacia el pedestal, y libros abiertos descansan en cada esquina interior.',
     ],
   },
   {

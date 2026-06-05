@@ -300,6 +300,9 @@ export function drawTomePrompt(ctx) {
   if (!at) return;
   const cx = (gt.pedestal.tx + gt.pedestal.w / 2) * TILE - state.cameraX;
   const cy = (gt.pedestal.ty + gt.pedestal.h / 2) * TILE - state.cameraY;
+  // Push the prompt above the floating book (pedestal top - book height
+  // - margin) so it never overlaps the tome itself.
+  const promptY = cy - (gt.pedestal.h * TILE) / 2 - 36 - 24;
   const pulse = 0.7 + 0.3 * Math.sin(state.time * 4);
   ctx.save();
   ctx.shadowColor = 'rgba(184,144,255,0.9)';
@@ -307,7 +310,7 @@ export function drawTomePrompt(ctx) {
   ctx.fillStyle   = `rgba(220, 200, 255, ${pulse})`;
   ctx.font        = 'bold 12px sans-serif';
   ctx.textAlign   = 'center';
-  ctx.fillText('[E] LEER EL TOMO', cx, cy - 40);
+  ctx.fillText('[E] LEER EL TOMO', cx, promptY);
   ctx.restore();
 }
 
@@ -326,11 +329,13 @@ export function drawGrandTome(ctx) {
   // an open tome facing the camera: two angled pages flanking a leather
   // spine, with rune glyphs glowing on both pages.
   const bob = Math.sin(state.time * 2.2) * 3;
-  // Book footprint: 52 wide × 36 tall. Anchor it well above the pedestal
-  // so the floating gap reads clearly.
+  // Book footprint: 52 wide × 36 tall. The pedestal is 3×3 (96×96 px)
+  // so its top edge sits at cy-48; we anchor the book so it floats
+  // clearly above that edge.
   const BW = 52, BH = 36;
   const tx = cx - BW / 2;
-  const ty = cy - 44 + bob;
+  const pedTopY = cy - (gt.pedestal.h * TILE) / 2;
+  const ty = pedTopY - BH - 6 + bob;
   ctx.save();
 
   // Halo (soft purple glow behind the whole book).
@@ -342,10 +347,10 @@ export function drawGrandTome(ctx) {
   ctx.fillStyle = halo;
   ctx.fillRect(cx - 60, ty - 14, 120, BH + 28);
 
-  // Drop shadow under the book (squashed ellipse on the pedestal top).
+  // Drop shadow on the pedestal top under the floating book.
   ctx.fillStyle = 'rgba(0,0,0,0.45)';
   ctx.beginPath();
-  ctx.ellipse(cx, cy - 4, BW * 0.45, 5, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, pedTopY + 6, BW * 0.45, 5, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // Leather covers: two trapezoids leaning back so the open spine sits
@@ -434,8 +439,8 @@ export function drawGrandTome(ctx) {
   ctx.fillRect(rrx + 3, rry,     2, 2);
   ctx.restore();
 
-  // Sequence UI: a horizontal strip of arrows above the pedestal.
-  drawSequenceUI(ctx, gt, cx, ty + bob);
+  // Sequence UI: a horizontal strip of arrows above the floating tome.
+  drawSequenceUI(ctx, gt, cx, ty);
 }
 
 /** @private */

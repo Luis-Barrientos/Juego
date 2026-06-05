@@ -787,25 +787,49 @@ function drawLibraryProp(ctx, p) {
 
 /**
  * Tall hexagonal stone pedestal (the giant tome that levitates on top is
- * rendered as an overlay from grandTome.js so it can bob and glow).
+ * rendered as an overlay from grandTome.js so it can bob and glow). All
+ * internal sizes scale with the prop footprint so a 3×3 pedestal still
+ * reads as a proportioned monument.
  */
 function drawTomePedestal(ctx, px, py, w, h, p) {
+  const slabH = Math.max(6, Math.floor(h * 0.13));
+  const stepH = Math.max(4, Math.floor(h * 0.08));
+  const inset = Math.max(2, Math.floor(w * 0.05));
+
   // Base shadow.
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.fillRect(px + 3, py + 4, w - 4, h - 3);
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(px + inset + 1, py + inset + 2, w - inset * 2, h - inset * 2);
   // Stone body.
   ctx.fillStyle = '#5a4a3a';
-  ctx.fillRect(px + 2, py + 2, w - 4, h - 4);
+  ctx.fillRect(px + inset, py + inset, w - inset * 2, h - inset * 2);
+  // Vertical seams (carved stone blocks).
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.fillRect(px + w * 0.33, py + inset + slabH + 2, 1, h - inset * 2 - slabH - stepH - 2);
+  ctx.fillRect(px + w * 0.66, py + inset + slabH + 2, 1, h - inset * 2 - slabH - stepH - 2);
   // Top slab (lighter).
   ctx.fillStyle = '#7a6a55';
-  ctx.fillRect(px + 4, py + 4, w - 8, 6);
-  // Carved rune slits.
+  ctx.fillRect(px + inset + 2, py + inset, w - inset * 2 - 4, slabH);
+  // Slab top edge highlight.
+  ctx.fillStyle = '#9c8a70';
+  ctx.fillRect(px + inset + 2, py + inset, w - inset * 2 - 4, 2);
+  // Carved purple rune cross in the centre column.
+  const runeLen = Math.floor(w * 0.45);
   ctx.fillStyle = '#b890ff';
-  ctx.fillRect(px + 8,        py + h / 2 - 1, w - 16, 2);
-  ctx.fillRect(px + w / 2 - 1, py + h / 2 - 6, 2, 12);
+  ctx.shadowColor = 'rgba(184,144,255,0.6)';
+  ctx.shadowBlur  = 6;
+  ctx.fillRect(px + (w - runeLen) / 2, py + h / 2 - 2, runeLen, 3);
+  ctx.fillRect(px + w / 2 - 2,         py + h / 2 - runeLen / 2, 3, runeLen);
+  ctx.shadowBlur = 0;
+  // Four corner rivets on the slab.
+  ctx.fillStyle = '#3a2c1f';
+  const rivet = 2;
+  ctx.fillRect(px + inset + 3,             py + inset + 3,             rivet, rivet);
+  ctx.fillRect(px + w - inset - 3 - rivet, py + inset + 3,             rivet, rivet);
+  ctx.fillRect(px + inset + 3,             py + inset + slabH - 5,     rivet, rivet);
+  ctx.fillRect(px + w - inset - 3 - rivet, py + inset + slabH - 5,     rivet, rivet);
   // Bottom step.
   ctx.fillStyle = '#3a2c1f';
-  ctx.fillRect(px + 1, py + h - 4, w - 2, 3);
+  ctx.fillRect(px + inset - 1, py + h - stepH, w - (inset - 1) * 2, stepH);
 }
 
 /**
