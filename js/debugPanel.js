@@ -58,12 +58,11 @@ let buildFloorFn = null;    // injected from main.js — rebuilds a floor
  * @param {{ buildFloor: (floor:number) => void }} hooks
  */
 export function initDebugPanel(hooks) {
-  if (!isDebugEnabled()) return;
   buildFloorFn = hooks.buildFloor;
   document.addEventListener('keydown', e => {
-    // Backquote (`) is the classic debug-console key and doesn't clash
-    // with any in-game binding; F2 was being swallowed by some browsers.
-    if (e.code === 'Backquote') {
+    // "ç" key on Spanish keyboards reports e.code === 'Semicolon'.
+    // Also accept e.key === 'ç' as a fallback for other layouts.
+    if (e.code === 'Semicolon' || e.key === 'ç' || e.key === 'Ç') {
       e.preventDefault();
       toggle();
     }
@@ -76,23 +75,17 @@ export function initDebugPanel(hooks) {
   const opener = document.createElement('button');
   opener.id = 'debugOpener';
   opener.type = 'button';
-  opener.textContent = 'Debug';
-  opener.title = 'Abrir panel de debug (`)';
+  opener.textContent = 'Debug (ç)';
+  opener.title = 'Abrir panel de debug (ç)';
   opener.addEventListener('click', toggle);
   document.body.appendChild(opener);
   // Default: start with the current floor expanded.
   expanded.add(1);
 }
 
-/** True when the debug panel should be available (localhost / ?debug=1). */
-function isDebugEnabled() {
-  const host = window.location.hostname;
-  const isLocal =
-    host === 'localhost' || host === '127.0.0.1' || host === '' ||
-    window.location.protocol === 'file:';
-  const hasFlag = /[?&]debug=1\b/.test(window.location.search);
-  return isLocal || hasFlag;
-}
+/** Reserved for future use — the panel is currently always available. */
+// eslint-disable-next-line no-unused-vars
+function _legacyDebugCheck() { return true; }
 
 function toggle() {
   if (!panelEl) return;
@@ -111,7 +104,7 @@ function createPanelDom() {
   root.className = 'hidden';
   root.innerHTML = `
     <div class="dp-header">
-      <span>Debug · Teletransporte (`)</span>
+      <span>Debug · Teletransporte (ç)</span>
       <button class="dp-close" type="button" aria-label="Cerrar">×</button>
     </div>
     <div class="dp-body"></div>
