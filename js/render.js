@@ -1893,6 +1893,21 @@ export function drawLighting(ctx) {
       lctx.arc(ex, ey, 140, 0, Math.PI * 2);
       lctx.fill();
     }
+    // Library Guardian: arcane purple aura. Smaller than the final boss
+    // but bright enough to act as a beacon across the dim Great Library.
+    if (e.type === 'guardian' && !e.dead) {
+      const ex = e.x - state.cameraX, ey = e.y - state.cameraY;
+      const pulse = 1 + Math.sin(state.time * 1.6) * 0.08;
+      const radius = 110 * pulse;
+      const grad = lctx.createRadialGradient(ex, ey, 8, ex, ey, radius);
+      grad.addColorStop(0,   'rgba(184,144,255,0.55)');
+      grad.addColorStop(0.5, 'rgba(150,100,220,0.30)');
+      grad.addColorStop(1,   'rgba(80,40,160,0)');
+      lctx.fillStyle = grad;
+      lctx.beginPath();
+      lctx.arc(ex, ey, radius, 0, Math.PI * 2);
+      lctx.fill();
+    }
   }
 
   // Sunbeams cut the ambient overlay so the floor under the ceiling crack
