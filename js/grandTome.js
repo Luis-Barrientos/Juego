@@ -329,13 +329,15 @@ export function drawGrandTome(ctx) {
   // an open tome facing the camera: two angled pages flanking a leather
   // spine, with rune glyphs glowing on both pages.
   const bob = Math.sin(state.time * 2.2) * 3;
-  // Book footprint: 52 wide × 36 tall. The pedestal is 3×3 (96×96 px)
-  // so its top edge sits at cy-48; we anchor the book so it floats
-  // clearly above that edge.
+  // Book footprint: 52 wide × 36 tall. We want the book to read as
+  // "sitting on the pedestal slab" — most of the book above the slab,
+  // its bottom edge overlapping the top of the slab.
   const BW = 52, BH = 36;
   const tx = cx - BW / 2;
   const pedTopY = cy - (gt.pedestal.h * TILE) / 2;
-  const ty = pedTopY - BH - 6 + bob;
+  // Book bottom 6 px below the slab top, so the bottom 14% overlaps the
+  // slab and the rest floats clearly above.
+  const ty = pedTopY + 6 - BH * 0.85 + bob;
   ctx.save();
 
   // Halo (soft purple glow behind the whole book).
@@ -413,30 +415,34 @@ export function drawGrandTome(ctx) {
   ctx.fillRect(tx + BW / 2 + spineW / 2 + pageInset / 2, ty + pageInset,
                BW / 2 - spineW / 2 - pageInset * 1.5, pageH - pageInset * 2);
 
-  // Faint hand-written lines (just a couple, to hint at text).
+  // Faint hand-written lines (just a couple, to hint at text). Centred
+  // in each page so both halves read identically.
+  const lineW = 14;
+  const leftLineX  = tx + 4 + ((BW / 2 - spineW / 2 - 4) - lineW) / 2;          // centred in left page
+  const rightLineX = tx + BW / 2 + spineW / 2 + ((BW / 2 - spineW / 2 - 4) - lineW) / 2; // centred in right page
   ctx.fillStyle = 'rgba(80,50,30,0.4)';
   for (let i = 0; i < 3; i++) {
     const ly = ty + 10 + i * 5;
-    ctx.fillRect(tx + 7,                            ly, 14, 1);
-    ctx.fillRect(tx + BW / 2 + spineW / 2 + 3,      ly, 14, 1);
+    ctx.fillRect(leftLineX,  ly, lineW, 1);
+    ctx.fillRect(rightLineX, ly, lineW, 1);
   }
 
-  // Rune glyphs glowing on both pages (pulse).
+  // Rune glyphs glowing on both pages (pulse). Identical mirrored cross
+  // shape on each page so the book reads as perfectly symmetric.
   const pulse = 0.55 + 0.45 * Math.sin(state.time * 3);
   ctx.fillStyle = `rgba(140,90,200,${pulse})`;
   ctx.shadowColor = '#e0c0ff';
   ctx.shadowBlur  = 10;
-  // Left page rune (vertical pair of bars + cross).
-  const lrx = tx + 10, lry = ty + 22;
-  ctx.fillRect(lrx,     lry,     2, 8);
-  ctx.fillRect(lrx + 6, lry,     2, 8);
-  ctx.fillRect(lrx,     lry + 3, 8, 2);
-  // Right page rune (triangle + dot).
-  const rrx = tx + BW / 2 + spineW / 2 + 6, rry = ty + 22;
-  ctx.fillRect(rrx,     rry + 6, 8, 2);
-  ctx.fillRect(rrx + 1, rry + 4, 6, 2);
-  ctx.fillRect(rrx + 2, rry + 2, 4, 2);
-  ctx.fillRect(rrx + 3, rry,     2, 2);
+  // Rune is 8 wide × 8 tall: vertical pair of bars + horizontal cross.
+  const runeW = 8, runeH = 8;
+  const leftRuneX  = tx + 4 + ((BW / 2 - spineW / 2 - 4) - runeW) / 2;
+  const rightRuneX = tx + BW / 2 + spineW / 2 + ((BW / 2 - spineW / 2 - 4) - runeW) / 2;
+  const runeY = ty + 22;
+  for (const rx of [leftRuneX, rightRuneX]) {
+    ctx.fillRect(rx,         runeY,     2, runeH);
+    ctx.fillRect(rx + 6,     runeY,     2, runeH);
+    ctx.fillRect(rx,         runeY + 3, runeW, 2);
+  }
   ctx.restore();
 
   // Sequence UI: a horizontal strip of arrows above the floating tome.
