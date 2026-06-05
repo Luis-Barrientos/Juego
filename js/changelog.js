@@ -15,6 +15,18 @@
 
 export const CHANGELOG = [
   {
+    version: '0.7.2',
+    date: '2026-06-05',
+    title: 'El santuario del Gran Tomo',
+    items: [
+      'La Sala del Gran Tomo ya no es una habitación vacía: ahora es un auténtico santuario arcano.',
+      'El tomo levita más grande sobre el pedestal, ahora abierto en dos páginas con runas brillando en cada una.',
+      'Bajo el pedestal aparece un enorme círculo rúnico con dos triángulos entrelazados y marcas cardinales.',
+      'Cuatro braseros de piedra con llama violeta iluminan las esquinas y bañan la sala en luz arcana.',
+      'Estanterías rodean el perímetro y libros abiertos y pergaminos descansan tirados por el suelo entre la magia.',
+    ],
+  },
+  {
     version: '0.7.1',
     date: '2026-06-05',
     title: 'La Sala del Gran Tomo',

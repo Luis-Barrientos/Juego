@@ -272,7 +272,7 @@ export function generateDungeon(floor, seed, biome) {
       librarySetPiece = placeLibrarySetPiece(greatLibraryRoom, map, rng, libraryProps);
     }
     if (grandTomeRoom) {
-      grandTome = placeGrandTome(grandTomeRoom, map, rng, libraryProps);
+      grandTome = placeGrandTome(grandTomeRoom, map, rng, libraryProps, lights);
     }
   }
 
@@ -1266,7 +1266,7 @@ function placeLibrarySetPiece(room, map, rng, libraryProps) {
  *
  * @private
  */
-function placeGrandTome(room, map, rng, libraryProps) {
+function placeGrandTome(room, map, rng, libraryProps, lights) {
   if (!room) return null;
   room.isGrandTome = true;
 
@@ -1287,7 +1287,50 @@ function placeGrandTome(room, map, rng, libraryProps) {
     libraryProps.splice(i, 1);
   }
 
-  // Carve the pedestal as solid wall tiles so it blocks movement.
+  // -----------------------------------------------------------------
+  // Ambient decor — make the room feel like a sealed arcane sanctum.
+  // Drawing order matters: push floor paint BEFORE the pedestal so the
+  // glyph ring renders underneath it.
+  // -----------------------------------------------------------------
+
+  // 1. Big runic ring painted on the floor under the pedestal (5×5,
+  //    walkable, does not touch the map).
+  libraryProps.push({
+    kind: 'tomeCircle',
+    tx: room.cx - 2, ty: room.cy - 2, w: 5, h: 5,
+    seed: Math.floor(rng() * 1e9),
+  });
+
+  // 2. Scattered open books / scrolls on the floor (walkable decor).
+  //    Avoid the pedestal footprint and the 4 cardinal axes around it so
+  //    nothing visually clips with the player path or the ring.
+  const bookSpots = [];
+  for (let oy = 0; oy < room.h; oy++) {
+    for (let ox = 0; ox < room.w; ox++) {
+      const xx = room.x + ox, yy = room.y + oy;
+      // Stay inside the perimeter (the perimeter is reserved for shelves
+      // and corner braziers).
+      if (xx <= room.x || xx >= room.x + room.w - 1) continue;
+      if (yy <= room.y || yy >= room.y + room.h - 1) continue;
+      // Skip the pedestal footprint and a 1-tile collar around it.
+      if (xx >= tx - 1 && xx <= tx + 2 && yy >= ty - 1 && yy <= ty + 2) continue;
+      if (!map[yy] || map[yy][xx] !== T_FLOOR) continue;
+      bookSpots.push({ xx, yy });
+    }
+  }
+  // Pick 3-4 of them at random.
+  const bookCount = 3 + Math.floor(rng() * 2);
+  for (let i = 0; i < bookCount && bookSpots.length > 0; i++) {
+    const k = Math.floor(rng() * bookSpots.length);
+    const spot = bookSpots.splice(k, 1)[0];
+    libraryProps.push({
+      kind: 'tomeBookPile',
+      tx: spot.xx, ty: spot.yy, w: 1, h: 1,
+      seed: Math.floor(rng() * 1e9),
+    });
+  }
+
+  // 3. Carve the pedestal as solid wall tiles so it blocks movement.
   for (let yy = ty; yy < ty + 2; yy++) {
     for (let xx = tx; xx < tx + 2; xx++) map[yy][xx] = T_WALL;
   }
@@ -1296,6 +1339,83 @@ function placeGrandTome(room, map, rng, libraryProps) {
     tx, ty, w: 2, h: 2,
     seed: Math.floor(rng() * 1e9),
   });
+
+  // 4. Four corner braziers (1×1 solid props with a steady magical flame
+  //    light attached). Skip a corner if a door is right next to it so we
+  //    don't seal the entrance.
+  const corners = [
+    { x: room.x + 1,             y: room.y + 1 },
+    { x: room.x + room.w - 2,    y: room.y + 1 },
+    { x: room.x + 1,             y: room.y + room.h - 2 },
+    { x: room.x + room.w - 2,    y: room.y + room.h - 2 },
+  ];
+  for (const c of corners) {
+    if (!map[c.y] || map[c.y][c.x] !== T_FLOOR) continue;
+    if (isNearDoor(map, c.x, c.y, room)) continue;
+    map[c.y][c.x] = T_WALL;
+    libraryProps.push({
+      kind: 'tomeBrazier',
+      tx: c.x, ty: c.y, w: 1, h: 1,
+      seed: Math.floor(rng() * 1e9),
+    });
+    if (lights) {
+      lights.push({
+        type:    'magicFlame',
+        ax: c.x * TILE + TILE / 2,
+        ay: c.y * TILE + 6,
+        bx: c.x * TILE + TILE / 2,
+        by: c.y * TILE + 6,
+        x:  c.x * TILE + TILE / 2,
+        y:  c.y * TILE + 6,
+        phase:   rng() * Math.PI * 2,
+        speed:   0.15 + rng() * 0.10,
+        wobble:  rng() * Math.PI * 2,
+        color:   [180, 120, 255],
+        r:       70,
+        flicker: rng() * Math.PI * 2,
+      });
+    }
+  }
+
+  // 5. Bookshelves lining the inner perimeter, in 2-tile chunks. Skip
+  //    door tiles (and their immediate neighbors) so the room stays
+  //    reachable. Skip the corners (already braziers) and the centre axes
+  //    so the silhouette around the pedestal stays clear.
+  const tryShelf = (sx, sy, w, h, orient, face) => {
+    // All target tiles must be floor and away from doors / corners.
+    for (let yy = sy; yy < sy + h; yy++) {
+      for (let xx = sx; xx < sx + w; xx++) {
+        if (!map[yy] || map[yy][xx] !== T_FLOOR) return false;
+        if (isNearDoor(map, xx, yy, room)) return false;
+        if (xx === room.cx && yy === room.cy) return false;
+      }
+    }
+    for (let yy = sy; yy < sy + h; yy++) {
+      for (let xx = sx; xx < sx + w; xx++) map[yy][xx] = T_WALL;
+    }
+    libraryProps.push({
+      kind: 'shelf',
+      tx: sx, ty: sy, w, h,
+      orient, face,
+      seed: Math.floor(rng() * 1e9),
+    });
+    return true;
+  };
+
+  // Top and bottom walls: 2-tile horizontal chunks, leaving a 2-tile gap
+  // around the door axis.
+  for (let xx = room.x + 2; xx <= room.x + room.w - 4; xx += 2) {
+    // Skip the column directly above/below the pedestal.
+    if (xx === tx || xx === tx + 1 || xx + 1 === tx || xx + 1 === tx + 1) continue;
+    tryShelf(xx, room.y,             2, 1, 'h', 'S');
+    tryShelf(xx, room.y + room.h - 1, 2, 1, 'h', 'N');
+  }
+  // Left and right walls: 2-tile vertical chunks, skipping the pedestal row.
+  for (let yy = room.y + 2; yy <= room.y + room.h - 4; yy += 2) {
+    if (yy === ty || yy === ty + 1 || yy + 1 === ty || yy + 1 === ty + 1) continue;
+    tryShelf(room.x,             yy, 1, 2, 'v', 'E');
+    tryShelf(room.x + room.w - 1, yy, 1, 2, 'v', 'W');
+  }
 
   return {
     room,
@@ -1315,6 +1435,38 @@ function placeGrandTome(room, map, rng, libraryProps) {
     flashKey: null,        // last key pressed, for the brief feedback flash
     flashTimer: 0,
   };
+}
+
+/**
+ * True if (x,y) is a perimeter floor tile that has a corridor coming in
+ * through the adjacent wall ring. We only care about the cardinal that
+ * points OUT of the room: if that wall tile is floor (the corridor
+ * carver punched through), this tile (and the one next to it) is the
+ * door entry and must stay walkable.
+ * @private
+ */
+function isNearDoor(map, x, y, room) {
+  // Build the list of "outward" cardinals based on which edge(s) this
+  // tile sits on. Interior tiles return false straight away.
+  const out = [];
+  if (x === room.x)             out.push([-1,  0]);
+  if (x === room.x + room.w - 1) out.push([ 1,  0]);
+  if (y === room.y)             out.push([ 0, -1]);
+  if (y === room.y + room.h - 1) out.push([ 0,  1]);
+  if (out.length === 0) return false;
+  for (const [dx, dy] of out) {
+    // This tile itself: outside neighbour is floor → door right here.
+    if (map[y + dy] && map[y + dy][x + dx] === T_FLOOR) return true;
+    // One tile to either side along the wall: protect a 3-tile gap so
+    // the doorway never gets shouldered.
+    for (let s = -1; s <= 1; s++) {
+      if (s === 0) continue;
+      const sx = dy === 0 ? x : x + s;
+      const sy = dy === 0 ? y + s : y;
+      if (map[sy + dy] && map[sy + dy][sx + dx] === T_FLOOR) return true;
+    }
+  }
+  return false;
 }
 
 function placeSarcophagi(rooms, map, rng, sarcophagi, lights) {

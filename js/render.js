@@ -769,6 +769,9 @@ function drawLibraryProp(ctx, p) {
     drawSummoningCircle(ctx, px, py, w, h, p);
     return;
   }
+  // Same goes for the floor decorations around the Grand Tome pedestal.
+  if (p.kind === 'tomeCircle')   { drawTomeCircle(ctx, px, py, w, h, p);   return; }
+  if (p.kind === 'tomeBookPile') { drawTomeBookPile(ctx, px, py, w, h, p); return; }
 
   // Wipe the underlying wall tile back to floor tone so the prop has its
   // own silhouette instead of inheriting the dark wall fill.
@@ -779,6 +782,7 @@ function drawLibraryProp(ctx, p) {
   else if (p.kind === 'table')        drawTable(ctx, px, py, w, h, p, false);
   else if (p.kind === 'tableBroken')  drawTable(ctx, px, py, w, h, p, true);
   else if (p.kind === 'tomePedestal') drawTomePedestal(ctx, px, py, w, h, p);
+  else if (p.kind === 'tomeBrazier')  drawTomeBrazier(ctx, px, py, w, h, p);
 }
 
 /**
@@ -802,6 +806,213 @@ function drawTomePedestal(ctx, px, py, w, h, p) {
   // Bottom step.
   ctx.fillStyle = '#3a2c1f';
   ctx.fillRect(px + 1, py + h - 4, w - 2, 3);
+}
+
+/**
+ * Large runic ring painted on the floor under the Grand Tome pedestal.
+ * Two concentric circles, a six-point hexagram inscribed inside, eight
+ * compass-cardinal rune marks on the outer ring, and a halo gradient.
+ * Walkable: never wipes the underlying floor.
+ */
+function drawTomeCircle(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  const r  = Math.min(w, h) * 0.46;
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+
+  ctx.save();
+  // Soft purple halo behind the rings.
+  const halo = ctx.createRadialGradient(cx, cy, r * 0.2, cx, cy, r * 1.05);
+  halo.addColorStop(0,   'rgba(120, 80, 200, 0.30)');
+  halo.addColorStop(0.6, 'rgba(80, 50, 160, 0.18)');
+  halo.addColorStop(1,   'rgba(40, 20, 80, 0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 1.05, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Dark base disk so runes pop.
+  ctx.fillStyle = 'rgba(18, 12, 28, 0.55)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Outer painted ring (purple).
+  ctx.strokeStyle = 'rgba(200, 160, 255, 0.95)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+  // Inner ring.
+  ctx.strokeStyle = 'rgba(220, 190, 255, 0.70)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 6, 0, Math.PI * 2);
+  ctx.stroke();
+  // Innermost ring around the pedestal.
+  ctx.strokeStyle = 'rgba(140, 100, 200, 0.60)';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.45, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Inscribed hexagram (two overlapping triangles).
+  ctx.strokeStyle = 'rgba(180, 140, 255, 0.70)';
+  ctx.lineWidth = 1.2;
+  for (let t = 0; t < 2; t++) {
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const ang = -Math.PI / 2 + (t ? Math.PI / 3 : 0) + i * (Math.PI * 2 / 3);
+      const x = cx + Math.cos(ang) * (r - 4);
+      const y = cy + Math.sin(ang) * (r - 4);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // Compass rune marks (small bars) at 8 equally spaced points on the outer ring.
+  ctx.fillStyle = 'rgba(230, 200, 255, 0.85)';
+  for (let i = 0; i < 8; i++) {
+    const ang = i * (Math.PI / 4);
+    const bx = cx + Math.cos(ang) * (r + 1);
+    const by = cy + Math.sin(ang) * (r + 1);
+    ctx.save();
+    ctx.translate(bx, by);
+    ctx.rotate(ang);
+    ctx.fillRect(-3, -1, 6, 2);
+    ctx.restore();
+  }
+
+  // Tiny rune dots inside the outer ring.
+  ctx.fillStyle = 'rgba(220, 180, 255, 0.60)';
+  for (let i = 0; i < 16; i++) {
+    const ang = i * (Math.PI / 8) + rnd() * 0.05;
+    const dx = cx + Math.cos(ang) * (r - 3);
+    const dy = cy + Math.sin(ang) * (r - 3);
+    ctx.fillRect(dx - 0.5, dy - 0.5, 1.2, 1.2);
+  }
+
+  // Faint floor cracks radiating outward.
+  ctx.strokeStyle = 'rgba(40, 24, 14, 0.45)';
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 6; i++) {
+    const a = rnd() * Math.PI * 2;
+    const x1 = cx + Math.cos(a) * (r * 0.5);
+    const y1 = cy + Math.sin(a) * (r * 0.5);
+    const x2 = cx + Math.cos(a) * (r * 0.95);
+    const y2 = cy + Math.sin(a) * (r * 0.95);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Corner brazier: stone pillar with a magical purple flame on top. Solid
+ * (writes T_WALL underneath). The actual light pool is rendered by the
+ * lighting pass via an attached magicFlame entry.
+ */
+function drawTomeBrazier(ctx, px, py, w, h, p) {
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+
+  ctx.save();
+  // Drop shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(px + 4, py + 22, 24, 7);
+  // Stone base (trapezoid feel via two stacked rects).
+  ctx.fillStyle = '#4a3d2c';
+  ctx.fillRect(px + 5, py + 18, 22, 10);
+  ctx.fillStyle = '#5e4c36';
+  ctx.fillRect(px + 7, py + 12, 18, 10);
+  // Brazier bowl (lighter rim).
+  ctx.fillStyle = '#7a6248';
+  ctx.fillRect(px + 6, py + 10, 20, 4);
+  ctx.fillStyle = '#2a1f14';
+  ctx.fillRect(px + 8, py + 12, 16, 2);
+  // Engraved purple rune on the front of the base.
+  ctx.fillStyle = 'rgba(180, 140, 255, 0.85)';
+  ctx.fillRect(px + 14, py + 20, 4, 1);
+  ctx.fillRect(px + 15, py + 18, 2, 5);
+
+  // Static "flame" silhouette (the dynamic glow comes from the lighting
+  // pass, but a small painted flame anchors it visually on the brazier).
+  const flameCx = px + 16;
+  const flameTopY = py + 4 + Math.floor(rnd() * 2);
+  // Outer purple flame.
+  ctx.fillStyle = 'rgba(170, 110, 230, 0.85)';
+  ctx.beginPath();
+  ctx.moveTo(flameCx,     flameTopY);
+  ctx.quadraticCurveTo(px + 9,  py + 10, px + 12, py + 12);
+  ctx.lineTo(px + 20, py + 12);
+  ctx.quadraticCurveTo(px + 23, py + 10, flameCx, flameTopY);
+  ctx.closePath();
+  ctx.fill();
+  // Inner brighter core.
+  ctx.fillStyle = 'rgba(230, 200, 255, 0.95)';
+  ctx.beginPath();
+  ctx.moveTo(flameCx, flameTopY + 2);
+  ctx.quadraticCurveTo(px + 12, py + 11, px + 14, py + 12);
+  ctx.lineTo(px + 18, py + 12);
+  ctx.quadraticCurveTo(px + 20, py + 11, flameCx, flameTopY + 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * A small pile of two or three open books / scrolls discarded on the
+ * floor. Walkable, decorative; covers a single 1×1 tile.
+ */
+function drawTomeBookPile(ctx, px, py, w, h, p) {
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+
+  ctx.save();
+  // Drop shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fillRect(px + 4, py + 22, 22, 6);
+
+  // Pile of 2-3 books, alternating cover colour, slightly rotated.
+  const covers = ['#5a2e1f', '#3a3a6a', '#4a2a5a', '#6a4a1f'];
+  const count = 2 + Math.floor(rnd() * 2);
+  for (let i = 0; i < count; i++) {
+    const bx = px + 5 + Math.floor(rnd() * 4) + i;
+    const by = py + 19 - i * 3;
+    const bw = 14 + Math.floor(rnd() * 6);
+    const bh = 4;
+    const tilt = (rnd() - 0.5) * 0.5;
+    ctx.save();
+    ctx.translate(bx + bw / 2, by + bh / 2);
+    ctx.rotate(tilt);
+    // Cover.
+    ctx.fillStyle = covers[Math.floor(rnd() * covers.length)];
+    ctx.fillRect(-bw / 2, -bh / 2, bw, bh);
+    // Pages (lighter band along the long edge).
+    ctx.fillStyle = '#e8d8b5';
+    ctx.fillRect(-bw / 2 + 1, -bh / 2 + 1, bw - 2, 1);
+    // Spine dot.
+    ctx.fillStyle = 'rgba(220, 200, 140, 0.7)';
+    ctx.fillRect(-bw / 2, -bh / 2, 1, bh);
+    ctx.restore();
+  }
+
+  // One open book in front: two parchment halves around a dark spine.
+  ctx.fillStyle = '#e8d8b5';
+  ctx.fillRect(px + 8,  py + 24, 7, 4);
+  ctx.fillRect(px + 17, py + 24, 7, 4);
+  ctx.fillStyle = '#2a1808';
+  ctx.fillRect(px + 15, py + 23, 2, 6);
+  // Faint text lines on the open pages.
+  ctx.fillStyle = 'rgba(80, 50, 30, 0.55)';
+  ctx.fillRect(px + 9,  py + 25, 5, 1);
+  ctx.fillRect(px + 9,  py + 27, 4, 1);
+  ctx.fillRect(px + 18, py + 25, 5, 1);
+  ctx.fillRect(px + 18, py + 27, 4, 1);
+  ctx.restore();
 }
 
 /** Tall bookshelf full of leaning books. Orientation follows p.orient. */
