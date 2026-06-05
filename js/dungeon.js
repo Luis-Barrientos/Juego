@@ -1663,32 +1663,16 @@ function placeObservatory(room, map, rng, libraryProps, lights, sunbeams, decora
     seed: Math.floor(rng() * 1e9),
   });
 
-  // 3. Magical skylight: the room is a sealed dome carved with a glowing
-  //    oculus that projects a clean cone of starlight downward (no
-  //    ceiling crack — we're on floor 2, there's no sky above).
-  //    Re-use the sunbeam container/render path so the floor under the
-  //    cone keeps the same warm cut-out in the ambient overlay, but
-  //    we build a clean trapezoidal shape and skip the jagged crack.
-  const beamLen = (room.w - 2) * TILE; // ~7 tiles wide cone at the top
-  const beam = {
-    kind: 'observatory',
-    x: (room.x + room.w / 2) * TILE,
-    y: room.y * TILE,
-    h: room.h * TILE,
-    length: beamLen,
-    splay: TILE * 0.9,
-    seed: Math.floor(rng() * 1e9),
-    wallRow: room.y - 1,
-    domeRoom: room, // anchor for the dynamic dome+oculus overlay
-  };
-  beam.shape = buildObservatoryBeamShape(beam);
-  // Intentionally NO beam.crack — the oculus is rendered dynamically by
-  // drawObservatoryDome instead of as a jagged fissure on the wall.
-  sunbeams.push(beam);
+  // 3. No skylight beam — the observatory is a sealed chamber.
+  //    Atmosphere comes from a starlight overlay painted across the
+  //    whole room (drawObservatoryStars in render.js) and the four
+  //    corner obelisks acting as light emitters. This keeps the look
+  //    fully top-down and consistent with the rest of the game.
 
   // 4. Four corner obelisks: 1×1 solid props at the interior corners.
-  //    Cool blue moon-glow light attached so the ambience reads as
-  //    "open to the night sky".
+  //    They are the sole light source of the room — a cool blue magical
+  //    glow that bathes the floor and casts the constellation ring in
+  //    soft starlight.
   const corners = [
     { x: room.x,                 y: room.y },
     { x: room.x + room.w - 1,    y: room.y },
@@ -1705,12 +1689,16 @@ function placeObservatory(room, map, rng, libraryProps, lights, sunbeams, decora
       seed: Math.floor(rng() * 1e9),
     });
     if (lights) {
+      // Cool blue-white magical light — wider radius and brighter than
+      // a regular candle since these are the only source in the room.
       lights.push({
-        type:    'candle',
+        type:    'starObelisk',
         x:       c.x * TILE + TILE / 2,
-        y:       c.y * TILE + 6,
-        r:       80,
+        y:       c.y * TILE + TILE / 2,
+        r:       190,
+        color:   [180, 210, 255],
         flicker: rng() * Math.PI * 2,
+        phase:   rng() * Math.PI * 2,
       });
     }
   }
@@ -1904,47 +1892,6 @@ function placePuddles(map, rooms, rng, puddles) {
       placed++;
     }
   }
-}
-
-/**
- * Clean conical beam shape used by the magical observatory oculus — no
- * jagged edges since the light comes from a smooth circular opening, not
- * a rocky fissure. Returns a soft trapezoid with subtly curved sides.
- * Coordinates are local to the beam anchor (sb.x, sb.y).
- * @private
- */
-function buildObservatoryBeamShape(sb) {
-  const halfTop    = sb.length * 0.5;
-  const halfBottom = halfTop + sb.splay;
-  const h          = sb.h;
-  const pts        = [];
-
-  // Top edge: smooth arc matching the oculus aperture.
-  const nTop = 10;
-  for (let i = 0; i < nTop; i++) {
-    const t = i / (nTop - 1);
-    const x = -halfTop + t * (halfTop * 2);
-    const dip = Math.sin(t * Math.PI) * 3;
-    pts.push([x, dip]);
-  }
-  // Right side: smooth diagonal to the floor.
-  const nSide = 4;
-  for (let i = 1; i <= nSide; i++) {
-    const t = i / nSide;
-    pts.push([halfTop + t * sb.splay, t * h]);
-  }
-  // Bottom edge: a slight curve outward.
-  const nBot = 10;
-  for (let i = 0; i < nBot; i++) {
-    const t = i / (nBot - 1);
-    pts.push([halfBottom - t * (halfBottom * 2), h]);
-  }
-  // Left side: smooth diagonal back up.
-  for (let i = nSide; i >= 1; i--) {
-    const t = i / nSide;
-    pts.push([-halfTop - t * sb.splay, t * h]);
-  }
-  return pts;
 }
 
 /**

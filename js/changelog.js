@@ -15,6 +15,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.7.7',
+    date: '2026-06-05',
+    title: 'Observatorio sin cúpula, obeliscos brillantes',
+    items: [
+      'Eliminada la cúpula del Observatorio: no encajaba con el estilo plano cenital del resto del juego.',
+      'Toda la sala emite ahora una sutil luminiscencia azul-violeta con estrellas titilando dispersas por el suelo, estables pero únicas por sala.',
+      'Los 4 obeliscos de las esquinas son los emisores visibles de la luz: ahora con una aura azul mucho más intensa y un núcleo de cristal mucho más brillante.',
+      'El teletransporte del panel de debug ya no te deja atrapado dentro del telescopio: busca la celda andable más cercana al centro.',
+    ],
+  },
+  {
     version: '0.7.6',
     date: '2026-06-05',
     title: 'La cúpula del Observatorio',

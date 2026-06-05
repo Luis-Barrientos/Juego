@@ -1346,21 +1346,41 @@ function drawStarObelisk(ctx, px, py, w, h, p) {
   ctx.fillStyle = 'rgba(180, 180, 220, 0.20)';
   ctx.fillRect(cx - 1, topY, 2, baseY - topY);
 
-  // Capstone crystal (small glowing gem).
+  // Capstone crystal (small glowing gem) — the visible source of the
+  // room's starlight, so we lean into the halo a bit.
   const pulse = 0.7 + Math.sin(t * 2.4 + (p.seed || 0)) * 0.25;
+  const slow  = 0.6 + Math.sin(t * 0.9 + (p.seed || 0) * 0.5) * 0.40;
   const gemX = cx;
   const gemY = topY - 1;
-  const gemR = 2.4;
-  const gemHalo = ctx.createRadialGradient(gemX, gemY, 0, gemX, gemY, gemR * 4);
-  gemHalo.addColorStop(0, `rgba(140, 200, 255, ${0.55 * pulse})`);
-  gemHalo.addColorStop(1, 'rgba(40, 80, 160, 0)');
-  ctx.fillStyle = gemHalo;
+  const gemR = 2.6;
+  // Wide outer aura (very soft, slow pulse).
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const aura = ctx.createRadialGradient(gemX, gemY, 0, gemX, gemY, gemR * 8);
+  aura.addColorStop(0,   `rgba(180, 210, 255, ${0.30 * slow})`);
+  aura.addColorStop(0.5, `rgba(140, 180, 255, ${0.12 * slow})`);
+  aura.addColorStop(1,   'rgba(40, 80, 160, 0)');
+  ctx.fillStyle = aura;
+  ctx.beginPath();
+  ctx.arc(gemX, gemY, gemR * 8, 0, Math.PI * 2);
+  ctx.fill();
+  // Tight inner halo.
+  const halo = ctx.createRadialGradient(gemX, gemY, 0, gemX, gemY, gemR * 4);
+  halo.addColorStop(0, `rgba(180, 220, 255, ${0.75 * pulse})`);
+  halo.addColorStop(1, 'rgba(40, 80, 160, 0)');
+  ctx.fillStyle = halo;
   ctx.beginPath();
   ctx.arc(gemX, gemY, gemR * 4, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#c8e0ff';
+  ctx.restore();
+  // Solid gem core with bright highlight.
+  ctx.fillStyle = '#d8ecff';
   ctx.beginPath();
   ctx.arc(gemX, gemY, gemR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.beginPath();
+  ctx.arc(gemX - 0.6, gemY - 0.8, gemR * 0.45, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -2113,6 +2133,12 @@ export function drawLighting(ctx) {
       // Steady cool flame: small flicker, cool blue-white pool.
       radius = lt.r + Math.sin(lt.flicker * 0.7) * 2 + Math.sin(lt.flicker * 1.9) * 1;
       color  = [180, 200, 255];
+    } else if (lt.type === 'starObelisk') {
+      // Magical starlight emitter: wide, steady blue pool with a slow
+      // breath so the room feels alive without flickering.
+      const pulse = 1 + Math.sin(state.time * 0.9 + (lt.phase || 0)) * 0.08;
+      radius = lt.r * pulse;
+      color  = lt.color || [180, 210, 255];
     } else if (lt.type === 'altar') {
       // Strong cool altar flame, lively flicker.
       radius = lt.r + Math.sin(lt.flicker * 0.8) * 6 + Math.sin(lt.flicker * 2.1) * 3;
@@ -2228,6 +2254,7 @@ export function drawLighting(ctx) {
     if (lt.type === 'glowMushroom') continue;
     if (lt.type === 'skull')        continue;
     if (lt.type === 'altar')        continue;
+    if (lt.type === 'starObelisk')  continue;
     const lx = lt.x - state.cameraX;
     const ly = lt.y - state.cameraY;
     if (lx < -120 || lx > VIEW_W + 120 || ly < -120 || ly > VIEW_H + 120) continue;
@@ -2265,6 +2292,7 @@ export function drawLighting(ctx) {
     const ly = lt.y - state.cameraY;
     if (lx < -10 || lx > VIEW_W + 10 || ly < 0 || ly > VIEW_H) continue;
     if (lt.type === 'altar') continue;  // flame already painted into the cache
+    if (lt.type === 'starObelisk') continue; // obelisk sprite is its own libraryProp
     const fl = Math.sin(lt.flicker * 1.7) * 1.5;
     if (lt.type === 'sconce') {
       // Wall bracket: short metal arm sticking out of the wall, bowl on top
@@ -2577,18 +2605,12 @@ export function drawSunbeams(ctx) {
 
     // Main body — warm vertical gradient.
     const isThin = sb.kind === 'thin';
-    const isObservatory = sb.kind === 'observatory';
     const grad = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
     if (isThin) {
       // Cool, delicate, no god-rays or dust — just a sliver of moonlight.
       grad.addColorStop(0,    'rgba(220, 230, 255, 0.18)');
       grad.addColorStop(0.7,  'rgba(220, 230, 255, 0.06)');
       grad.addColorStop(1,    'rgba(220, 230, 255, 0)');
-    } else if (isObservatory) {
-      // Starlight column: bright cool white, brightest near the top.
-      grad.addColorStop(0,    'rgba(200, 220, 255, 0.42)');
-      grad.addColorStop(0.55, 'rgba(180, 210, 255, 0.18)');
-      grad.addColorStop(1,    'rgba(180, 210, 255, 0.00)');
     } else {
       grad.addColorStop(0,    'rgba(255, 240, 180, 0.26)');
       grad.addColorStop(0.55, 'rgba(255, 230, 160, 0.12)');
@@ -2609,15 +2631,9 @@ export function drawSunbeams(ctx) {
         const width  = 6 + Math.sin(t * 0.7 + phase) * 1.5;
         const alpha  = 0.05 + (Math.sin(t * 0.9 + phase) * 0.5 + 0.5) * 0.06;
         const rgrad  = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
-        if (isObservatory) {
-          rgrad.addColorStop(0,   `rgba(220, 235, 255, ${alpha * 1.3})`);
-          rgrad.addColorStop(0.7, `rgba(200, 220, 255, ${alpha * 0.6})`);
-          rgrad.addColorStop(1,   'rgba(180, 210, 255, 0)');
-        } else {
-          rgrad.addColorStop(0,   `rgba(255, 245, 200, ${alpha * 1.3})`);
-          rgrad.addColorStop(0.7, `rgba(255, 235, 170, ${alpha * 0.6})`);
-          rgrad.addColorStop(1,   'rgba(255, 220, 140, 0)');
-        }
+        rgrad.addColorStop(0,   `rgba(255, 245, 200, ${alpha * 1.3})`);
+        rgrad.addColorStop(0.7, `rgba(255, 235, 170, ${alpha * 0.6})`);
+        rgrad.addColorStop(1,   'rgba(255, 220, 140, 0)');
         ctx.fillStyle = rgrad;
         ctx.fillRect(baseX - width / 2, sy, width, sb.h);
       }
@@ -2649,10 +2665,7 @@ export function drawSunbeams(ctx) {
         ctx.fillStyle = `rgba(255, 252, 230, ${Math.min(1, a * 1.6)})`;
         ctx.fillRect(dx - size, dy - size, size * 2, size * 2);
       } else {
-        const fill = isObservatory
-          ? `rgba(220, 235, 255, ${a})`
-          : `rgba(255, 245, 200, ${a})`;
-        ctx.fillStyle = fill;
+        ctx.fillStyle = `rgba(255, 245, 200, ${a})`;
         ctx.fillRect(dx, dy, size, size);
       }
     }
@@ -2661,149 +2674,65 @@ export function drawSunbeams(ctx) {
 }
 
 /**
- * Draw the magical observatory dome + oculus overlay for every observatory
- * beam in `state.sunbeams`. Architecture (curved stone ribs and a heavy
- * dark oculus rim) sits over the wall row above the room; the bright
- * glowing aperture and orbiting runes sit at the centre of the rim so the
- * sunbeam appears to emanate from a magical eye on the ceiling instead of
- * a jagged crack. Call this AFTER drawSunbeams so the oculus glow stacks
- * on top of the beam halo, but BEFORE drawLighting so the lighting pass
- * can still tint it.
+ * Top-down starlight overlay for the Observatorio. Painted INSIDE the
+ * room footprint as a subtle blue-violet tint plus a sprinkling of
+ * twinkling stars — purely flat (no perspective, no fake "ceiling") so
+ * it sits cleanly with the rest of the top-down art.
+ *
+ * The constellation ring under the telescope and the four corner
+ * obelisks (which now emit the actual light) carry the spectacle; this
+ * overlay just sells the "you are under the night sky" mood.
+ *
+ * Call AFTER drawSunbeams and BEFORE drawLighting so the lighting pass
+ * still tints it.
  */
-export function drawObservatoryDome(ctx) {
-  if (!state.sunbeams || state.sunbeams.length === 0) return;
-  const t = state.time;
-  for (const sb of state.sunbeams) {
-    if (sb.kind !== 'observatory') continue;
-    drawObservatoryDomeOne(ctx, sb, t);
-  }
-}
-
-/** @private */
-function drawObservatoryDomeOne(ctx, sb, t) {
-  const room = sb.domeRoom;
+export function drawObservatoryStars(ctx) {
+  const room = state.observatoryRoom;
   if (!room) return;
+  // Cull off-screen: skip if the room rect doesn't intersect the view.
+  const rx = room.x * TILE - state.cameraX;
+  const ry = room.y * TILE - state.cameraY;
+  const rw = room.w * TILE;
+  const rh = room.h * TILE;
+  if (rx + rw < 0 || rx > VIEW_W || ry + rh < 0 || ry > VIEW_H) return;
 
-  // Anchor in screen space at the top centre of the wall row above the
-  // room — the rim of the oculus sits here.
-  const cx     = (room.x + room.w / 2) * TILE - state.cameraX;
-  const wallTop = (room.y - 1) * TILE - state.cameraY;
-  const wallBot =  room.y       * TILE - state.cameraY;
-  const wallMid = (wallTop + wallBot) / 2;
-
-  // Dome footprint: spans the room width on the wall row above, with a
-  // small overhang into the room top so it reads as a curved ceiling
-  // pushing down on the floor edge.
-  const halfW    = (room.w * TILE) * 0.46;
-  const overhang = TILE * 0.30;
-
-  // Cull off-screen.
-  if (cx + halfW < 0 || cx - halfW > VIEW_W) return;
-  if (wallTop > VIEW_H || wallBot + overhang < 0) return;
+  const t = state.time;
 
   ctx.save();
-
-  // 1. Dome body: a wide elliptical band painted on the wall row above.
-  //    Dark stone gradient so it reads as carved masonry curving inward.
-  const domeGrad = ctx.createLinearGradient(0, wallTop - 2, 0, wallBot + overhang);
-  domeGrad.addColorStop(0,    '#1a1620');
-  domeGrad.addColorStop(0.55, '#2a2638');
-  domeGrad.addColorStop(1,    '#0e0c14');
-  ctx.fillStyle = domeGrad;
+  // Clip to the room rect so the overlay never bleeds into corridors.
   ctx.beginPath();
-  ctx.ellipse(cx, wallMid, halfW, TILE * 0.55 + overhang * 0.5, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.rect(rx, ry, rw, rh);
+  ctx.clip();
 
-  // 2. Curved stone ribs radiating from the oculus, viewed from below as
-  //    concentric arcs across the dome.
-  ctx.strokeStyle = 'rgba(180, 180, 220, 0.18)';
-  ctx.lineWidth   = 1;
-  for (let i = 0; i < 4; i++) {
-    const rW = halfW * (0.30 + i * 0.18);
-    const rH = (TILE * 0.55 + overhang * 0.5) * (0.30 + i * 0.18);
-    ctx.beginPath();
-    ctx.ellipse(cx, wallMid, rW, rH, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
+  // 1. Faint blue-violet tint across the whole room.
+  ctx.fillStyle = 'rgba(40, 60, 120, 0.10)';
+  ctx.fillRect(rx, ry, rw, rh);
 
-  // 3. Radial rib lines (8 of them) — like spokes from the oculus to the
-  //    rim of the dome.
-  ctx.strokeStyle = 'rgba(180, 180, 220, 0.22)';
-  ctx.lineWidth   = 1;
-  const RIBS = 8;
-  for (let i = 0; i < RIBS; i++) {
-    const a = (i / RIBS) * Math.PI * 2;
-    const x0 = cx + Math.cos(a) * halfW * 0.22;
-    const y0 = wallMid + Math.sin(a) * (TILE * 0.55 + overhang * 0.5) * 0.22;
-    const x1 = cx + Math.cos(a) * halfW * 0.95;
-    const y1 = wallMid + Math.sin(a) * (TILE * 0.55 + overhang * 0.5) * 0.95;
-    ctx.beginPath();
-    ctx.moveTo(x0, y0);
-    ctx.lineTo(x1, y1);
-    ctx.stroke();
-  }
-
-  // 4. Oculus rim — a heavy dark ring with a thin highlight on top.
-  const ocR = Math.min(halfW * 0.20, TILE * 0.55);
-  ctx.fillStyle = '#0a0810';
-  ctx.beginPath();
-  ctx.arc(cx, wallMid, ocR * 1.18, 0, Math.PI * 2);
-  ctx.fill();
-  // Polished brass inner ring.
-  ctx.strokeStyle = '#c8a050';
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.arc(cx, wallMid, ocR * 1.05, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // 5. Oculus aperture — the bright glowing eye that emits starlight.
-  //    Pulses slowly so the room feels alive.
-  const pulse = 0.85 + Math.sin(t * 1.4) * 0.15;
+  // 2. Twinkling stars: deterministic positions seeded by the room's
+  //    upper-left corner so they stay fixed but unique per spawn.
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  // Outer halo.
-  const halo = ctx.createRadialGradient(cx, wallMid, 1, cx, wallMid, ocR * 3.4);
-  halo.addColorStop(0,   `rgba(200, 220, 255, ${0.55 * pulse})`);
-  halo.addColorStop(0.5, `rgba(160, 190, 255, ${0.20 * pulse})`);
-  halo.addColorStop(1,   'rgba(80, 110, 200, 0)');
-  ctx.fillStyle = halo;
-  ctx.beginPath();
-  ctx.arc(cx, wallMid, ocR * 3.4, 0, Math.PI * 2);
-  ctx.fill();
-  // Bright disc core.
-  const core = ctx.createRadialGradient(cx, wallMid, 0, cx, wallMid, ocR);
-  core.addColorStop(0, `rgba(240, 248, 255, ${0.95 * pulse})`);
-  core.addColorStop(1, 'rgba(160, 190, 255, 0.35)');
-  ctx.fillStyle = core;
-  ctx.beginPath();
-  ctx.arc(cx, wallMid, ocR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // 6. Orbiting runes around the oculus rim — 4 small glyphs rotating
-  //    slowly to sell the "magic ceiling" reading.
-  const ORBIT_R = ocR * 1.6;
-  const ROT     = t * 0.35;
-  ctx.save();
-  ctx.fillStyle = 'rgba(220, 235, 255, 0.85)';
-  for (let i = 0; i < 4; i++) {
-    const a = ROT + (i / 4) * Math.PI * 2;
-    const gx = cx + Math.cos(a) * ORBIT_R;
-    const gy = wallMid + Math.sin(a) * ORBIT_R * 0.55; // squashed (top-down)
-    const gs = 2.4;
-    // Tiny halo so the rune reads against the dark stone.
-    ctx.globalCompositeOperation = 'lighter';
-    const rh = ctx.createRadialGradient(gx, gy, 0, gx, gy, gs * 3);
-    rh.addColorStop(0, 'rgba(200, 225, 255, 0.65)');
-    rh.addColorStop(1, 'rgba(80, 110, 200, 0)');
-    ctx.fillStyle = rh;
-    ctx.beginPath();
-    ctx.arc(gx, gy, gs * 3, 0, Math.PI * 2);
-    ctx.fill();
-    // Solid glyph dot.
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = 'rgba(230, 240, 255, 0.95)';
-    ctx.fillRect(gx - gs * 0.6, gy - gs * 0.6, gs * 1.2, gs * 1.2);
+  const STARS = 36;
+  let s = ((room.x * 73856093) ^ (room.y * 19349663)) >>> 0;
+  const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  for (let i = 0; i < STARS; i++) {
+    const ux = rnd();
+    const uy = rnd();
+    const ph = rnd() * Math.PI * 2;
+    const sz = 0.5 + rnd() * 1.4;
+    const x  = rx + ux * rw;
+    const y  = ry + uy * rh;
+    // Twinkle: alpha modulated by a slow sine.
+    const a  = 0.30 + 0.55 * (Math.sin(t * 1.6 + ph) * 0.5 + 0.5);
+    ctx.fillStyle = `rgba(220, 235, 255, ${a})`;
+    ctx.fillRect(x - sz * 0.5, y - sz * 0.5, sz, sz);
+    // Occasional brighter star with a tiny halo (every ~8th).
+    if (i % 8 === 0 && sz > 1.0) {
+      ctx.fillStyle = `rgba(220, 235, 255, ${a * 0.20})`;
+      ctx.beginPath();
+      ctx.arc(x, y, sz * 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 

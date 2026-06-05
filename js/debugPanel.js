@@ -214,10 +214,37 @@ function teleportTo(floor, entry) {
 
 function placePlayerInRoom(room) {
   if (!state.player) return;
-  state.player.x = room.cx * TILE + TILE / 2;
-  state.player.y = room.cy * TILE + TILE / 2;
+  // Some set-pieces (e.g. the Observatorio telescope) occupy the centre
+  // tiles as solid walls — landing right on (cx, cy) would trap us. Walk
+  // outward in concentric rings until we hit a floor tile.
+  const t = findNearestFloor(state.map, room.cx, room.cy);
+  state.player.x = t.tx * TILE + TILE / 2;
+  state.player.y = t.ty * TILE + TILE / 2;
   state.currentRoom = room;
   // Reset the per-floor "entered observatory" flag so the toast fires
   // again if we hop in and out for testing.
   state._observatoryEntered = false;
+}
+
+/**
+ * Find the nearest walkable tile to (cx, cy) by scanning concentric
+ * rings outward up to maxRadius. Returns {tx, ty}; falls back to the
+ * input coords if nothing was found (should not happen inside a valid
+ * room).
+ * @private
+ */
+function findNearestFloor(map, cx, cy, maxRadius = 6) {
+  const T_FLOOR_ = 1;
+  if (map[cy] && map[cy][cx] === T_FLOOR_) return { tx: cx, ty: cy };
+  for (let r = 1; r <= maxRadius; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        // Only the ring border at this radius.
+        if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+        const x = cx + dx, y = cy + dy;
+        if (map[y] && map[y][x] === T_FLOOR_) return { tx: x, ty: y };
+      }
+    }
+  }
+  return { tx: cx, ty: cy };
 }
