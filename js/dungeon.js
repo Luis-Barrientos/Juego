@@ -63,9 +63,44 @@ export function generateDungeon(floor, seed, biome) {
   const map = Array.from({ length: MAP_H }, () => Array(MAP_W).fill(T_WALL));
   const rooms = [];
 
-  const root = { x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2 };
+  // -------------------------------------------------------------------
+  // Step 1: reserve big set-piece rooms BEFORE running BSP.
+  // BSP partitions the entire map into leaves with no awareness of any
+  // future "special" room, so once leaves are filled the only space left
+  // for star rooms is the thin sliver of wall between them. That caps how
+  // big anything can grow.
+  //
+  // To guarantee enough space for monumental set-pieces (Great Library,
+  // future bosses, etc.), we carve the special rectangle FIRST, register
+  // it as a real room, then run BSP only on the strips of map that
+  // surround it. Any room from this point on is generic, but the special
+  // one is already guaranteed to be 20×16.
+  // -------------------------------------------------------------------
+  const isLibraryBiome = biome && biome.id === 'library';
+  let greatLibraryRoom = null;
+  const bspRoots = [];
+
+  if (isLibraryBiome && rng() < 0.70) {
+    const reservation = reserveSpecialRoom(map, rng, 20, 16, 3);
+    if (reservation) {
+      reservation.room.isGreatLibrary = true;
+      reservation.room.isLarge = true;
+      rooms.push(reservation.room);
+      greatLibraryRoom = reservation.room;
+      bspRoots.push(...reservation.strips);
+    }
+  }
+
+  if (bspRoots.length === 0) {
+    bspRoots.push({ x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2 });
+  }
+
+  // Step 2: BSP each free region independently. Strips smaller than the
+  // BSP minimum are dropped automatically by splitNode.
   const leaves = [];
-  splitNode(root, style.depth, leaves, rng, style);
+  for (const root of bspRoots) {
+    splitNode(root, style.depth, leaves, rng, style);
+  }
 
   for (const leaf of leaves) {
     // Rooms now fill 75-92% of their BSP leaf — almost no dead space.
@@ -97,26 +132,14 @@ export function generateDungeon(floor, seed, biome) {
 
   // Promote rooms to 'star' rooms — larger than the rest, used to host
   // the visual spectacle and key encounters. Ruins gets 1-2 stars; the
-  // catacombs and library floors get exactly one (the crypta / Great
-  // Library), since they each host a single set-piece encounter.
-  const isLibraryBiome = biome && biome.id === 'library';
+  // catacombs floor gets exactly one (the crypta). The library biome
+  // already has its star reserved as the Great Library, so we skip the
+  // generic promotion there.
   const starCount = isRuinsStyle(styleKey)     ? (1 + Math.floor(rng() * 2))
                   : isCatacombsStyle(styleKey) ? 1
-                  : isLibraryBiome             ? 1
+                  : (isLibraryBiome && !greatLibraryRoom) ? 1
                   : 0;
   if (starCount > 0) expandStarRooms(rooms, map, rng, starCount);
-
-  // Library biome: pre-pick the star room destined to become the Great
-  // Library and grow it WAY beyond the normal star cap (up to 20×16),
-  // before corridors are carved so the corridor planner knows the real
-  // footprint. We commit to this choice here (70% per library floor); the
-  // chosen room is later detected via the `isGreatLibrary` flag and
-  // skipped by placeShelves/placeTables so we can lay our own bookcase
-  // aisles inside.
-  let greatLibraryRoom = null;
-  if (isLibraryBiome && rng() < 0.70) {
-    greatLibraryRoom = prepareGreatLibraryRoom(rooms, map, rng);
-  }
 
   // Detect start (top-left-most) and stairs (farthest from start) rooms
   // BEFORE placing pillars/sarcophagi so those placers can skip them.
@@ -924,56 +947,67 @@ function placeTables(rooms, map, rng, libraryProps) {
 }
 
 /**
- * Library biome only: pick the room destined to host the Great Library
- * and grow it well beyond the normal star cap so it actually feels grand.
- * Called BEFORE corridors are carved so the corridor planner sees the
- * final, larger footprint.
+ * Reserve a `w`×`h` rectangle in the map BEFORE BSP runs so a special
+ * set-piece room (Great Library, future bosses, …) is guaranteed enough
+ * space. The rectangle is carved as floor and returned alongside the
+ * surrounding free strips, which the caller feeds to `splitNode` so
+ * normal rooms grow only in the leftover space.
  *
- * Reuses `tryExpand` with a roomier `MAX_DIM` (up to ~20×16) and stops
- * early if the room can't grow further (other rooms in the way, map
- * edge). Returns the chosen room or null if no candidate exists.
+ * Position is randomized but kept at least `margin` tiles from every
+ * map edge so corridors can wrap around the reservation if needed.
+ *
+ * Returns `{ room, strips }` or `null` if the map is too small.
  *
  * @private
  */
-function prepareGreatLibraryRoom(rooms, map, rng) {
-  // Prefer the largest existing star room that isn't start/stairs. Fall
-  // back to the largest non-start/stairs room if no eligible star exists
-  // (very small floors).
-  const eligible = rooms.filter(r =>
-    !r.isStartRoom && !r.isStairsRoom &&
-    r.w >= 6 && r.h >= 6,
-  );
-  if (!eligible.length) return null;
-  eligible.sort((a, b) => {
-    // Stars first, then larger by area.
-    if (a.isLarge !== b.isLarge) return a.isLarge ? -1 : 1;
-    return (b.w * b.h) - (a.w * a.h);
-  });
-  const room = eligible[0];
+function reserveSpecialRoom(map, rng, w, h, margin = 3) {
+  const maxX = MAP_W - 1 - margin - w;
+  const maxY = MAP_H - 1 - margin - h;
+  if (maxX < margin || maxY < margin) return null;
 
-  // Grow well past the regular star cap so the Great Library feels grand.
-  const BIG_DIM = { w: 20, h: 16 };
-  const TARGET_AREA = BIG_DIM.w * BIG_DIM.h;
-  const dirs = ['left', 'right', 'up', 'down'];
-  let safety = 200;
-  while (room.w * room.h < TARGET_AREA && safety-- > 0) {
-    for (let i = dirs.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
-    }
-    let grew = false;
-    for (const dir of dirs) {
-      if (tryExpand(room, map, dir, rooms, BIG_DIM)) { grew = true; break; }
-    }
-    if (!grew) break;
+  const rx = margin + Math.floor(rng() * (maxX - margin + 1));
+  const ry = margin + Math.floor(rng() * (maxY - margin + 1));
+
+  for (let y = ry; y < ry + h; y++) {
+    for (let x = rx; x < rx + w; x++) map[y][x] = T_FLOOR;
   }
-  room.cx = room.x + (room.w >> 1);
-  room.cy = room.y + (room.h >> 1);
-  room.isLarge = true;
-  // Mark early so placeShelves / placeTables / placePillars / chest spawn
-  // skip this room — we'll lay our own bookshelf aisles inside.
-  room.isGreatLibrary = true;
-  return room;
+
+  const room = {
+    x: rx, y: ry, w, h,
+    cx: rx + (w >> 1),
+    cy: ry + (h >> 1),
+    enemies: [],
+    cleared: false,
+    visited: false,
+  };
+
+  // Up-to-4 free strips around the reservation (top / bottom / left /
+  // right). A 1-tile wall buffer is preserved on every side so corridors
+  // can carve through. Strips that are too thin for BSP to do anything
+  // meaningful are dropped here; splitNode also filters by minDim.
+  const MIN_STRIP = 6;
+  const strips = [];
+  // top
+  if (ry - 2 >= MIN_STRIP) {
+    strips.push({ x: 1, y: 1, w: MAP_W - 2, h: ry - 2 });
+  }
+  // bottom
+  const bottomY = ry + h + 1;
+  if (MAP_H - 1 - bottomY >= MIN_STRIP) {
+    strips.push({ x: 1, y: bottomY, w: MAP_W - 2, h: MAP_H - 1 - bottomY });
+  }
+  // left (only spans the reservation's vertical band — top/bottom strips
+  // already cover everything outside it).
+  if (rx - 2 >= MIN_STRIP) {
+    strips.push({ x: 1, y: ry, w: rx - 2, h });
+  }
+  // right
+  const rightX = rx + w + 1;
+  if (MAP_W - 1 - rightX >= MIN_STRIP) {
+    strips.push({ x: rightX, y: ry, w: MAP_W - 1 - rightX, h });
+  }
+
+  return { room, strips };
 }
 
 /**
@@ -1046,10 +1080,10 @@ function paintShelfRow(map, libraryProps, rng, x1, x2, y) {
 
 /**
  * Place the Great Library set-piece in the room reserved by
- * `prepareGreatLibraryRoom`: paint bookshelf aisles around a clear
- * central rotunda, lay a 2×2 summoning circle at the centre and four
- * floating rune stones around it. The circle is walkable (no T_WALL
- * writes) so the player can step onto it to trigger the encounter via E.
+ * `reserveSpecialRoom`: paint bookshelf aisles around a clear central
+ * rotunda, lay a 2×2 summoning circle at the centre and four floating
+ * rune stones around it. The circle is walkable (no T_WALL writes) so
+ * the player can step onto it to trigger the encounter via E.
  *
  * Returns the set-piece descriptor or null if `room` is missing.
  *
