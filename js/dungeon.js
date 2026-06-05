@@ -82,10 +82,18 @@ export function generateDungeon(floor, seed, biome) {
   let observatoryRoom  = null;
   const bspRoots = [];
 
+  // Debug overrides: when the F2 panel teleports to a set-piece on a
+  // different floor it sets a window flag so the regenerated dungeon
+  // guarantees that room exists regardless of the natural spawn roll.
+  const FORCE = (typeof window !== 'undefined' && window.__DEBUG_FORCE) || {};
+  const forceGrandTome   = !!FORCE.grandTome;
+  const forceObservatory = !!FORCE.observatory;
+  const forceGreatLib    = !!FORCE.greatLibrary;
+
   // Sala del Gran Tomo first: it's smaller (11×9) and easier to fit, so
   // reserving it before the Great Library guarantees it never gets
   // squeezed out by the larger reservation.
-  if (isLibraryBiome && rng() < 0.70) {
+  if (isLibraryBiome && (forceGrandTome || rng() < 0.70)) {
     const reservation = reserveSpecialRoom(map, rng, 11, 9, 2);
     if (reservation) {
       reservation.room.isGrandTome = true;
@@ -98,7 +106,7 @@ export function generateDungeon(floor, seed, biome) {
   // Observatorio: standalone 9×9 buff room. Reserved before the Great
   // Library so it's never squeezed out. Odd-sized so the telescope (3×3)
   // aligns pixel-perfect with the central skylight beam.
-  if (isLibraryBiome && rng() < 0.55) {
+  if (isLibraryBiome && (forceObservatory || rng() < 0.55)) {
     const sources = bspRoots.length ? bspRoots : [{ x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2 }];
     const res = reserveInStrips(map, rng, 9, 9, 2, sources);
     if (res) {
@@ -114,7 +122,7 @@ export function generateDungeon(floor, seed, biome) {
   // Great Library second: claim the largest strip that fits its 20×16
   // footprint with a 3-tile margin, falling back to the full map if no
   // tome was reserved.
-  if (isLibraryBiome && rng() < 0.70) {
+  if (isLibraryBiome && (forceGreatLib || rng() < 0.70)) {
     const sources = bspRoots.length ? bspRoots : [{ x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2 }];
     const res = reserveInStrips(map, rng, 20, 16, 3, sources);
     if (res) {

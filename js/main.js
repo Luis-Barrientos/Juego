@@ -23,6 +23,7 @@ import {
 import { state }                          from './state.js';
 import { Audio }                          from './audio.js';
 import { initInput, updateTouchAim }      from './input.js';
+import { initDebugPanel }                 from './debugPanel.js';
 import { clamp, lerp, rand }              from './utils.js';
 import {
   generateDungeon, getRoomAt,
@@ -78,6 +79,7 @@ resizeCanvas();
 window.addEventListener('resize',            resizeCanvas);
 window.addEventListener('orientationchange', resizeCanvas);
 initInput(canvas, { pause: pauseGame, resume: resumeGame });
+initDebugPanel({ buildFloor });
 
 /* ─────────────────────────── Game flow ─────────────────────────── */
 

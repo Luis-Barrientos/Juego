@@ -849,3 +849,61 @@ body.overlay-active #toast { display: none; }
   transition: color 0.2s;
 }
 #versionTag:hover { color: #ffc870; }
+
+/* --- Debug panel (F2) --- */
+#debugPanel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 320px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: rgba(18, 16, 28, 0.96);
+  border: 1px solid #4a4060;
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  color: #d6d4e8;
+  font-family: 'Trebuchet MS', sans-serif;
+  font-size: 13px;
+  z-index: 9999;
+  user-select: none;
+}
+#debugPanel.hidden { display: none; }
+.dp-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px;
+  background: rgba(60, 40, 90, 0.55);
+  font-weight: bold; letter-spacing: 1px;
+  border-bottom: 1px solid #4a4060;
+}
+.dp-close {
+  background: none; border: none; color: #d6d4e8;
+  font-size: 18px; cursor: pointer; padding: 0 4px;
+}
+.dp-close:hover { color: #ffaa66; }
+.dp-body { padding: 6px 0; }
+.dp-foot {
+  padding: 6px 12px; font-size: 11px; color: #8a86a8;
+  border-top: 1px solid #2c2638;
+}
+.dp-floor { display: flex; flex-direction: column; }
+.dp-floor.dp-current .dp-floor-head { background: rgba(120, 80, 200, 0.18); }
+.dp-floor-head {
+  display: flex; justify-content: space-between; align-items: center;
+  background: none; border: none; color: #d6d4e8;
+  padding: 8px 12px; cursor: pointer; text-align: left;
+  font: inherit; gap: 8px;
+}
+.dp-floor-head:hover { background: rgba(120, 80, 200, 0.25); }
+.dp-floor-num { font-weight: bold; color: #c8b8ff; min-width: 50px; }
+.dp-floor-name { flex: 1; color: #b8b4cc; font-size: 12px; }
+.dp-floor-toggle { color: #8a86a8; }
+.dp-rooms { display: flex; flex-direction: column; padding: 2px 0 6px 24px; gap: 2px; }
+.dp-room {
+  background: rgba(40, 32, 60, 0.55);
+  border: 1px solid #3a3050;
+  color: #d6d4e8; font: inherit;
+  padding: 5px 10px; text-align: left; cursor: pointer;
+  border-radius: 3px;
+}
+.dp-room:hover { background: rgba(120, 80, 200, 0.35); border-color: #6a4a90; }
