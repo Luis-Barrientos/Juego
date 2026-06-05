@@ -774,6 +774,10 @@ function drawLibraryProp(ctx, p) {
   if (p.kind === 'tomeBookPile') { drawTomeBookPile(ctx, px, py, w, h, p); return; }
   if (p.kind === 'libraryRuneMark') { drawLibraryRuneMark(ctx, px, py, w, h, p); return; }
   if (p.kind === 'constellationRing') { drawConstellationRing(ctx, px, py, w, h, p); return; }
+  // Telescope sits on top of the constellation ring — skip the square
+  // floor patch so the round ring (and the fog overlay) show through the
+  // corners of the 3×3 footprint instead of being punched out.
+  if (p.kind === 'telescope') { drawTelescope(ctx, px, py, w, h, p); return; }
 
   // Wipe the underlying wall tile back to floor tone so the prop has its
   // own silhouette instead of inheriting the dark wall fill.
@@ -785,7 +789,6 @@ function drawLibraryProp(ctx, p) {
   else if (p.kind === 'tableBroken')  drawTable(ctx, px, py, w, h, p, true);
   else if (p.kind === 'tomePedestal') drawTomePedestal(ctx, px, py, w, h, p);
   else if (p.kind === 'tomeBrazier')  drawTomeBrazier(ctx, px, py, w, h, p);
-  else if (p.kind === 'telescope')    drawTelescope(ctx, px, py, w, h, p);
   else if (p.kind === 'starObelisk')  drawStarObelisk(ctx, px, py, w, h, p);
 }
 
