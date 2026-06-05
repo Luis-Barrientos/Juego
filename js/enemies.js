@@ -51,16 +51,19 @@ export const ENEMY_TYPES = {
   },
   /**
    * Guardian of the Library: stone-and-rune mini-boss summoned from the
-   * library's runestone circle. Roughly twice a Sepulchral's HP, hits
-   * harder, and periodically lobs a fan of three rune projectiles.
+   * library's runestone circle. Tanky, hits hard, fires fans of rune
+   * projectiles, and enrages below 50% HP with a wider fan and a
+   * periodic shockwave ring.
    */
   guardian: {
-    hp: 240, dmg: 28, speed: 50, r: 18,
+    hp: 380, dmg: 34, speed: 52, r: 18,
     color: '#5a5a64', glow: '#b890ff',
-    score: 220, gold: [40, 70],
-    range: 34, attackCool: 1.2, behavior: 'guardian',
+    score: 320, gold: [60, 100],
+    range: 36, attackCool: 1.0, behavior: 'guardian',
     /** Rune-burst cooldown band (seconds). */
-    runeCool: 3.6, runeMin: 80, runeMax: 320,
+    runeCool: 2.6, runeMin: 80, runeMax: 360,
+    /** Shockwave ring cooldown when enraged (HP < 50%). */
+    novaCool: 5.0,
   },
 };
 
@@ -136,6 +139,7 @@ export function spawnGuardianAt(x, y, floor) {
   e.state       = 'emerging';
   e.fromLibrary = true;
   e.runeCool    = ENEMY_TYPES.guardian.runeCool;
+  e.novaCool    = ENEMY_TYPES.guardian.novaCool;
   state.enemies.push(e);
   spawnParticles(x, y, '#b890ff', 36);
   return e;
@@ -260,20 +264,25 @@ export function enemyUpdate(e, dt, hooks) {
       }
     }
   } else if (e.behavior === 'guardian') {
-    // Slow stone golem with periodic 3-rune fan attack. Approaches in
-    // melee but never lets the cooldown drop the rune burst at any range.
+    // Slow stone golem with a periodic rune fan attack. Below 50% HP it
+    // enrages: faster runes, wider fan, and a shockwave nova every few
+    // seconds that forces the player to keep moving.
     const t = ENEMY_TYPES.guardian;
+    const enraged = e.hp <= e.maxHp * 0.5;
     e.runeCool = Math.max(0, (e.runeCool || 0) - dt);
     if (e.runeCool <= 0 && d > t.runeMin && d < t.runeMax) {
-      e.runeCool = t.runeCool + Math.random() * 0.6;
+      e.runeCool = (enraged ? t.runeCool * 0.65 : t.runeCool) + Math.random() * 0.5;
       const a = Math.atan2(dy, dx);
-      const speed = 200;
-      for (let i = -1; i <= 1; i++) {
-        const ang = a + i * 0.22;
+      const speed = enraged ? 230 : 200;
+      const count = enraged ? 5 : 3;          // 3-fan -> 5-fan when enraged
+      const spread = enraged ? 0.28 : 0.22;
+      const half = (count - 1) / 2;
+      for (let i = 0; i < count; i++) {
+        const ang = a + (i - half) * spread;
         state.projectiles.push({
           friendly: false, x: e.x, y: e.y, r: 6,
           vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
-          life: 2.4, dmg: e.dmg * 0.7,
+          life: 2.6, dmg: e.dmg * 0.7,
           color: '#b890ff', glow: '#e0c0ff',
           type: 'magic',
         });
@@ -281,8 +290,29 @@ export function enemyUpdate(e, dt, hooks) {
       Audio.magicShoot && Audio.magicShoot();
       e.state = 'attack';
     }
+    // Enraged shockwave: ring of 12 slow projectiles centered on the
+    // guardian. Punishes players who try to hug-and-burst him.
+    if (enraged) {
+      e.novaCool = Math.max(0, (e.novaCool || t.novaCool) - dt);
+      if (e.novaCool <= 0) {
+        e.novaCool = t.novaCool + Math.random() * 1.2;
+        const N = 12;
+        const speed = 150;
+        for (let i = 0; i < N; i++) {
+          const ang = (Math.PI * 2 * i) / N;
+          state.projectiles.push({
+            friendly: false, x: e.x, y: e.y, r: 7,
+            vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
+            life: 2.2, dmg: e.dmg * 0.6,
+            color: '#d8a0ff', glow: '#f0d0ff',
+            type: 'magic',
+          });
+        }
+        Audio.magicShoot && Audio.magicShoot();
+      }
+    }
     if (d > e.range + p.r) {
-      const sp = e.speed;
+      const sp = enraged ? e.speed * 1.15 : e.speed;
       tryMove(state.map, e, (dx / d) * sp * dt, (dy / d) * sp * dt);
       if (e.state !== 'attack') e.state = 'chase';
     } else {
