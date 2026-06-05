@@ -81,36 +81,33 @@ export function generateDungeon(floor, seed, biome) {
   let grandTomeRoom    = null;
   const bspRoots = [];
 
+  // Sala del Gran Tomo first: it's smaller (9×7) and easier to fit, so
+  // reserving it before the Great Library guarantees it never gets
+  // squeezed out by the larger reservation.
   if (isLibraryBiome && rng() < 0.70) {
-    const reservation = reserveSpecialRoom(map, rng, 20, 16, 3);
+    const reservation = reserveSpecialRoom(map, rng, 9, 7, 2);
     if (reservation) {
-      reservation.room.isGreatLibrary = true;
-      reservation.room.isLarge = true;
+      reservation.room.isGrandTome = true;
       rooms.push(reservation.room);
-      greatLibraryRoom = reservation.room;
+      grandTomeRoom = reservation.room;
       bspRoots.push(...reservation.strips);
     }
   }
 
-  // Sala del Gran Tomo: medium-sized side room (~10×8) with a Simon-Says
-  // book pedestal at the centre. Independent roll from the Great Library
-  // (≈55% per library floor); both can co-exist.
-  if (isLibraryBiome && rng() < 0.55) {
-    // Re-feed the strips from the previous reservation if there were any
-    // — the second reservation must come out of those strips, not the
-    // full map.
+  // Great Library second: claim the largest strip that fits its 20×16
+  // footprint with a 3-tile margin, falling back to the full map if no
+  // tome was reserved.
+  if (isLibraryBiome && rng() < 0.70) {
     const sources = bspRoots.length ? bspRoots : [{ x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2 }];
-    const res = reserveInStrips(map, rng, 10, 8, 2, sources);
+    const res = reserveInStrips(map, rng, 20, 16, 3, sources);
     if (res) {
-      res.room.isGrandTome = true;
-      res.room.isLarge = false;
+      res.room.isGreatLibrary = true;
+      res.room.isLarge = true;
       rooms.push(res.room);
-      grandTomeRoom = res.room;
-      // Replace the consumed strip with its leftover pieces.
-      bspRoots.splice(bspRoots.indexOf(res.consumedStrip), 1, ...res.strips);
-      // If we started from a single full-map strip (no Great Library),
-      // bspRoots was empty; just push the leftover strips.
-      if (!bspRoots.length) bspRoots.push(...res.strips);
+      greatLibraryRoom = res.room;
+      const idx = bspRoots.indexOf(res.consumedStrip);
+      if (idx >= 0) bspRoots.splice(idx, 1, ...res.strips);
+      else          bspRoots.push(...res.strips);
     }
   }
 
