@@ -15,6 +15,18 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.0',
+    date: '2026-06-05',
+    title: 'La Sala de la Llave y el Archivo Prohibido',
+    items: [
+      'La Biblioteca esconde ahora un par de salas vinculadas: una arena sellada con un dais rúnico azul y una bóveda cerrada con runa dorada.',
+      'Al entrar en la Sala de la Llave, todas las salidas se sellan y aparece una oleada extra de enemigos. Al limpiarla, la sala se libera y deja caer una llave rúnica dorada en el centro.',
+      'El Archivo Prohibido permanece bloqueado por una puerta con runa naranja: necesitas la llave para entrar. Dentro te espera un cofre legendario gratis (bendición permanente + pociones + oro).',
+      'Las dos salas siempre aparecen juntas o no aparecen: si una no cabe en el piso, ninguna se genera. Las puertas alternativas al Archivo se tapian para que la única entrada sea la cerradura rúnica.',
+      'Nueva entrada en el panel de debug (ç) para teletransportarte directamente a la Sala de la Llave o al Archivo.',
+    ],
+  },
+  {
     version: '0.7.8',
     date: '2026-06-05',
     title: 'El cosmos del Observatorio',
