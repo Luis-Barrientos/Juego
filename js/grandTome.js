@@ -322,39 +322,120 @@ export function drawGrandTome(ctx) {
   const cx = (gt.pedestal.tx + gt.pedestal.w / 2) * TILE - state.cameraX;
   const cy = (gt.pedestal.ty + gt.pedestal.h / 2) * TILE - state.cameraY;
 
-  // Hovering tome above the pedestal (bobbing).
+  // Hovering tome above the pedestal (bobbing). The book is rendered as
+  // an open tome facing the camera: two angled pages flanking a leather
+  // spine, with rune glyphs glowing on both pages.
   const bob = Math.sin(state.time * 2.2) * 3;
-  const tx = cx - 12, ty = cy - 30 + bob;
+  // Book footprint: 52 wide × 36 tall. Anchor it well above the pedestal
+  // so the floating gap reads clearly.
+  const BW = 52, BH = 36;
+  const tx = cx - BW / 2;
+  const ty = cy - 44 + bob;
   ctx.save();
-  // Halo.
-  const halo = ctx.createRadialGradient(cx, cy - 24 + bob, 2, cx, cy - 24 + bob, 28);
+
+  // Halo (soft purple glow behind the whole book).
+  const haloCx = cx;
+  const haloCy = ty + BH / 2;
+  const halo = ctx.createRadialGradient(haloCx, haloCy, 4, haloCx, haloCy, 48);
   halo.addColorStop(0, 'rgba(184,144,255,0.55)');
   halo.addColorStop(1, 'rgba(184,144,255,0)');
   ctx.fillStyle = halo;
-  ctx.fillRect(cx - 32, cy - 56 + bob, 64, 56);
+  ctx.fillRect(cx - 60, ty - 14, 120, BH + 28);
 
-  // Book body.
-  ctx.fillStyle = '#5a3a1f';
-  ctx.fillRect(tx, ty, 24, 16);
-  ctx.fillStyle = '#3a2412';
-  ctx.fillRect(tx, ty + 14, 24, 2);
-  // Pages (glowing line down the middle).
-  ctx.fillStyle = '#f0e0c0';
-  ctx.fillRect(tx + 2, ty + 2, 20, 12);
-  ctx.strokeStyle = 'rgba(120,80,160,0.6)';
+  // Drop shadow under the book (squashed ellipse on the pedestal top).
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
   ctx.beginPath();
-  ctx.moveTo(tx + 12, ty + 2);
-  ctx.lineTo(tx + 12, ty + 14);
-  ctx.stroke();
-  // Rune glyph on the right page.
-  ctx.fillStyle = 'rgba(140,90,200,0.85)';
-  ctx.fillRect(tx + 15, ty + 5, 5, 1);
-  ctx.fillRect(tx + 15, ty + 9, 5, 1);
-  ctx.fillRect(tx + 17, ty + 5, 1, 5);
+  ctx.ellipse(cx, cy - 4, BW * 0.45, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Leather covers: two trapezoids leaning back so the open spine sits
+  // forward. Draw them as filled paths so the silhouette is unmistakable.
+  const spineW = 4;
+  const pageH = BH;
+  // Cover shadow (slightly larger, behind).
+  ctx.fillStyle = '#2a1808';
+  ctx.beginPath();
+  ctx.moveTo(tx - 2,        ty + 4);
+  ctx.lineTo(tx + BW / 2 - 1, ty - 2);
+  ctx.lineTo(tx + BW / 2 - 1, ty + pageH + 2);
+  ctx.lineTo(tx,            ty + pageH + 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(tx + BW + 2,     ty + 4);
+  ctx.lineTo(tx + BW / 2 + 1, ty - 2);
+  ctx.lineTo(tx + BW / 2 + 1, ty + pageH + 2);
+  ctx.lineTo(tx + BW,         ty + pageH + 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // Left cover (dark wood/leather).
+  ctx.fillStyle = '#5a3a1f';
+  ctx.beginPath();
+  ctx.moveTo(tx,            ty + 2);
+  ctx.lineTo(tx + BW / 2 - spineW / 2, ty);
+  ctx.lineTo(tx + BW / 2 - spineW / 2, ty + pageH);
+  ctx.lineTo(tx + 2,        ty + pageH + 2);
+  ctx.closePath();
+  ctx.fill();
+  // Cover highlight strip.
+  ctx.fillStyle = '#7a5028';
+  ctx.fillRect(tx + 2, ty + 4, 3, pageH - 6);
+
+  // Right cover.
+  ctx.fillStyle = '#5a3a1f';
+  ctx.beginPath();
+  ctx.moveTo(tx + BW,        ty + 2);
+  ctx.lineTo(tx + BW / 2 + spineW / 2, ty);
+  ctx.lineTo(tx + BW / 2 + spineW / 2, ty + pageH);
+  ctx.lineTo(tx + BW - 2,    ty + pageH + 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#7a5028';
+  ctx.fillRect(tx + BW - 5, ty + 4, 3, pageH - 6);
+
+  // Spine (the dark gap between the two pages).
+  ctx.fillStyle = '#1a0e08';
+  ctx.fillRect(tx + BW / 2 - spineW / 2, ty - 2, spineW, pageH + 4);
+
+  // Pages: parchment fill inside each cover, inset.
+  const pageInset = 4;
+  ctx.fillStyle = '#f0e0c0';
+  // Left page.
+  ctx.fillRect(tx + pageInset, ty + pageInset,
+               BW / 2 - spineW / 2 - pageInset * 1.5, pageH - pageInset * 2);
+  // Right page.
+  ctx.fillRect(tx + BW / 2 + spineW / 2 + pageInset / 2, ty + pageInset,
+               BW / 2 - spineW / 2 - pageInset * 1.5, pageH - pageInset * 2);
+
+  // Faint hand-written lines (just a couple, to hint at text).
+  ctx.fillStyle = 'rgba(80,50,30,0.4)';
+  for (let i = 0; i < 3; i++) {
+    const ly = ty + 10 + i * 5;
+    ctx.fillRect(tx + 7,                            ly, 14, 1);
+    ctx.fillRect(tx + BW / 2 + spineW / 2 + 3,      ly, 14, 1);
+  }
+
+  // Rune glyphs glowing on both pages (pulse).
+  const pulse = 0.55 + 0.45 * Math.sin(state.time * 3);
+  ctx.fillStyle = `rgba(140,90,200,${pulse})`;
+  ctx.shadowColor = '#e0c0ff';
+  ctx.shadowBlur  = 10;
+  // Left page rune (vertical pair of bars + cross).
+  const lrx = tx + 10, lry = ty + 22;
+  ctx.fillRect(lrx,     lry,     2, 8);
+  ctx.fillRect(lrx + 6, lry,     2, 8);
+  ctx.fillRect(lrx,     lry + 3, 8, 2);
+  // Right page rune (triangle + dot).
+  const rrx = tx + BW / 2 + spineW / 2 + 6, rry = ty + 22;
+  ctx.fillRect(rrx,     rry + 6, 8, 2);
+  ctx.fillRect(rrx + 1, rry + 4, 6, 2);
+  ctx.fillRect(rrx + 2, rry + 2, 4, 2);
+  ctx.fillRect(rrx + 3, rry,     2, 2);
   ctx.restore();
 
   // Sequence UI: a horizontal strip of arrows above the pedestal.
-  drawSequenceUI(ctx, gt, cx, cy + bob);
+  drawSequenceUI(ctx, gt, cx, ty + bob);
 }
 
 /** @private */
