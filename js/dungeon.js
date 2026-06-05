@@ -303,7 +303,7 @@ export function generateDungeon(floor, seed, biome) {
       grandTome = placeGrandTome(grandTomeRoom, map, rng, libraryProps, lights);
     }
     if (observatoryRoom) {
-      placeObservatory(observatoryRoom, map, rng, libraryProps, lights, sunbeams);
+      placeObservatory(observatoryRoom, map, rng, libraryProps, lights, sunbeams, decorations);
     }
   }
 
@@ -1598,7 +1598,7 @@ function isNearDoor(map, x, y, room) {
  *
  * @private
  */
-function placeObservatory(room, map, rng, libraryProps, lights, sunbeams) {
+function placeObservatory(room, map, rng, libraryProps, lights, sunbeams, decorations) {
   if (!room) return;
   room.isObservatory = true;
 
@@ -1611,17 +1611,31 @@ function placeObservatory(room, map, rng, libraryProps, lights, sunbeams) {
   const ringTx = cx - 3;
   const ringTy = cy - 3;
 
-  // Wipe any prop overlapping the telescope footprint.
+  // Wipe ANY existing library prop inside the room footprint — we hand-
+  // place every prop in this sanctuary and don't want shelves or tables
+  // leaking through into the constellation ring.
   for (let i = libraryProps.length - 1; i >= 0; i--) {
     const p = libraryProps[i];
-    if (p.tx + p.w <= ringTx || p.tx >= ringTx + ringSize) continue;
-    if (p.ty + p.h <= ringTy || p.ty >= ringTy + ringSize) continue;
+    if (p.tx + p.w <= room.x || p.tx >= room.x + room.w) continue;
+    if (p.ty + p.h <= room.y || p.ty >= room.y + room.h) continue;
     for (let yy = p.ty; yy < p.ty + p.h; yy++) {
       for (let xx = p.tx; xx < p.tx + p.w; xx++) {
         if (map[yy] && map[yy][xx] === T_WALL) map[yy][xx] = T_FLOOR;
       }
     }
     libraryProps.splice(i, 1);
+  }
+
+  // Wipe wall decorations on the row above the room — that's where the
+  // dome silhouette lives now, so we don't want scroll hangings or
+  // portraits painted in the middle of the cupola.
+  if (decorations) {
+    for (let i = decorations.length - 1; i >= 0; i--) {
+      const d = decorations[i];
+      if (d.ty !== room.y - 1) continue;
+      if (d.tx < room.x || d.tx >= room.x + room.w) continue;
+      decorations.splice(i, 1);
+    }
   }
 
   // 1. Constellation ring painted on the floor (walkable, 7×7).
@@ -1641,10 +1655,13 @@ function placeObservatory(room, map, rng, libraryProps, lights, sunbeams) {
     seed: Math.floor(rng() * 1e9),
   });
 
-  // 3. Skylight beam: centred on the room, length spans the whole room.
-  //    Re-use the existing sunbeams system so render handles the shape
-  //    cutout in the ambient overlay automatically.
-  const beamLen = (room.w - 2) * TILE; // ~7 tiles wide cone
+  // 3. Magical skylight: the room is a sealed dome carved with a glowing
+  //    oculus that projects a clean cone of starlight downward (no
+  //    ceiling crack — we're on floor 2, there's no sky above).
+  //    Re-use the sunbeam container/render path so the floor under the
+  //    cone keeps the same warm cut-out in the ambient overlay, but
+  //    we build a clean trapezoidal shape and skip the jagged crack.
+  const beamLen = (room.w - 2) * TILE; // ~7 tiles wide cone at the top
   const beam = {
     kind: 'observatory',
     x: (room.x + room.w / 2) * TILE,
@@ -1654,9 +1671,11 @@ function placeObservatory(room, map, rng, libraryProps, lights, sunbeams) {
     splay: TILE * 0.9,
     seed: Math.floor(rng() * 1e9),
     wallRow: room.y - 1,
+    domeRoom: room, // anchor for the dynamic dome+oculus overlay
   };
-  beam.shape = buildBeamShape(beam, rng);
-  beam.crack = buildCrackPath(beam, rng);
+  beam.shape = buildObservatoryBeamShape(beam);
+  // Intentionally NO beam.crack — the oculus is rendered dynamically by
+  // drawObservatoryDome instead of as a jagged fissure on the wall.
   sunbeams.push(beam);
 
   // 4. Four corner obelisks: 1×1 solid props at the interior corners.
@@ -1877,6 +1896,47 @@ function placePuddles(map, rooms, rng, puddles) {
       placed++;
     }
   }
+}
+
+/**
+ * Clean conical beam shape used by the magical observatory oculus — no
+ * jagged edges since the light comes from a smooth circular opening, not
+ * a rocky fissure. Returns a soft trapezoid with subtly curved sides.
+ * Coordinates are local to the beam anchor (sb.x, sb.y).
+ * @private
+ */
+function buildObservatoryBeamShape(sb) {
+  const halfTop    = sb.length * 0.5;
+  const halfBottom = halfTop + sb.splay;
+  const h          = sb.h;
+  const pts        = [];
+
+  // Top edge: smooth arc matching the oculus aperture.
+  const nTop = 10;
+  for (let i = 0; i < nTop; i++) {
+    const t = i / (nTop - 1);
+    const x = -halfTop + t * (halfTop * 2);
+    const dip = Math.sin(t * Math.PI) * 3;
+    pts.push([x, dip]);
+  }
+  // Right side: smooth diagonal to the floor.
+  const nSide = 4;
+  for (let i = 1; i <= nSide; i++) {
+    const t = i / nSide;
+    pts.push([halfTop + t * sb.splay, t * h]);
+  }
+  // Bottom edge: a slight curve outward.
+  const nBot = 10;
+  for (let i = 0; i < nBot; i++) {
+    const t = i / (nBot - 1);
+    pts.push([halfBottom - t * (halfBottom * 2), h]);
+  }
+  // Left side: smooth diagonal back up.
+  for (let i = nSide; i >= 1; i--) {
+    const t = i / nSide;
+    pts.push([-halfTop - t * sb.splay, t * h]);
+  }
+  return pts;
 }
 
 /**

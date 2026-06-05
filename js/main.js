@@ -44,7 +44,7 @@ import {
   updateLoot, drawLoot, spawnChest, openChest,
 }                                         from './loot.js';
 import {
-  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawPuddles, drawSarcophagiOverlay, drawLibrarySetPiece, drawMinimap,
+  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawObservatoryDome, drawPuddles, drawSarcophagiOverlay, drawLibrarySetPiece, drawMinimap,
 }                                         from './render.js';
 import {
   updateHUD, showToast, hideAllOverlays, showMenu, showPause, hidePause,
@@ -585,6 +585,7 @@ function render() {
   drawCirclePrompt(ctx);
   drawTomePrompt(ctx);
   drawSunbeams(ctx);
+  drawObservatoryDome(ctx);
   drawLighting(ctx);
 
   // Boss banner

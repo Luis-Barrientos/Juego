@@ -1114,12 +1114,14 @@ function drawConstellationRing(ctx, px, py, w, h, p) {
 
   ctx.save();
 
-  // Dark disc base — a sliver lighter at the centre so the eye is drawn
-  // toward the telescope above.
+  // Dark disc base — fully opaque at the centre so the underlying floor
+  // cobbles don't leak through and clutter the constellation. Fades out
+  // at the rim so the edge blends with the surrounding floor.
   const base = ctx.createRadialGradient(cx, cy, 1, cx, cy, R);
-  base.addColorStop(0,    'rgba(20, 30, 60, 0.78)');
-  base.addColorStop(0.75, 'rgba(10, 16, 36, 0.65)');
-  base.addColorStop(1,    'rgba(10, 16, 36, 0)');
+  base.addColorStop(0,    'rgba(12, 18, 36, 1.00)');
+  base.addColorStop(0.55, 'rgba(10, 16, 32, 0.96)');
+  base.addColorStop(0.85, 'rgba(10, 16, 28, 0.72)');
+  base.addColorStop(1,    'rgba(10, 16, 28, 0)');
   ctx.fillStyle = base;
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
@@ -2655,6 +2657,156 @@ export function drawSunbeams(ctx) {
       }
     }
   }
+  ctx.restore();
+}
+
+/**
+ * Draw the magical observatory dome + oculus overlay for every observatory
+ * beam in `state.sunbeams`. Architecture (curved stone ribs and a heavy
+ * dark oculus rim) sits over the wall row above the room; the bright
+ * glowing aperture and orbiting runes sit at the centre of the rim so the
+ * sunbeam appears to emanate from a magical eye on the ceiling instead of
+ * a jagged crack. Call this AFTER drawSunbeams so the oculus glow stacks
+ * on top of the beam halo, but BEFORE drawLighting so the lighting pass
+ * can still tint it.
+ */
+export function drawObservatoryDome(ctx) {
+  if (!state.sunbeams || state.sunbeams.length === 0) return;
+  const t = state.time;
+  for (const sb of state.sunbeams) {
+    if (sb.kind !== 'observatory') continue;
+    drawObservatoryDomeOne(ctx, sb, t);
+  }
+}
+
+/** @private */
+function drawObservatoryDomeOne(ctx, sb, t) {
+  const room = sb.domeRoom;
+  if (!room) return;
+
+  // Anchor in screen space at the top centre of the wall row above the
+  // room — the rim of the oculus sits here.
+  const cx     = (room.x + room.w / 2) * TILE - state.cameraX;
+  const wallTop = (room.y - 1) * TILE - state.cameraY;
+  const wallBot =  room.y       * TILE - state.cameraY;
+  const wallMid = (wallTop + wallBot) / 2;
+
+  // Dome footprint: spans the room width on the wall row above, with a
+  // small overhang into the room top so it reads as a curved ceiling
+  // pushing down on the floor edge.
+  const halfW    = (room.w * TILE) * 0.46;
+  const overhang = TILE * 0.30;
+
+  // Cull off-screen.
+  if (cx + halfW < 0 || cx - halfW > VIEW_W) return;
+  if (wallTop > VIEW_H || wallBot + overhang < 0) return;
+
+  ctx.save();
+
+  // 1. Dome body: a wide elliptical band painted on the wall row above.
+  //    Dark stone gradient so it reads as carved masonry curving inward.
+  const domeGrad = ctx.createLinearGradient(0, wallTop - 2, 0, wallBot + overhang);
+  domeGrad.addColorStop(0,    '#1a1620');
+  domeGrad.addColorStop(0.55, '#2a2638');
+  domeGrad.addColorStop(1,    '#0e0c14');
+  ctx.fillStyle = domeGrad;
+  ctx.beginPath();
+  ctx.ellipse(cx, wallMid, halfW, TILE * 0.55 + overhang * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Curved stone ribs radiating from the oculus, viewed from below as
+  //    concentric arcs across the dome.
+  ctx.strokeStyle = 'rgba(180, 180, 220, 0.18)';
+  ctx.lineWidth   = 1;
+  for (let i = 0; i < 4; i++) {
+    const rW = halfW * (0.30 + i * 0.18);
+    const rH = (TILE * 0.55 + overhang * 0.5) * (0.30 + i * 0.18);
+    ctx.beginPath();
+    ctx.ellipse(cx, wallMid, rW, rH, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // 3. Radial rib lines (8 of them) — like spokes from the oculus to the
+  //    rim of the dome.
+  ctx.strokeStyle = 'rgba(180, 180, 220, 0.22)';
+  ctx.lineWidth   = 1;
+  const RIBS = 8;
+  for (let i = 0; i < RIBS; i++) {
+    const a = (i / RIBS) * Math.PI * 2;
+    const x0 = cx + Math.cos(a) * halfW * 0.22;
+    const y0 = wallMid + Math.sin(a) * (TILE * 0.55 + overhang * 0.5) * 0.22;
+    const x1 = cx + Math.cos(a) * halfW * 0.95;
+    const y1 = wallMid + Math.sin(a) * (TILE * 0.55 + overhang * 0.5) * 0.95;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+  }
+
+  // 4. Oculus rim — a heavy dark ring with a thin highlight on top.
+  const ocR = Math.min(halfW * 0.20, TILE * 0.55);
+  ctx.fillStyle = '#0a0810';
+  ctx.beginPath();
+  ctx.arc(cx, wallMid, ocR * 1.18, 0, Math.PI * 2);
+  ctx.fill();
+  // Polished brass inner ring.
+  ctx.strokeStyle = '#c8a050';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.arc(cx, wallMid, ocR * 1.05, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 5. Oculus aperture — the bright glowing eye that emits starlight.
+  //    Pulses slowly so the room feels alive.
+  const pulse = 0.85 + Math.sin(t * 1.4) * 0.15;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  // Outer halo.
+  const halo = ctx.createRadialGradient(cx, wallMid, 1, cx, wallMid, ocR * 3.4);
+  halo.addColorStop(0,   `rgba(200, 220, 255, ${0.55 * pulse})`);
+  halo.addColorStop(0.5, `rgba(160, 190, 255, ${0.20 * pulse})`);
+  halo.addColorStop(1,   'rgba(80, 110, 200, 0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, wallMid, ocR * 3.4, 0, Math.PI * 2);
+  ctx.fill();
+  // Bright disc core.
+  const core = ctx.createRadialGradient(cx, wallMid, 0, cx, wallMid, ocR);
+  core.addColorStop(0, `rgba(240, 248, 255, ${0.95 * pulse})`);
+  core.addColorStop(1, 'rgba(160, 190, 255, 0.35)');
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(cx, wallMid, ocR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 6. Orbiting runes around the oculus rim — 4 small glyphs rotating
+  //    slowly to sell the "magic ceiling" reading.
+  const ORBIT_R = ocR * 1.6;
+  const ROT     = t * 0.35;
+  ctx.save();
+  ctx.fillStyle = 'rgba(220, 235, 255, 0.85)';
+  for (let i = 0; i < 4; i++) {
+    const a = ROT + (i / 4) * Math.PI * 2;
+    const gx = cx + Math.cos(a) * ORBIT_R;
+    const gy = wallMid + Math.sin(a) * ORBIT_R * 0.55; // squashed (top-down)
+    const gs = 2.4;
+    // Tiny halo so the rune reads against the dark stone.
+    ctx.globalCompositeOperation = 'lighter';
+    const rh = ctx.createRadialGradient(gx, gy, 0, gx, gy, gs * 3);
+    rh.addColorStop(0, 'rgba(200, 225, 255, 0.65)');
+    rh.addColorStop(1, 'rgba(80, 110, 200, 0)');
+    ctx.fillStyle = rh;
+    ctx.beginPath();
+    ctx.arc(gx, gy, gs * 3, 0, Math.PI * 2);
+    ctx.fill();
+    // Solid glyph dot.
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(230, 240, 255, 0.95)';
+    ctx.fillRect(gx - gs * 0.6, gy - gs * 0.6, gs * 1.2, gs * 1.2);
+  }
+  ctx.restore();
+
   ctx.restore();
 }
 

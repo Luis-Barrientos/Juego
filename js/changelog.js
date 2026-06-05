@@ -15,6 +15,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.7.6',
+    date: '2026-06-05',
+    title: 'La cúpula del Observatorio',
+    items: [
+      'El Observatorio ya no recibe luz por una grieta del techo: ahora tiene una cúpula mágica grabada con costillas de piedra concentricas y radios desde el centro.',
+      'En el centro de la cúpula brilla un óculo arcano que pulsa lentamente, con cuatro runas estelares orbitando a su alrededor.',
+      'El haz de luz que cae al suelo emana ahora limpiamente desde el óculo, sin bordes dentados.',
+      'El círculo de constelaciones es totalmente opaco en el centro — nada del suelo se cuela por debajo — y se limpia mejor de objetos generados antes.',
+    ],
+  },
+  {
     version: '0.7.5',
     date: '2026-06-05',
     title: 'Luz que cura en las Ruinas',
