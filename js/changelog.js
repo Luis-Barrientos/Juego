@@ -15,6 +15,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.7.8',
+    date: '2026-06-05',
+    title: 'El cosmos del Observatorio',
+    items: [
+      'Los obeliscos no solo iluminan la sala: ahora proyectan el cielo nocturno real sobre todo el suelo del Observatorio.',
+      'El suelo de la sala se reemplaza por un fondo cósmico de azul profundo con dos sutiles nebulosas (rosa y azul) en modo aditivo.',
+      'La capa de estrellas titilantes pasa de 36 a 72 estrellas, con tamaños, velocidades y colores variados (blanco frío, amarillo cálido, rosa nebulosa, azul pálido) y destellos de difracción en las más brillantes.',
+      'Las baldosas grises del suelo ya no se cuelan por encima del círculo de constelaciones: ahora toda la sala está cubierta por el cosmos y el círculo, telescopio y obeliscos se re-pintan limpiamente encima.',
+    ],
+  },
+  {
     version: '0.7.7',
     date: '2026-06-05',
     title: 'Observatorio sin cúpula, obeliscos brillantes',

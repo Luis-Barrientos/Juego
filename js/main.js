@@ -45,7 +45,7 @@ import {
   updateLoot, drawLoot, spawnChest, openChest,
 }                                         from './loot.js';
 import {
-  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawObservatoryStars, drawPuddles, drawSarcophagiOverlay, drawLibrarySetPiece, drawMinimap,
+  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawObservatoryFloor, drawObservatoryStars, drawPuddles, drawSarcophagiOverlay, drawLibrarySetPiece, drawMinimap,
 }                                         from './render.js';
 import {
   updateHUD, showToast, hideAllOverlays, showMenu, showPause, hidePause,
@@ -573,6 +573,7 @@ function render() {
   if (!state.map) return;
 
   drawMap(ctx);
+  drawObservatoryFloor(ctx);
   drawLoot(ctx);
   for (const e of state.enemies)     drawEnemy(ctx, e);
   if (state.player)                  drawPlayer(ctx, state.player);
