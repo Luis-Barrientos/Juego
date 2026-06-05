@@ -687,6 +687,10 @@ export function populateFloor(floor, maxFloor, spawnChest) {
   }
   for (const r of state.rooms) {
     if (r.isStartRoom || r.isStairsRoom) continue;
+    // The Great Library hosts its own legendary + rare chests as a reward
+    // for completing the Guardian encounter — skip the generic spawner
+    // here so chests don't land on top of the summoning circle.
+    if (r.isGreatLibrary) continue;
     // Star rooms get two small chests grouped near the centre instead of
     // a single one — feels more rewarding to clear.
     if (r.isLarge) {

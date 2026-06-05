@@ -970,6 +970,9 @@ function prepareGreatLibraryRoom(rooms, map, rng) {
   room.cx = room.x + (room.w >> 1);
   room.cy = room.y + (room.h >> 1);
   room.isLarge = true;
+  // Mark early so placeShelves / placeTables / placePillars / chest spawn
+  // skip this room — we'll lay our own bookshelf aisles inside.
+  room.isGreatLibrary = true;
   return room;
 }
 
@@ -989,8 +992,10 @@ function paintGreatLibraryAisles(room, map, rng, libraryProps) {
   // a bare floor with the circle (handled by the caller).
   if (w < 11 || h < 9) return;
 
-  // 7×7 rotunda kept clear around the centre (cx ± 3, cy ± 3).
-  const rotR = 3;
+  // 5×5 rotunda kept clear around the centre (cx ± 2, cy ± 2). Smaller
+  // than it sounds: 2 tiles around the 2×2 circle let the four rune
+  // stones breathe without swallowing the bookshelf rows.
+  const rotR = 2;
   const rotMinY = cy - rotR, rotMaxY = cy + rotR;
 
   // Bookshelf rows every 3 tiles starting at y+2. Aisles between rows are
