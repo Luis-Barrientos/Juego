@@ -109,7 +109,9 @@ function startGame() {
   state.librarySetPiece = null;
   state.grandTome    = null;
   state.soulSpawners = [];
+  state.leafSpawners = [];
   state._whisperTimer = 6;
+  state._creakTimer   = 12;
   state.shake       = 0;
   state.cameraX     = 0;
   state.cameraY     = 0;
@@ -136,7 +138,9 @@ function buildFloor(floor) {
   state.librarySetPiece = d.librarySetPiece || null;
   state.grandTome       = d.grandTome       || null;
   state.soulSpawners = d.soulSpawners || [];
+  state.leafSpawners = d.leafSpawners || [];
   state._whisperTimer = 6 + Math.random() * 6;
+  state._creakTimer   = 8 + Math.random() * 14;
 
   resetChallenge();
   resetLibraryEvent();
@@ -383,34 +387,70 @@ function applyBiomeModifiers(dt) {
 }
 
 /**
- * Catacombs-only ambient layer: drifting soul wisps from anchor spawners
- * plus an occasional procedural whisper. No-op on other biomes.
+ * Per-biome ambient layer.
+ * - Catacombs: drifting soul wisps + procedural whispers.
+ * - Library:   drifting leaves / paper scraps + occasional wood creaks.
  */
 function updateAmbient(dt) {
-  if (!state.biome || state.biome.id !== 'crypt') return;
+  if (!state.biome) return;
+  const id = state.biome.id;
 
-  for (const s of state.soulSpawners) {
-    s.timer -= dt;
-    if (s.timer > 0) continue;
-    s.timer = 1.6 + Math.random() * 2.8;
-    state.particles.push({
-      kind: 'soul',
-      x: s.x + (Math.random() - 0.5) * 10,
-      y: s.y + (Math.random() - 0.5) * 6,
-      vx: (Math.random() - 0.5) * 6,
-      vy: -10 - Math.random() * 12,
-      life: 2.4 + Math.random() * 0.9,
-      maxLife: 3.3,
-      r: 1.8 + Math.random() * 1.2,
-      color: 'rgba(160,200,240,1)',
-      seed: Math.random() * Math.PI * 2,
-    });
+  if (id === 'crypt') {
+    for (const s of state.soulSpawners) {
+      s.timer -= dt;
+      if (s.timer > 0) continue;
+      s.timer = 1.6 + Math.random() * 2.8;
+      state.particles.push({
+        kind: 'soul',
+        x: s.x + (Math.random() - 0.5) * 10,
+        y: s.y + (Math.random() - 0.5) * 6,
+        vx: (Math.random() - 0.5) * 6,
+        vy: -10 - Math.random() * 12,
+        life: 2.4 + Math.random() * 0.9,
+        maxLife: 3.3,
+        r: 1.8 + Math.random() * 1.2,
+        color: 'rgba(160,200,240,1)',
+        seed: Math.random() * Math.PI * 2,
+      });
+    }
+
+    state._whisperTimer -= dt;
+    if (state._whisperTimer <= 0) {
+      Audio.whisper();
+      state._whisperTimer = 18 + Math.random() * 12;
+    }
   }
 
-  state._whisperTimer -= dt;
-  if (state._whisperTimer <= 0) {
-    Audio.whisper();
-    state._whisperTimer = 18 + Math.random() * 12;
+  if (id === 'library') {
+    for (const s of state.leafSpawners) {
+      s.timer -= dt;
+      if (s.timer > 0) continue;
+      s.timer = 2.5 + Math.random() * 4.0;
+      const paper = s.hue === 'paper';
+      state.particles.push({
+        kind: 'leaf',
+        x: s.x + (Math.random() - 0.5) * 16,
+        y: s.y + (Math.random() - 0.5) * 8,
+        vx: (Math.random() - 0.5) * 14,
+        // Falls downward slowly with mild side wobble (applied in particles.js).
+        vy: 10 + Math.random() * 14,
+        life: 4.5 + Math.random() * 2.0,
+        maxLife: 6.5,
+        r: 2.5 + Math.random() * 1.5,
+        rot:    Math.random() * Math.PI * 2,
+        rotSp:  (Math.random() - 0.5) * 2.4,
+        color:  paper ? 'rgba(220, 200, 170, 1)' : 'rgba(140, 160, 100, 1)',
+        // Marks the particle as paper so the draw call uses a rectangle.
+        paper,
+        seed:   Math.random() * Math.PI * 2,
+      });
+    }
+
+    state._creakTimer -= dt;
+    if (state._creakTimer <= 0) {
+      Audio.woodCreak();
+      state._creakTimer = 22 + Math.random() * 16;
+    }
   }
 }
 

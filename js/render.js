@@ -772,6 +772,7 @@ function drawLibraryProp(ctx, p) {
   // Same goes for the floor decorations around the Grand Tome pedestal.
   if (p.kind === 'tomeCircle')   { drawTomeCircle(ctx, px, py, w, h, p);   return; }
   if (p.kind === 'tomeBookPile') { drawTomeBookPile(ctx, px, py, w, h, p); return; }
+  if (p.kind === 'libraryRuneMark') { drawLibraryRuneMark(ctx, px, py, w, h, p); return; }
 
   // Wipe the underlying wall tile back to floor tone so the prop has its
   // own silhouette instead of inheriting the dark wall fill.
@@ -1036,6 +1037,62 @@ function drawTomeBookPile(ctx, px, py, w, h, p) {
   ctx.fillRect(px + 9,  py + 27, 4, 1);
   ctx.fillRect(px + 18, py + 25, 5, 1);
   ctx.fillRect(px + 18, py + 27, 4, 1);
+  ctx.restore();
+}
+
+/**
+ * Small painted rune mark on the floor — a single tile-sized purple
+ * glyph used as ambient decor next to magic flames. Walkable; never
+ * wipes the underlying floor tile.
+ */
+function drawLibraryRuneMark(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  const r  = Math.min(w, h) * 0.36;
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  // Pick a glyph variant once per mark.
+  const variant = Math.floor(rnd() * 3);
+
+  ctx.save();
+  // Subtle violet halo so the mark reads against the dark floor.
+  const halo = ctx.createRadialGradient(cx, cy, 1, cx, cy, r * 1.4);
+  halo.addColorStop(0, 'rgba(184, 144, 255, 0.22)');
+  halo.addColorStop(1, 'rgba(40, 20, 80, 0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Outer ring (single thin stroke).
+  ctx.strokeStyle = 'rgba(200, 160, 255, 0.85)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(220, 180, 255, 0.85)';
+  if (variant === 0) {
+    // Cross glyph.
+    ctx.fillRect(cx - r * 0.7, cy - 0.8, r * 1.4, 1.6);
+    ctx.fillRect(cx - 0.8, cy - r * 0.7, 1.6, r * 1.4);
+  } else if (variant === 1) {
+    // Three-bar glyph.
+    for (let i = -1; i <= 1; i++) {
+      ctx.fillRect(cx - r * 0.55, cy + i * 3 - 0.5, r * 1.1, 1.2);
+    }
+  } else {
+    // Diamond glyph (4 short bars meeting near the centre).
+    ctx.beginPath();
+    ctx.moveTo(cx,           cy - r * 0.65);
+    ctx.lineTo(cx + r * 0.65, cy);
+    ctx.lineTo(cx,           cy + r * 0.65);
+    ctx.lineTo(cx - r * 0.65, cy);
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(220, 180, 255, 0.85)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -1999,6 +2056,8 @@ export function drawLighting(ctx) {
       ctx.quadraticCurveTo(lx + 1.0, ly + bob - 5, lx - 0.4, ly + bob - 8);
       ctx.stroke();
       ctx.restore();
+      // Optional: small levitating rune glyph orbiting the flame.
+      if (lt.rune) drawFloatingRune(ctx, lx, ly + bob, lt.rune, c);
     } else {
       // Floor torch: stake + flame
       ctx.fillStyle = '#3a2010';
@@ -2009,6 +2068,64 @@ export function drawLighting(ctx) {
       ctx.beginPath(); ctx.ellipse(lx, ly - 6 + fl, 1.5, 3, 0, 0, Math.PI * 2); ctx.fill();
     }
   }
+}
+
+/**
+ * Draw a small magical rune glyph levitating near a magic flame. The
+ * glyph orbits the flame on a tiny circle and pulses; rendered in the
+ * 'lighter' composite mode so it adds to the flame's bloom.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} fx Flame x (screen-space, already includes bob).
+ * @param {number} fy Flame y (screen-space).
+ * @param {{shape:number,orbitR:number,phase:number,bobAmp:number,bobSpeed:number}} rune
+ * @param {[number,number,number]} c Flame colour for glow tint.
+ */
+function drawFloatingRune(ctx, fx, fy, rune, c) {
+  const orbit = state.time * 0.6 + rune.phase;
+  // Orbit above the flame: stays in the upper half so it doesn't clip.
+  const ang = -Math.PI / 2 + Math.sin(orbit) * 0.9;
+  const rx = fx + Math.cos(ang) * rune.orbitR;
+  const ry = fy + Math.sin(ang) * rune.orbitR
+           + Math.sin(state.time * rune.bobSpeed + rune.phase) * rune.bobAmp - 12;
+  const pulse = 0.55 + 0.45 * Math.sin(state.time * 2.4 + rune.phase);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = pulse;
+  ctx.shadowColor = `rgba(${c[0]},${c[1]},${c[2]},1)`;
+  ctx.shadowBlur  = 8;
+  ctx.fillStyle   = '#f0d8ff';
+  ctx.strokeStyle = '#f0d8ff';
+  ctx.lineWidth   = 1;
+  // Four glyph variants (chosen per flame in dungeon.js).
+  switch (rune.shape) {
+    case 0: // small cross
+      ctx.fillRect(rx - 3, ry - 0.5, 6, 1.2);
+      ctx.fillRect(rx - 0.5, ry - 3, 1.2, 6);
+      break;
+    case 1: // triangle outline
+      ctx.beginPath();
+      ctx.moveTo(rx, ry - 3);
+      ctx.lineTo(rx + 3, ry + 2);
+      ctx.lineTo(rx - 3, ry + 2);
+      ctx.closePath();
+      ctx.stroke();
+      break;
+    case 2: // two parallel bars
+      ctx.fillRect(rx - 3, ry - 2, 6, 1.2);
+      ctx.fillRect(rx - 3, ry + 1, 6, 1.2);
+      break;
+    default: // diamond outline
+      ctx.beginPath();
+      ctx.moveTo(rx, ry - 3);
+      ctx.lineTo(rx + 3, ry);
+      ctx.lineTo(rx, ry + 3);
+      ctx.lineTo(rx - 3, ry);
+      ctx.closePath();
+      ctx.stroke();
+      break;
+  }
+  ctx.restore();
 }
 
 /**

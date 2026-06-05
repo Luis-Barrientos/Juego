@@ -15,6 +15,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.7.3',
+    date: '2026-06-05',
+    title: 'Aire arcano en la Biblioteca',
+    items: [
+      'La Biblioteca cobra vida con páginas y hojas secas que caen lentamente desde el techo, girando mientras se desvanecen.',
+      'Junto a cada llama mágica levita ahora una pequeña runa luminosa que orbita y pulsa con el fuego.',
+      'Algunas llamas tienen un círculo rúnico pintado en el suelo a sus pies con uno de varios glifos diferentes.',
+      'De vez en cuando se oye el crujido de las maderas viejas de las estanterías acomodándose en la oscuridad.',
+    ],
+  },
+  {
     version: '0.7.2',
     date: '2026-06-05',
     title: 'El santuario del Gran Tomo',

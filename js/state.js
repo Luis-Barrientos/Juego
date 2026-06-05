@@ -22,7 +22,9 @@ export const state = {
   grandTome:       null,  // library Sala del Gran Tomo (Simon-Says) state
   challenge: null,        // crypta challenge state (see challenge.js)
   soulSpawners: [],       // catacombs ambient soul anchors (see main.js)
+  leafSpawners: [],       // library ambient leaf / paper-scrap anchors
   _whisperTimer: 0,       // seconds until the next whisper sound
+  _creakTimer: 0,         // seconds until the next library wood-creak sound
   cameraX: 0,
   cameraY: 0,
   shake: 0,

@@ -68,6 +68,13 @@ export function updateParticles(dt) {
       // Souls drift slowly upward without friction and wobble side-to-side.
       p.phase = (p.phase || 0) + dt;
       p.x += Math.sin(p.phase * 2.2 + (p.seed || 0)) * 8 * dt;
+    } else if (p.kind === 'leaf') {
+      // Leaves: drift downward, wobble horizontally, rotate slowly.
+      p.phase = (p.phase || 0) + dt;
+      p.x += Math.sin(p.phase * 1.8 + (p.seed || 0)) * 12 * dt;
+      p.rot = (p.rot || 0) + (p.rotSp || 0) * dt;
+      // Very mild air drag on the fall velocity so they reach a terminal feel.
+      p.vy *= 0.995;
     } else if (p.kind === 'guardianSlam') {
       // Expanding shockwave ring: radius grows from r to maxR over life.
       const t = 1 - (p.life / p.maxLife);
@@ -108,6 +115,39 @@ export function drawParticles(ctx) {
       ctx.beginPath();
       ctx.arc(x, y, p.r * a, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
+      continue;
+    }
+    if (p.kind === 'leaf') {
+      // Leaf / paper scrap: small rotated quad with subtle shadow.
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(p.rot || 0);
+      ctx.globalAlpha = a;
+      const w = (p.r || 2) * 2.2;
+      const h = (p.r || 2) * 1.4;
+      // Drop shadow underneath.
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(-w / 2 + 1, -h / 2 + 1, w, h);
+      // Body.
+      ctx.fillStyle = p.color;
+      if (p.paper) {
+        ctx.fillRect(-w / 2, -h / 2, w, h);
+        // Fold/seam highlight along the centre.
+        ctx.fillStyle = 'rgba(255,235,200,0.55)';
+        ctx.fillRect(-w / 2, -0.5, w, 1);
+      } else {
+        // Leaf: rounded with a vein.
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(80, 100, 60, 0.7)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-w / 2 + 1, 0);
+        ctx.lineTo( w / 2 - 1, 0);
+        ctx.stroke();
+      }
       ctx.restore();
       continue;
     }

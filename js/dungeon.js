@@ -261,12 +261,23 @@ export function generateDungeon(floor, seed, biome) {
   const soulSpawners = [];
   if (isCatacombs) placeSoulSpawners(rooms, rng, soulSpawners, sarcophagi);
 
+  // Library biome ambient anchors: spawners that periodically drop
+  // floating leaves / paper scraps from the ceiling. Filled by the
+  // library block below so the magicFlame lights exist already.
+  const leafSpawners = [];
+
   let librarySetPiece = null;
   let grandTome       = null;
   if (isLibrary) {
     placeMagicFlames(rooms, rng, lights);
     placeRoomWallDecorations(map, rooms, rng, decorations, lights,
       ['wallShelf', 'scrollHanging', 'runeSymbol', 'darkPortrait', 'noticeBoard']);
+    // Paint small floor rune marks next to ~40% of the magic flames.
+    placeLibraryRuneMarks(map, rooms, rng, lights, libraryProps);
+    // Attach a small floating rune glyph to every magic flame (live overlay).
+    decorateMagicFlamesWithRunes(lights, rng);
+    // Spawners for drifting leaves / paper scraps (per room).
+    placeLibraryLeafSpawners(rooms, rng, leafSpawners);
     // Lay the Great Library set-piece on the room we reserved up top.
     if (greatLibraryRoom) {
       librarySetPiece = placeLibrarySetPiece(greatLibraryRoom, map, rng, libraryProps);
@@ -276,7 +287,7 @@ export function generateDungeon(floor, seed, biome) {
     }
   }
 
-  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, libraryProps, soulSpawners, librarySetPiece, grandTome, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, libraryProps, soulSpawners, leafSpawners, librarySetPiece, grandTome, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
 }
 
 /**
@@ -837,6 +848,92 @@ function placeMagicFlames(rooms, rng, lights) {
         color:   purple ? [180, 120, 255] : [255,  90, 110],
         r:       70 + rng() * 25,
         flicker: rng() * Math.PI * 2,
+      });
+    }
+  }
+}
+
+/**
+ * Attach a small levitating rune glyph to every existing magicFlame.
+ * The glyph orbits the flame at a fixed offset and pulses; rendered as
+ * a live overlay in render.js, never touches the map.
+ * @private
+ */
+function decorateMagicFlamesWithRunes(lights, rng) {
+  for (const l of lights) {
+    if (l.type !== 'magicFlame') continue;
+    l.rune = {
+      // 4 possible glyph shapes — picked once per flame for variety.
+      shape:    Math.floor(rng() * 4),
+      // Orbit offset relative to the flame: small radius, random initial angle.
+      orbitR:   8 + rng() * 4,
+      phase:    rng() * Math.PI * 2,
+      // Bob amplitude on the Y axis (in addition to orbiting).
+      bobAmp:   2 + rng() * 2,
+      bobSpeed: 1.4 + rng() * 0.8,
+    };
+  }
+}
+
+/**
+ * Paint a small (1×1) rune mark on the floor adjacent to ~40% of the
+ * magic flames. Walkable; stored as a 'libraryRuneMark' libraryProp so
+ * the existing draw pass picks it up.
+ * @private
+ */
+function placeLibraryRuneMarks(map, rooms, rng, lights, libraryProps) {
+  for (const l of lights) {
+    if (l.type !== 'magicFlame') continue;
+    if (rng() > 0.40) continue;
+    // Snap to the nearest interior floor tile within a 3-tile box.
+    const cxT = Math.floor(l.ax / TILE);
+    const cyT = Math.floor(l.ay / TILE);
+    const candidates = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const xx = cxT + dx, yy = cyT + dy;
+        if (!map[yy] || map[yy][xx] !== T_FLOOR) continue;
+        candidates.push({ xx, yy });
+      }
+    }
+    if (!candidates.length) continue;
+    const c = candidates[Math.floor(rng() * candidates.length)];
+    // Avoid stacking on a tile that already hosts a rune mark.
+    if (libraryProps.some(p => p.kind === 'libraryRuneMark' && p.tx === c.xx && p.ty === c.yy)) continue;
+    libraryProps.push({
+      kind: 'libraryRuneMark',
+      tx: c.xx, ty: c.yy, w: 1, h: 1,
+      seed: Math.floor(rng() * 1e9),
+    });
+  }
+}
+
+/**
+ * For each non-tiny library room, register 1-2 ambient leaf spawners
+ * anchored at random ceiling-side positions. Each spawner periodically
+ * emits a falling 'leaf' particle. Skips the Grand Tome and Great Library
+ * since those rooms already have their own atmosphere.
+ * @private
+ */
+function placeLibraryLeafSpawners(rooms, rng, leafSpawners) {
+  for (const r of rooms) {
+    if (r.isStartRoom) continue;
+    if (r.isGrandTome) continue;
+    if (r.w < 4 || r.h < 4) continue;
+    const count = r.isLarge || r.isGreatLibrary
+      ? 3 + Math.floor(rng() * 2)
+      : 1 + (rng() < 0.5 ? 1 : 0);
+    for (let i = 0; i < count; i++) {
+      const sx = (r.x + 1 + rng() * (r.w - 2)) * TILE;
+      // Spawn near the top of the room so the leaf has room to fall.
+      const sy = (r.y + 0.5 + rng() * 1.5) * TILE;
+      leafSpawners.push({
+        x: sx,
+        y: sy,
+        // Per-spawner emission cadence.
+        timer: 1 + rng() * 4,
+        // Half hue split — pale parchment vs cool moss / muted bookleather.
+        hue:   rng() < 0.5 ? 'paper' : 'leaf',
       });
     }
   }

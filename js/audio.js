@@ -121,4 +121,30 @@ export const Audio = {
     src.connect(f1).connect(f2).connect(gain).connect(masterGain);
     src.start();
   },
+  woodCreak:  () => {
+    if (!actx) return;
+    // A short, low-pitched creak: filtered noise with a slow amplitude
+    // wobble plus a faint downward chirp on a triangle oscillator.
+    const dur = 0.55 + Math.random() * 0.3;
+    const buf = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      const t = i / data.length;
+      // Slow tremolo so the noise reads as a wood "groan" not a hiss.
+      const env = Math.sin(Math.PI * t) * (0.55 + 0.45 * Math.sin(t * 9));
+      data[i] = (Math.random() * 2 - 1) * env;
+    }
+    const src  = actx.createBufferSource();
+    const lp   = actx.createBiquadFilter();
+    const bp   = actx.createBiquadFilter();
+    const gain = actx.createGain();
+    src.buffer = buf;
+    lp.type = 'lowpass';  lp.frequency.value = 360;
+    bp.type = 'bandpass'; bp.frequency.value = 180; bp.Q.value = 4;
+    gain.gain.value = 0.07;
+    src.connect(lp).connect(bp).connect(gain).connect(masterGain);
+    src.start();
+    // Pair with a very low groan tone for body.
+    tone({ freq: 110, type: 'triangle', dur: dur * 0.8, vol: 0.05, slide: -28 });
+  },
 };
