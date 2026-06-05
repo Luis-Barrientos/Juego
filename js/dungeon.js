@@ -97,9 +97,12 @@ export function generateDungeon(floor, seed, biome) {
 
   // Promote rooms to 'star' rooms — larger than the rest, used to host
   // the visual spectacle and key encounters. Ruins gets 1-2 stars; the
-  // catacombs floor gets exactly one (the crypta).
+  // catacombs and library floors get exactly one (the crypta / Great
+  // Library), since they each host a single set-piece encounter.
+  const isLibraryBiome = biome && biome.id === 'library';
   const starCount = isRuinsStyle(styleKey)     ? (1 + Math.floor(rng() * 2))
                   : isCatacombsStyle(styleKey) ? 1
+                  : isLibraryBiome             ? 1
                   : 0;
   if (starCount > 0) expandStarRooms(rooms, map, rng, starCount);
 
