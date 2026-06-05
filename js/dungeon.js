@@ -106,6 +106,18 @@ export function generateDungeon(floor, seed, biome) {
                   : 0;
   if (starCount > 0) expandStarRooms(rooms, map, rng, starCount);
 
+  // Library biome: pre-pick the star room destined to become the Great
+  // Library and grow it WAY beyond the normal star cap (up to 20×16),
+  // before corridors are carved so the corridor planner knows the real
+  // footprint. We commit to this choice here (70% per library floor); the
+  // chosen room is later detected via the `isGreatLibrary` flag and
+  // skipped by placeShelves/placeTables so we can lay our own bookcase
+  // aisles inside.
+  let greatLibraryRoom = null;
+  if (isLibraryBiome && rng() < 0.70) {
+    greatLibraryRoom = prepareGreatLibraryRoom(rooms, map, rng);
+  }
+
   // Detect start (top-left-most) and stairs (farthest from start) rooms
   // BEFORE placing pillars/sarcophagi so those placers can skip them.
   // The actual T_STAIR tile is written later, after structural placers.
@@ -211,9 +223,9 @@ export function generateDungeon(floor, seed, biome) {
     placeMagicFlames(rooms, rng, lights);
     placeRoomWallDecorations(map, rooms, rng, decorations, lights,
       ['wallShelf', 'scrollHanging', 'runeSymbol', 'darkPortrait', 'noticeBoard']);
-    // 70% chance to spawn the Great Library set-piece on a star room.
-    if (rng() < 0.70) {
-      librarySetPiece = placeLibrarySetPiece(rooms, map, rng, libraryProps);
+    // Lay the Great Library set-piece on the room we reserved up top.
+    if (greatLibraryRoom) {
+      librarySetPiece = placeLibrarySetPiece(greatLibraryRoom, map, rng, libraryProps);
     }
   }
 
@@ -796,6 +808,7 @@ function placeMagicFlames(rooms, rng, lights) {
 function placeShelves(rooms, map, rng, libraryProps) {
   for (const r of rooms) {
     if (r.isStartRoom || r.isStairsRoom) continue;
+    if (r.isGreatLibrary) continue; // hand-decorated by the set-piece placer
     if (r.w < 4 || r.h < 4) continue;
     if (!r.isLarge && rng() > 0.55) continue;
 
@@ -862,6 +875,7 @@ function placeShelves(rooms, map, rng, libraryProps) {
 function placeTables(rooms, map, rng, libraryProps) {
   for (const r of rooms) {
     if (r.isStartRoom || r.isStairsRoom) continue;
+    if (r.isGreatLibrary) continue; // hand-decorated by the set-piece placer
     if (r.w < 5 || r.h < 4) continue;
     if (rng() > 0.6) continue;
 
@@ -910,26 +924,139 @@ function placeTables(rooms, map, rng, libraryProps) {
 }
 
 /**
- * Place the Great Library set-piece in a star room: a 2×2 summoning circle
- * at the centre, plus four floating rune stones around it. The circle is
- * a walkable decoration (no T_WALL writes) so the player can step onto it
- * to trigger the encounter via E.
+ * Library biome only: pick the room destined to host the Great Library
+ * and grow it well beyond the normal star cap so it actually feels grand.
+ * Called BEFORE corridors are carved so the corridor planner sees the
+ * final, larger footprint.
  *
- * Picks the largest non-start, non-stairs star room. Returns the set-piece
- * descriptor or null if no eligible room exists.
+ * Reuses `tryExpand` with a roomier `MAX_DIM` (up to ~20×16) and stops
+ * early if the room can't grow further (other rooms in the way, map
+ * edge). Returns the chosen room or null if no candidate exists.
  *
  * @private
  */
-function placeLibrarySetPiece(rooms, map, rng, libraryProps) {
-  // Star rooms first; pick the largest by area.
-  const stars = rooms.filter(r =>
-    r.isLarge && !r.isStartRoom && !r.isStairsRoom &&
-    r.w >= 7 && r.h >= 7,
+function prepareGreatLibraryRoom(rooms, map, rng) {
+  // Prefer the largest existing star room that isn't start/stairs. Fall
+  // back to the largest non-start/stairs room if no eligible star exists
+  // (very small floors).
+  const eligible = rooms.filter(r =>
+    !r.isStartRoom && !r.isStairsRoom &&
+    r.w >= 6 && r.h >= 6,
   );
-  if (!stars.length) return null;
-  stars.sort((a, b) => (b.w * b.h) - (a.w * a.h));
-  const room = stars[0];
+  if (!eligible.length) return null;
+  eligible.sort((a, b) => {
+    // Stars first, then larger by area.
+    if (a.isLarge !== b.isLarge) return a.isLarge ? -1 : 1;
+    return (b.w * b.h) - (a.w * a.h);
+  });
+  const room = eligible[0];
+
+  // Grow well past the regular star cap so the Great Library feels grand.
+  const BIG_DIM = { w: 20, h: 16 };
+  const TARGET_AREA = BIG_DIM.w * BIG_DIM.h;
+  const dirs = ['left', 'right', 'up', 'down'];
+  let safety = 200;
+  while (room.w * room.h < TARGET_AREA && safety-- > 0) {
+    for (let i = dirs.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+    }
+    let grew = false;
+    for (const dir of dirs) {
+      if (tryExpand(room, map, dir, rooms, BIG_DIM)) { grew = true; break; }
+    }
+    if (!grew) break;
+  }
+  room.cx = room.x + (room.w >> 1);
+  room.cy = room.y + (room.h >> 1);
+  room.isLarge = true;
+  return room;
+}
+
+/**
+ * Paint horizontal bookshelf rows inside the Great Library, separated by
+ * walking aisles, with a clear central rotunda for the summoning circle
+ * and a 3-tile-wide central N-S aisle that connects every row.
+ *
+ * Each shelf tile is written as T_WALL and registered as a 'shelf'
+ * libraryProp so it renders consistently with the existing shelves.
+ * @private
+ */
+function paintGreatLibraryAisles(room, map, rng, libraryProps) {
+  const { x, y, w, h, cx, cy } = room;
+  // Need enough space for at least one row of shelves on either side of
+  // the rotunda and a full perimeter aisle. Smaller rooms fall back to
+  // a bare floor with the circle (handled by the caller).
+  if (w < 11 || h < 9) return;
+
+  // 7×7 rotunda kept clear around the centre (cx ± 3, cy ± 3).
+  const rotR = 3;
+  const rotMinY = cy - rotR, rotMaxY = cy + rotR;
+
+  // Bookshelf rows every 3 tiles starting at y+2. Aisles between rows are
+  // 2 tiles thick (good for walking). Skip rows that fall inside the
+  // rotunda y-band.
+  for (let ty = y + 2; ty <= y + h - 3; ty += 3) {
+    if (ty >= rotMinY && ty <= rotMaxY) continue;
+    paintShelfRow(map, libraryProps, rng, x + 2, cx - 2, ty);          // left wing
+    paintShelfRow(map, libraryProps, rng, cx + 2, x + w - 3, ty);      // right wing
+  }
+}
+
+/**
+ * Paint a horizontal shelf row from x1..x2 (inclusive) at y, in 2-tile
+ * chunks, falling back to 1-tile chunks at the tail. Skips tiles that
+ * aren't currently floor (so we never block a corridor entry).
+ * @private
+ */
+function paintShelfRow(map, libraryProps, rng, x1, x2, y) {
+  if (x2 < x1) return;
+  let cur = x1;
+  while (cur <= x2) {
+    // Try a 2-tile chunk if both tiles are floor and there's room.
+    if (cur + 1 <= x2 &&
+        map[y] && map[y][cur] === T_FLOOR && map[y][cur + 1] === T_FLOOR) {
+      map[y][cur] = T_WALL;
+      map[y][cur + 1] = T_WALL;
+      libraryProps.push({
+        kind: 'shelf', tx: cur, ty: y, w: 2, h: 1,
+        orient: 'h', face: rng() < 0.5 ? 'S' : 'N',
+        seed: Math.floor(rng() * 1e9),
+      });
+      cur += 2;
+      continue;
+    }
+    // 1-tile fallback (tail or blocked neighbour).
+    if (map[y] && map[y][cur] === T_FLOOR) {
+      map[y][cur] = T_WALL;
+      libraryProps.push({
+        kind: 'shelf', tx: cur, ty: y, w: 1, h: 1,
+        orient: 'h', face: rng() < 0.5 ? 'S' : 'N',
+        seed: Math.floor(rng() * 1e9),
+      });
+    }
+    cur += 1;
+  }
+}
+
+/**
+ * Place the Great Library set-piece in the room reserved by
+ * `prepareGreatLibraryRoom`: paint bookshelf aisles around a clear
+ * central rotunda, lay a 2×2 summoning circle at the centre and four
+ * floating rune stones around it. The circle is walkable (no T_WALL
+ * writes) so the player can step onto it to trigger the encounter via E.
+ *
+ * Returns the set-piece descriptor or null if `room` is missing.
+ *
+ * @private
+ */
+function placeLibrarySetPiece(room, map, rng, libraryProps) {
+  if (!room) return null;
   room.isGreatLibrary = true;
+
+  // Paint the bookshelf aisles + central rotunda. Only attempted on rooms
+  // big enough to fit them; smaller rooms fall back to a bare circle.
+  paintGreatLibraryAisles(room, map, rng, libraryProps);
 
   // Centre 2×2 circle on the room centre.
   const cx = Math.floor(room.x + room.w / 2);
