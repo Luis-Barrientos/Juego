@@ -78,6 +78,7 @@ export function generateDungeon(floor, seed, biome) {
   // -------------------------------------------------------------------
   const isLibraryBiome = biome && biome.id === 'library';
   let greatLibraryRoom = null;
+  let grandTomeRoom    = null;
   const bspRoots = [];
 
   if (isLibraryBiome && rng() < 0.70) {
@@ -88,6 +89,28 @@ export function generateDungeon(floor, seed, biome) {
       rooms.push(reservation.room);
       greatLibraryRoom = reservation.room;
       bspRoots.push(...reservation.strips);
+    }
+  }
+
+  // Sala del Gran Tomo: medium-sized side room (~10×8) with a Simon-Says
+  // book pedestal at the centre. Independent roll from the Great Library
+  // (≈55% per library floor); both can co-exist.
+  if (isLibraryBiome && rng() < 0.55) {
+    // Re-feed the strips from the previous reservation if there were any
+    // — the second reservation must come out of those strips, not the
+    // full map.
+    const sources = bspRoots.length ? bspRoots : [{ x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2 }];
+    const res = reserveInStrips(map, rng, 10, 8, 2, sources);
+    if (res) {
+      res.room.isGrandTome = true;
+      res.room.isLarge = false;
+      rooms.push(res.room);
+      grandTomeRoom = res.room;
+      // Replace the consumed strip with its leftover pieces.
+      bspRoots.splice(bspRoots.indexOf(res.consumedStrip), 1, ...res.strips);
+      // If we started from a single full-map strip (no Great Library),
+      // bspRoots was empty; just push the leftover strips.
+      if (!bspRoots.length) bspRoots.push(...res.strips);
     }
   }
 
@@ -242,6 +265,7 @@ export function generateDungeon(floor, seed, biome) {
   if (isCatacombs) placeSoulSpawners(rooms, rng, soulSpawners, sarcophagi);
 
   let librarySetPiece = null;
+  let grandTome       = null;
   if (isLibrary) {
     placeMagicFlames(rooms, rng, lights);
     placeRoomWallDecorations(map, rooms, rng, decorations, lights,
@@ -250,9 +274,12 @@ export function generateDungeon(floor, seed, biome) {
     if (greatLibraryRoom) {
       librarySetPiece = placeLibrarySetPiece(greatLibraryRoom, map, rng, libraryProps);
     }
+    if (grandTomeRoom) {
+      grandTome = placeGrandTome(grandTomeRoom, map, rng, libraryProps);
+    }
   }
 
-  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, libraryProps, soulSpawners, librarySetPiece, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, libraryProps, soulSpawners, librarySetPiece, grandTome, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
 }
 
 /**
@@ -832,6 +859,7 @@ function placeShelves(rooms, map, rng, libraryProps) {
   for (const r of rooms) {
     if (r.isStartRoom || r.isStairsRoom) continue;
     if (r.isGreatLibrary) continue; // hand-decorated by the set-piece placer
+    if (r.isGrandTome) continue;    // pedestal is the only prop in here
     if (r.w < 4 || r.h < 4) continue;
     if (!r.isLarge && rng() > 0.55) continue;
 
@@ -899,6 +927,7 @@ function placeTables(rooms, map, rng, libraryProps) {
   for (const r of rooms) {
     if (r.isStartRoom || r.isStairsRoom) continue;
     if (r.isGreatLibrary) continue; // hand-decorated by the set-piece placer
+    if (r.isGrandTome) continue;    // pedestal is the only prop in here
     if (r.w < 5 || r.h < 4) continue;
     if (rng() > 0.6) continue;
 
@@ -1008,6 +1037,73 @@ function reserveSpecialRoom(map, rng, w, h, margin = 3) {
   }
 
   return { room, strips };
+}
+
+/**
+ * Try to reserve a w×h rectangle inside one of the existing free
+ * `strips` (output of `reserveSpecialRoom`). Picks the largest strip
+ * that fits, places the room with `margin` tiles of buffer to every
+ * strip edge, carves it as floor and returns:
+ *
+ *   { room, strips: leftover strips that surround the new room,
+ *     consumedStrip: the strip that was split }
+ *
+ * The caller is expected to remove `consumedStrip` from the BSP root
+ * list and push the leftovers in its place.
+ *
+ * Returns null if no strip is big enough.
+ *
+ * @private
+ */
+function reserveInStrips(map, rng, w, h, margin, strips) {
+  const fits = strips.filter(s => s.w >= w + margin * 2 && s.h >= h + margin * 2);
+  if (!fits.length) return null;
+  fits.sort((a, b) => (b.w * b.h) - (a.w * a.h));
+  const strip = fits[0];
+
+  const maxX = strip.x + strip.w - margin - w;
+  const maxY = strip.y + strip.h - margin - h;
+  const minX = strip.x + margin;
+  const minY = strip.y + margin;
+  const rx = minX + Math.floor(rng() * Math.max(1, maxX - minX + 1));
+  const ry = minY + Math.floor(rng() * Math.max(1, maxY - minY + 1));
+
+  for (let y = ry; y < ry + h; y++) {
+    for (let x = rx; x < rx + w; x++) map[y][x] = T_FLOOR;
+  }
+
+  const room = {
+    x: rx, y: ry, w, h,
+    cx: rx + (w >> 1),
+    cy: ry + (h >> 1),
+    enemies: [],
+    cleared: false,
+    visited: false,
+  };
+
+  // Cut the consumed strip into up to 4 leftover strips around the room.
+  const MIN_STRIP = 6;
+  const leftover = [];
+  // top of strip → y of room
+  if (ry - strip.y - 2 >= MIN_STRIP) {
+    leftover.push({ x: strip.x, y: strip.y, w: strip.w, h: ry - strip.y - 2 });
+  }
+  // bottom of room → bottom of strip
+  const bottomY = ry + h + 1;
+  if (strip.y + strip.h - bottomY >= MIN_STRIP) {
+    leftover.push({ x: strip.x, y: bottomY, w: strip.w, h: strip.y + strip.h - bottomY });
+  }
+  // left side of strip → x of room (only spans the room's vertical band)
+  if (rx - strip.x - 2 >= MIN_STRIP) {
+    leftover.push({ x: strip.x, y: ry, w: rx - strip.x - 2, h });
+  }
+  // right side
+  const rightX = rx + w + 1;
+  if (strip.x + strip.w - rightX >= MIN_STRIP) {
+    leftover.push({ x: rightX, y: ry, w: strip.x + strip.w - rightX, h });
+  }
+
+  return { room, strips: leftover, consumedStrip: strip };
 }
 
 /**
@@ -1158,6 +1254,69 @@ function placeLibrarySetPiece(room, map, rng, libraryProps) {
     guardianSpawned: false,
     rewardGiven: false,
     stonesHidden: false,
+  };
+}
+
+/**
+ * Place the Sala del Gran Tomo set-piece: a stone pedestal at the centre
+ * of the room with a giant levitating tome on top. The pedestal is a
+ * 2×2 solid (T_WALL) registered as a libraryProp so the rest of the
+ * world ignores it (collision and rendering ride the existing pipeline).
+ *
+ * The encounter (Simon-Says of 5–7 directions) is driven entirely from
+ * `grandTome.js`; here we just commit the geometry and return the
+ * descriptor.
+ *
+ * @private
+ */
+function placeGrandTome(room, map, rng, libraryProps) {
+  if (!room) return null;
+  room.isGrandTome = true;
+
+  // 2×2 pedestal at the room centre.
+  const tx = room.cx - 1;
+  const ty = room.cy - 1;
+
+  // Wipe any prop that overlaps (just in case the order changes later).
+  for (let i = libraryProps.length - 1; i >= 0; i--) {
+    const p = libraryProps[i];
+    if (p.tx + p.w <= tx || p.tx >= tx + 2) continue;
+    if (p.ty + p.h <= ty || p.ty >= ty + 2) continue;
+    for (let yy = p.ty; yy < p.ty + p.h; yy++) {
+      for (let xx = p.tx; xx < p.tx + p.w; xx++) {
+        if (map[yy] && map[yy][xx] === T_WALL) map[yy][xx] = T_FLOOR;
+      }
+    }
+    libraryProps.splice(i, 1);
+  }
+
+  // Carve the pedestal as solid wall tiles so it blocks movement.
+  for (let yy = ty; yy < ty + 2; yy++) {
+    for (let xx = tx; xx < tx + 2; xx++) map[yy][xx] = T_WALL;
+  }
+  libraryProps.push({
+    kind: 'tomePedestal',
+    tx, ty, w: 2, h: 2,
+    seed: Math.floor(rng() * 1e9),
+  });
+
+  return {
+    room,
+    pedestal: { tx, ty, w: 2, h: 2 },
+    state: 'idle',         // 'idle' | 'showing' | 'awaiting' | 'failed' | 'success'
+    sequence: [],          // ['up'|'down'|'left'|'right', ...]
+    showIndex: 0,          // step currently flashing during 'showing'
+    showTimer: 0,
+    inputIndex: 0,         // step the player is expected to input next
+    inputTimer: 0,         // soft idle timer in 'awaiting'
+    attempts: 0,           // attempts spent
+    maxAttempts: 3,
+    completed: false,
+    rewardGiven: false,
+    sealedTiles: [],
+    failWaveSpawned: false,
+    flashKey: null,        // last key pressed, for the brief feedback flash
+    flashTimer: 0,
   };
 }
 

@@ -50,7 +50,7 @@ export function createPlayer(x, y) {
  * @param {(e: object, dmg: number, crit: boolean) => void} onEnemyHit
  */
 export function playerUpdate(p, dt, hooks) {
-  const { onStairs, onChest, onEnemyHit, onAltar, onCircle } = hooks;
+  const { onStairs, onChest, onEnemyHit, onAltar, onCircle, onTome } = hooks;
 
   // Movement
   let mx = 0, my = 0;
@@ -133,6 +133,10 @@ export function playerUpdate(p, dt, hooks) {
     }
     // Library summoning circle (Great Library event).
     if (input.keys['KeyE'] && onCircle && onCircle()) {
+      input.keys['KeyE'] = false;
+    }
+    // Library Sala del Gran Tomo (Simon-Says).
+    if (input.keys['KeyE'] && onTome && onTome()) {
       input.keys['KeyE'] = false;
     }
   }

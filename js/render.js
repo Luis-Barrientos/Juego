@@ -778,6 +778,30 @@ function drawLibraryProp(ctx, p) {
   if (p.kind === 'shelf')         drawShelf(ctx, px, py, w, h, p);
   else if (p.kind === 'table')        drawTable(ctx, px, py, w, h, p, false);
   else if (p.kind === 'tableBroken')  drawTable(ctx, px, py, w, h, p, true);
+  else if (p.kind === 'tomePedestal') drawTomePedestal(ctx, px, py, w, h, p);
+}
+
+/**
+ * Tall hexagonal stone pedestal (the giant tome that levitates on top is
+ * rendered as an overlay from grandTome.js so it can bob and glow).
+ */
+function drawTomePedestal(ctx, px, py, w, h, p) {
+  // Base shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(px + 3, py + 4, w - 4, h - 3);
+  // Stone body.
+  ctx.fillStyle = '#5a4a3a';
+  ctx.fillRect(px + 2, py + 2, w - 4, h - 4);
+  // Top slab (lighter).
+  ctx.fillStyle = '#7a6a55';
+  ctx.fillRect(px + 4, py + 4, w - 8, 6);
+  // Carved rune slits.
+  ctx.fillStyle = '#b890ff';
+  ctx.fillRect(px + 8,        py + h / 2 - 1, w - 16, 2);
+  ctx.fillRect(px + w / 2 - 1, py + h / 2 - 6, 2, 12);
+  // Bottom step.
+  ctx.fillStyle = '#3a2c1f';
+  ctx.fillRect(px + 1, py + h - 4, w - 2, 3);
 }
 
 /** Tall bookshelf full of leaning books. Orientation follows p.orient. */

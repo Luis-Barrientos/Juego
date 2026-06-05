@@ -55,6 +55,7 @@ import { save, load }                     from './storage.js';
 import { initChangelogUI }                from './changelog.js';
 import { tryStartChallenge, updateChallenge, resetChallenge, drawAltarPrompt } from './challenge.js';
 import { tryStartLibraryEvent, updateLibraryEvent, resetLibraryEvent, drawCirclePrompt } from './librarySetPiece.js';
+import { tryStartGrandTome, updateGrandTome, resetGrandTome, drawGrandTome, drawTomePrompt } from './grandTome.js';
 
 /* ─────────────────────────── DOM bootstrap ─────────────────────────── */
 const canvas  = document.getElementById('game');
@@ -106,6 +107,7 @@ function startGame() {
   state.sarcophagi  = [];
   state.libraryProps = [];
   state.librarySetPiece = null;
+  state.grandTome    = null;
   state.soulSpawners = [];
   state._whisperTimer = 6;
   state.shake       = 0;
@@ -132,11 +134,13 @@ function buildFloor(floor) {
   state.sarcophagi  = d.sarcophagi  || [];
   state.libraryProps = d.libraryProps || [];
   state.librarySetPiece = d.librarySetPiece || null;
+  state.grandTome       = d.grandTome       || null;
   state.soulSpawners = d.soulSpawners || [];
   state._whisperTimer = 6 + Math.random() * 6;
 
   resetChallenge();
   resetLibraryEvent();
+  resetGrandTome();
 
   const start = d.startRoom;
   if (state.player) {
@@ -299,6 +303,40 @@ function spawnLibraryRewards(room, circle) {
   }
 }
 
+/**
+ * Spawn the Sala del Gran Tomo success rewards: 3 free rare chests
+ * around the pedestal. Free as in `cost = 0` (the puzzle was the price).
+ */
+function spawnGrandTomeRewards(room, pedestal) {
+  const cx = pedestal.tx + Math.floor(pedestal.w / 2);
+  const cy = pedestal.ty + Math.floor(pedestal.h / 2);
+  const slots = [
+    { dx:  0, dy:  3 },
+    { dx: -3, dy:  0 },
+    { dx:  3, dy:  0 },
+    { dx:  0, dy: -3 },
+    { dx: -3, dy:  3 },
+    { dx:  3, dy:  3 },
+  ];
+  let placed = 0;
+  for (const s of slots) {
+    if (placed >= 3) break;
+    const tx = cx + s.dx;
+    const ty = cy + s.dy;
+    if (!state.map[ty] || state.map[ty][tx] !== 1) continue;        // T_FLOOR
+    state.loot.push({
+      type: 'chest', opened: false,
+      rare: true, legendary: false,
+      cost: 0,
+      x: tx * TILE + TILE / 2,
+      y: ty * TILE + TILE / 2,
+      age: 0, r: 12, vx: 0, vy: 0,
+      fromGrandTome: true,
+    });
+    placed++;
+  }
+}
+
 /* ─────────────────────────── Hooks ─────────────────────────── */
 
 const enemyHooks = {
@@ -317,6 +355,7 @@ const playerHooks = {
   onEnemyHit:  (e, dmg, crit) => damageEnemy(e, dmg, crit, { onWin: triggerWin }),
   onAltar:     () => tryStartChallenge(showToast),
   onCircle:    () => tryStartLibraryEvent(showToast),
+  onTome:      () => tryStartGrandTome(showToast),
 };
 
 /* ─────────────────────────── Update / render ─────────────────────────── */
@@ -394,6 +433,7 @@ function update(dt) {
   updateParticles(dt);
   updateChallenge(dt, showToast);
   updateLibraryEvent(dt, showToast, spawnLibraryRewards);
+  updateGrandTome(dt, showToast, spawnGrandTomeRewards);
   updateAmbient(dt);
   updateCamera();
   updateHUD();
@@ -430,8 +470,10 @@ function render() {
   drawPuddles(ctx);
   drawSarcophagiOverlay(ctx);
   drawLibrarySetPiece(ctx);
+  drawGrandTome(ctx);
   drawAltarPrompt(ctx);
   drawCirclePrompt(ctx);
+  drawTomePrompt(ctx);
   drawSunbeams(ctx);
   drawLighting(ctx);
 

@@ -695,6 +695,9 @@ export function populateFloor(floor, maxFloor, spawnChest) {
 
   for (const r of state.rooms) {
     if (r.isStartRoom) continue;
+    // Sala del Gran Tomo: the Simon-Says encounter spawns its own wave on
+    // failure; pre-populating the room would defeat the puzzle.
+    if (r.isGrandTome) continue;
     // Density scales with room area: ~1 enemy per 28 tiles, clamped to a
     // sensible band so tiny rooms still pose a threat and star rooms
     // don't become slaughterhouses.
@@ -721,6 +724,9 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     // for completing the Guardian encounter — skip the generic spawner
     // here so chests don't land on top of the summoning circle.
     if (r.isGreatLibrary) continue;
+    // The Sala del Gran Tomo gives chests on Simon-Says success and
+    // spawns a hostile wave on failure — no random chests on entry.
+    if (r.isGrandTome) continue;
     // Star rooms get two small chests grouped near the centre instead of
     // a single one — feels more rewarding to clear.
     if (r.isLarge) {

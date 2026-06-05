@@ -15,6 +15,18 @@
 
 export const CHANGELOG = [
   {
+    version: '0.7.1',
+    date: '2026-06-05',
+    title: 'La Sala del Gran Tomo',
+    items: [
+      'Una nueva sala puede aparecer en la Biblioteca: un pedestal de piedra con un tomo gigante levitando lleno de runas.',
+      'Acércate y pulsa E: el tomo te muestra una secuencia de flechas. Repítela con las teclas WASD o las flechas del teclado.',
+      'Tienes tres intentos. Si la aciertas, lluvia de tres cofres morados. Si fallas todo, el tomo se enfurece y desata una oleada que tendrás que limpiar.',
+      'La Gran Biblioteca es ahora realmente grande: pasillos de estanterías formando hileras alrededor del círculo del Guardián.',
+      'El Guardián ya no se rinde tan fácil: más vida, más daño, y al bajar de la mitad de su HP se enfurece, lanza abanicos más anchos de runas y manda ondas expansivas a su alrededor.',
+    ],
+  },
+  {
     version: '0.7.0',
     date: '2026-06-05',
     title: 'El Guardián de la Biblioteca',
