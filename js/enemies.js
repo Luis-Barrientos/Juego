@@ -140,6 +140,8 @@ export function spawnGuardianAt(x, y, floor) {
   e.fromLibrary = true;
   e.runeCool    = ENEMY_TYPES.guardian.runeCool;
   e.novaCool    = ENEMY_TYPES.guardian.novaCool;
+  e.slamTel     = 0;
+  e.slamFlash   = 0;
   state.enemies.push(e);
   spawnParticles(x, y, '#b890ff', 36);
   return e;
@@ -312,14 +314,56 @@ export function enemyUpdate(e, dt, hooks) {
       }
     }
     if (d > e.range + p.r) {
+      // Cancel any windup if the player escapes range.
+      e.slamTel = 0;
       const sp = enraged ? e.speed * 1.15 : e.speed;
       tryMove(state.map, e, (dx / d) * sp * dt, (dy / d) * sp * dt);
       if (e.state !== 'attack') e.state = 'chase';
     } else {
       e.state = 'attack';
-      if (e.attackCool <= 0) {
-        e.attackCool = e.attackRate;
-        hooks.onPlayerHit(e.dmg, e);
+      // Telegraphed slam: when ready, raise arms for SLAM_TEL seconds and
+      // then strike. Damage + camera shake + visual ring + particles fire
+      // on impact. The flash window keeps the arms-down pose visible for
+      // a few frames so the player understands what hit them.
+      const SLAM_TEL = 0.45;
+      const SLAM_FLASH = 0.18;
+      e.slamFlash = Math.max(0, (e.slamFlash || 0) - dt);
+      if (e.slamTel > 0) {
+        e.slamTel -= dt;
+        if (e.slamTel <= 0) {
+          // Impact frame.
+          e.slamTel = 0;
+          e.slamFlash = SLAM_FLASH;
+          // Damage only if the player is still in melee range at impact.
+          const dx2 = state.player.x - e.x;
+          const dy2 = state.player.y - e.y;
+          const d2  = Math.hypot(dx2, dy2);
+          if (d2 < e.range + state.player.r + 4) {
+            hooks.onPlayerHit(e.dmg, e);
+          }
+          // Visual + audio feedback.
+          state.shake = Math.max(state.shake || 0, enraged ? 9 : 6);
+          for (let i = 0; i < 14; i++) {
+            spawnParticles(
+              e.x + (Math.random() - 0.5) * 28,
+              e.y + 10 + (Math.random() - 0.5) * 6,
+              '#3a2c4a', 1,
+            );
+          }
+          // Expanding rune ring (rendered as a short-lived particle).
+          state.particles.push({
+            kind: 'guardianSlam',
+            x: e.x, y: e.y + 8,
+            life: 0.35, maxLife: 0.35,
+            r: 6, maxR: enraged ? 64 : 52,
+            color: 'rgba(184,144,255,0.85)',
+          });
+          Audio.bossHit && Audio.bossHit();
+          e.attackCool = e.attackRate;
+        }
+      } else if (e.attackCool <= 0) {
+        // Begin a new slam windup.
+        e.slamTel = SLAM_TEL;
       }
     }
   } else if (e.behavior === 'ranged') {
@@ -573,6 +617,38 @@ export function drawEnemy(ctx, e) {
     ctx.fillStyle = flash ? '#fff' : '#4a4a54';
     ctx.fillRect(x - 18, y - 10 + bob - sinkY * 0.4, 6, 10);
     ctx.fillRect(x + 12, y - 10 + bob - sinkY * 0.4, 6, 10);
+    // Arms — animate slam telegraph (arms raised, purple glow building)
+    // and post-impact (arms slammed down past the body). Default pose:
+    // arms hanging at the sides next to the shoulders.
+    const tel    = e.slamTel   || 0;
+    const flashT = e.slamFlash || 0;
+    const SLAM_TEL = 0.45;
+    let armUp = 0;        // 0..1 raise factor
+    let armDn = 0;        // 0..1 slam-down factor
+    if (tel > 0) {
+      // Windup: armUp eases from 0 → 1 as tel decreases from SLAM_TEL → 0.
+      armUp = 1 - (tel / SLAM_TEL);
+    } else if (flashT > 0) {
+      // Impact: arms held at slammed-down pose, decaying back.
+      armDn = flashT / 0.18;
+    }
+    const armBaseY = y - 6 + bob - sinkY * 0.4;
+    const armRaise = armUp * 22;         // pixels up during windup
+    const armDrop  = armDn * 14;         // pixels down on impact
+    ctx.fillStyle = flash ? '#fff' : '#4a4a54';
+    // Left arm.
+    ctx.fillRect(x - 22, armBaseY - armRaise + armDrop, 6, 14);
+    // Right arm.
+    ctx.fillRect(x + 16, armBaseY - armRaise + armDrop, 6, 14);
+    // Fists glow brighter during windup.
+    if (armUp > 0.15) {
+      const g = 0.4 + 0.6 * armUp;
+      ctx.fillStyle = `rgba(184,144,255,${g})`;
+      ctx.shadowColor = '#e0c0ff'; ctx.shadowBlur = 14;
+      ctx.fillRect(x - 23, armBaseY - armRaise - 4, 8, 6);
+      ctx.fillRect(x + 15, armBaseY - armRaise - 4, 8, 6);
+    }
+    ctx.shadowColor = e.glow; ctx.shadowBlur = 22;
     // Head (smaller stone block).
     ctx.fillStyle = flash ? '#fff' : '#6a6a74';
     ctx.fillRect(x - 7, y - 22 + bob - sinkY * 0.5, 14, 10);
@@ -590,7 +666,14 @@ export function drawEnemy(ctx, e) {
       ctx.fillRect(x - 1, y - 8  + bob - sinkY * 0.4, 2, 4);
       ctx.fillRect(x + 4, y - 5  + bob - sinkY * 0.4, 2, 6);
       ctx.fillRect(x - 4, y - 1  + bob - sinkY * 0.4, 8, 2);
-      // Eye slit on the head.
+      // Eye slit on the head — flashes red during slam windup as a tell.
+      const eyeColor = armUp > 0.2 ? `rgba(255,${Math.round(200 - armUp * 200)},${Math.round(200 - armUp * 200)},1)` : null;
+      if (eyeColor) {
+        ctx.fillStyle = eyeColor;
+        ctx.shadowColor = '#ff8080'; ctx.shadowBlur = 10;
+      } else {
+        ctx.fillStyle = `rgba(184,144,255,${pulse})`;
+      }
       ctx.fillRect(x - 5, y - 19 + bob - sinkY * 0.5, 10, 1.5);
     }
     // Stone dust while emerging.

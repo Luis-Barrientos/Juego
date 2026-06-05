@@ -68,6 +68,10 @@ export function updateParticles(dt) {
       // Souls drift slowly upward without friction and wobble side-to-side.
       p.phase = (p.phase || 0) + dt;
       p.x += Math.sin(p.phase * 2.2 + (p.seed || 0)) * 8 * dt;
+    } else if (p.kind === 'guardianSlam') {
+      // Expanding shockwave ring: radius grows from r to maxR over life.
+      const t = 1 - (p.life / p.maxLife);
+      p.r = 6 + (p.maxR - 6) * t;
     } else {
       p.vx *= 0.92;
       p.vy *= 0.92;
@@ -104,6 +108,21 @@ export function drawParticles(ctx) {
       ctx.beginPath();
       ctx.arc(x, y, p.r * a, 0, Math.PI * 2);
       ctx.fill();
+      ctx.restore();
+      continue;
+    }
+    if (p.kind === 'guardianSlam') {
+      // Expanding rune ring: bright stroke that fades as it grows.
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#e0c0ff';
+      ctx.shadowBlur  = 12;
+      ctx.beginPath();
+      ctx.arc(x, y, p.r, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
       continue;
     }
