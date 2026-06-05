@@ -907,3 +907,19 @@ body.overlay-active #toast { display: none; }
   border-radius: 3px;
 }
 .dp-room:hover { background: rgba(120, 80, 200, 0.35); border-color: #6a4a90; }
+
+#debugOpener {
+  position: fixed; top: 16px; right: 16px;
+  background: rgba(60, 40, 90, 0.85);
+  border: 1px solid #6a4a90;
+  color: #d6d4e8;
+  font: bold 12px 'Trebuchet MS', sans-serif;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  z-index: 9998;
+  opacity: 0.55;
+  transition: opacity 0.2s;
+}
+#debugOpener:hover { opacity: 1; }

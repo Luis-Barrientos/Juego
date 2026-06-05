@@ -61,7 +61,9 @@ export function initDebugPanel(hooks) {
   if (!isDebugEnabled()) return;
   buildFloorFn = hooks.buildFloor;
   document.addEventListener('keydown', e => {
-    if (e.code === 'F2') {
+    // Backquote (`) is the classic debug-console key and doesn't clash
+    // with any in-game binding; F2 was being swallowed by some browsers.
+    if (e.code === 'Backquote') {
       e.preventDefault();
       toggle();
     }
@@ -69,6 +71,15 @@ export function initDebugPanel(hooks) {
   // Pre-create the panel element so the first toggle is instant.
   panelEl = createPanelDom();
   document.body.appendChild(panelEl);
+  // Floating opener button so the panel is always reachable even if the
+  // keyboard shortcut is intercepted by the browser.
+  const opener = document.createElement('button');
+  opener.id = 'debugOpener';
+  opener.type = 'button';
+  opener.textContent = 'Debug';
+  opener.title = 'Abrir panel de debug (`)';
+  opener.addEventListener('click', toggle);
+  document.body.appendChild(opener);
   // Default: start with the current floor expanded.
   expanded.add(1);
 }
@@ -100,7 +111,7 @@ function createPanelDom() {
   root.className = 'hidden';
   root.innerHTML = `
     <div class="dp-header">
-      <span>Debug · Teletransporte (F2)</span>
+      <span>Debug · Teletransporte (`)</span>
       <button class="dp-close" type="button" aria-label="Cerrar">×</button>
     </div>
     <div class="dp-body"></div>
