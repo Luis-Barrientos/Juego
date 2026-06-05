@@ -2674,100 +2674,14 @@ export function drawSunbeams(ctx) {
 }
 
 /**
- * Deep-space floor tint for the Observatorio. The lore is that the four
- * corner obelisks project a precise replica of the night sky across the
- * entire chamber, so the regular library cobbles are completely hidden
- * underneath a cosmic backdrop.
+ * Atmospheric fog drifting ABOVE the Observatorio. Replaces the previous
+ * opaque cosmic floor: the regular library cobbles stay visible, and a
+ * mystical haze hovers on top with twinkling stars and slow nebula wisps.
  *
- * Call this RIGHT AFTER drawMap and BEFORE entities, so the player,
- * telescope, ring and obelisks all sit on top of the cosmos instead of
- * being darkened by it.
+ * Painted as a single top-layer pass (after lighting) so it reads as a
+ * mist suspended in the room, not as a solid background to be overdrawn.
  */
-export function drawObservatoryFloor(ctx) {
-  const room = state.observatoryRoom;
-  if (!room) return;
-  const rx = room.x * TILE - state.cameraX;
-  const ry = room.y * TILE - state.cameraY;
-  const rw = room.w * TILE;
-  const rh = room.h * TILE;
-  if (rx + rw < 0 || rx > VIEW_W || ry + rh < 0 || ry > VIEW_H) return;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(rx, ry, rw, rh);
-  ctx.clip();
-
-  // 1. Solid deep-space base. Opaque enough to fully erase the floor
-  //    cobbles underneath.
-  ctx.fillStyle = '#08061a';
-  ctx.fillRect(rx, ry, rw, rh);
-
-  // 2. Soft radial nebula gradient — slightly lighter toward the centre
-  //    so the room doesn't feel flat. Vignettes back to near-black at
-  //    the walls.
-  const ccx = rx + rw / 2;
-  const ccy = ry + rh / 2;
-  const grd = ctx.createRadialGradient(ccx, ccy, 0, ccx, ccy, Math.max(rw, rh) * 0.55);
-  grd.addColorStop(0,    'rgba(40, 28, 78, 0.65)');
-  grd.addColorStop(0.55, 'rgba(20, 14, 48, 0.35)');
-  grd.addColorStop(1,    'rgba(4, 2, 12, 0.0)');
-  ctx.fillStyle = grd;
-  ctx.fillRect(rx, ry, rw, rh);
-
-  // 3. Two subtle nebula wisps in additive mode — gives the cosmos a
-  //    painted, "Hubble photo" quality without being noisy.
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  // Pinkish wisp upper-left of centre.
-  const nebA = ctx.createRadialGradient(
-    ccx - rw * 0.22, ccy - rh * 0.18, 0,
-    ccx - rw * 0.22, ccy - rh * 0.18, Math.max(rw, rh) * 0.45,
-  );
-  nebA.addColorStop(0,   'rgba(180, 80, 160, 0.18)');
-  nebA.addColorStop(0.6, 'rgba(120, 50, 140, 0.06)');
-  nebA.addColorStop(1,   'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = nebA;
-  ctx.fillRect(rx, ry, rw, rh);
-  // Bluish wisp lower-right.
-  const nebB = ctx.createRadialGradient(
-    ccx + rw * 0.20, ccy + rh * 0.22, 0,
-    ccx + rw * 0.20, ccy + rh * 0.22, Math.max(rw, rh) * 0.50,
-  );
-  nebB.addColorStop(0,   'rgba(60, 100, 220, 0.18)');
-  nebB.addColorStop(0.6, 'rgba(40, 80, 180, 0.06)');
-  nebB.addColorStop(1,   'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = nebB;
-  ctx.fillRect(rx, ry, rw, rh);
-  ctx.restore();
-
-  ctx.restore();
-
-  // 4. The cosmos overlay above just painted over the constellation ring,
-  //    telescope and obelisks (all baked into the map cache). Re-paint
-  //    those props on top so they stay visible against the night sky.
-  //    Cheap: only 6 elements (1 ring + 1 telescope + 4 obelisks).
-  if (state.libraryProps && state.libraryProps.length > 0) {
-    ctx.save();
-    ctx.translate(-state.cameraX, -state.cameraY);
-    for (const p of state.libraryProps) {
-      if (p.tx + p.w <= room.x || p.tx >= room.x + room.w) continue;
-      if (p.ty + p.h <= room.y || p.ty >= room.y + room.h) continue;
-      drawLibraryProp(ctx, p);
-    }
-    ctx.restore();
-  }
-}
-
-/**
- * Top-down starlight overlay for the Observatorio. Painted INSIDE the
- * room footprint as a sprinkling of twinkling stars — the actual cosmic
- * backdrop is laid down earlier by drawObservatoryFloor; this pass just
- * adds the live, sparkling layer above props and entities.
- *
- * Call AFTER drawSunbeams and BEFORE drawLighting so the lighting pass
- * still tints it.
- */
-export function drawObservatoryStars(ctx) {
+export function drawObservatoryFog(ctx) {
   const room = state.observatoryRoom;
   if (!room) return;
   const rx = room.x * TILE - state.cameraX;
@@ -2782,27 +2696,53 @@ export function drawObservatoryStars(ctx) {
   ctx.beginPath();
   ctx.rect(rx, ry, rw, rh);
   ctx.clip();
-  ctx.globalCompositeOperation = 'lighter';
 
-  // Deterministic stars seeded by the room corner so the layout stays
-  // stable across frames but unique per spawn.
-  const STARS = 72;
+  // 1. Soft semi-transparent veil — slightly darker toward the centre and
+  //    fading at the edges so the room's perimeter still reads clearly.
+  const ccx = rx + rw / 2;
+  const ccy = ry + rh / 2;
+  const veil = ctx.createRadialGradient(ccx, ccy, 0, ccx, ccy, Math.max(rw, rh) * 0.65);
+  veil.addColorStop(0,    'rgba(20, 18, 50, 0.34)');
+  veil.addColorStop(0.55, 'rgba(16, 14, 40, 0.22)');
+  veil.addColorStop(1,    'rgba(8, 6, 22, 0.00)');
+  ctx.fillStyle = veil;
+  ctx.fillRect(rx, ry, rw, rh);
+
+  // 2. Two slow-drifting nebula wisps (additive). Their offsets pulse with
+  //    time so the fog never feels static.
+  ctx.globalCompositeOperation = 'lighter';
+  const driftA = Math.sin(t * 0.13) * rw * 0.06;
+  const driftB = Math.cos(t * 0.10) * rh * 0.05;
+
+  const nebA = ctx.createRadialGradient(
+    ccx - rw * 0.20 + driftA, ccy - rh * 0.16, 0,
+    ccx - rw * 0.20 + driftA, ccy - rh * 0.16, Math.max(rw, rh) * 0.45,
+  );
+  nebA.addColorStop(0,   'rgba(150, 90, 200, 0.16)');
+  nebA.addColorStop(0.6, 'rgba(110, 60, 170, 0.05)');
+  nebA.addColorStop(1,   'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = nebA;
+  ctx.fillRect(rx, ry, rw, rh);
+
+  const nebB = ctx.createRadialGradient(
+    ccx + rw * 0.18, ccy + rh * 0.20 + driftB, 0,
+    ccx + rw * 0.18, ccy + rh * 0.20 + driftB, Math.max(rw, rh) * 0.50,
+  );
+  nebB.addColorStop(0,   'rgba(70, 110, 220, 0.16)');
+  nebB.addColorStop(0.6, 'rgba(40, 80, 180, 0.05)');
+  nebB.addColorStop(1,   'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = nebB;
+  ctx.fillRect(rx, ry, rw, rh);
+
+  // 3. Twinkling star field suspended in the haze. Deterministic per-room
+  //    so positions stay stable across frames.
+  const STARS = 56;
   let s = ((room.x * 73856093) ^ (room.y * 19349663)) >>> 0;
   const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-
-  // Palette: mostly cool white, a few warm/pink and blue accents for
-  // variety. Mirrors how a real star field looks (different spectral
-  // classes).
   const PALETTE = [
-    [220, 235, 255], // cool white (majority)
-    [220, 235, 255],
-    [220, 235, 255],
-    [220, 235, 255],
-    [255, 235, 215], // warm yellowish
-    [255, 200, 200], // pinkish
-    [180, 210, 255], // pale blue
+    [220, 235, 255], [220, 235, 255], [220, 235, 255], [220, 235, 255],
+    [255, 235, 215], [255, 200, 200], [180, 210, 255],
   ];
-
   for (let i = 0; i < STARS; i++) {
     const ux = rnd();
     const uy = rnd();
@@ -2812,25 +2752,18 @@ export function drawObservatoryStars(ctx) {
     const col = PALETTE[Math.floor(rnd() * PALETTE.length)];
     const x  = rx + ux * rw;
     const y  = ry + uy * rh;
-    // Twinkle: alpha modulated by a slow sine.
-    const a  = 0.35 + 0.55 * (Math.sin(t * sp + ph) * 0.5 + 0.5);
+    const a  = 0.30 + 0.55 * (Math.sin(t * sp + ph) * 0.5 + 0.5);
+    if (sz > 1.1) {
+      const halo = ctx.createRadialGradient(x, y, 0, x, y, sz * 4);
+      halo.addColorStop(0, `rgba(${col[0]}, ${col[1]}, ${col[2]}, ${a * 0.45})`);
+      halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(x, y, sz * 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.fillStyle = `rgba(${col[0]}, ${col[1]}, ${col[2]}, ${a})`;
     ctx.fillRect(x - sz * 0.5, y - sz * 0.5, sz, sz);
-    // Brighter stars (~1 in 7) get a soft halo and diffraction spikes
-    // for that "real starfield" feel.
-    if (i % 7 === 0 && sz > 1.0) {
-      ctx.fillStyle = `rgba(${col[0]}, ${col[1]}, ${col[2]}, ${a * 0.25})`;
-      ctx.beginPath();
-      ctx.arc(x, y, sz * 2.6, 0, Math.PI * 2);
-      ctx.fill();
-      // Cross-shaped diffraction spikes (very thin).
-      ctx.strokeStyle = `rgba(${col[0]}, ${col[1]}, ${col[2]}, ${a * 0.55})`;
-      ctx.lineWidth = 0.6;
-      ctx.beginPath();
-      ctx.moveTo(x - sz * 2.2, y); ctx.lineTo(x + sz * 2.2, y);
-      ctx.moveTo(x, y - sz * 2.2); ctx.lineTo(x, y + sz * 2.2);
-      ctx.stroke();
-    }
   }
 
   ctx.restore();
