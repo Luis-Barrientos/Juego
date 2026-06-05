@@ -783,12 +783,21 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     if (r.isGrandTome) continue;
     // Observatorio: pacific buff room, no hostile spawns.
     if (r.isObservatory) continue;
+    // Archivo Prohibido: sealed vault; the only thing inside is the
+    // legendary chest. Populating with enemies would let them block the
+    // chest and confuse the room's purpose.
+    if (r.isForbiddenArchive) continue;
     // Density scales with room area: ~1 enemy per 28 tiles, clamped to a
     // sensible band so tiny rooms still pose a threat and star rooms
     // don't become slaughterhouses.
     const area = r.w * r.h;
     const base = Math.ceil(area / 28);
-    const n    = Math.max(2, Math.min(4 + floor, base + irand(0, 1 + Math.floor(floor / 2))));
+    let n      = Math.max(2, Math.min(4 + floor, base + irand(0, 1 + Math.floor(floor / 2))));
+    // Sala de la Llave: extra mobs so the kill-all puzzle feels like a
+    // real arena rather than a normal room. Tagged so the puzzle can
+    // detect when every challenger is down and drop the rune key.
+    const isKeyRoom = !!r.isKeyRoom;
+    if (isKeyRoom) n += 3;
     for (let i = 0; i < n; i++) {
       let ex, ey, safety = 12;
       do {
@@ -799,6 +808,7 @@ export function populateFloor(floor, maxFloor, spawnChest) {
       if (safety <= 0) continue;
       const e = createEnemy(choice(pool), ex, ey, floor);
       e.room = r;
+      if (isKeyRoom) e.fromKeyRoom = true;
       state.enemies.push(e);
       r.enemies.push(e);
     }
@@ -814,6 +824,11 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     if (r.isGrandTome) continue;
     // Observatorio: the buff is the reward, no chests inside.
     if (r.isObservatory) continue;
+    // Sala de la Llave: the rune key is the only reward, dropped on
+    // wave clear. No generic chests or it would dilute the goal.
+    if (r.isKeyRoom) continue;
+    // Archivo Prohibido: hand-placed legendary chest below.
+    if (r.isForbiddenArchive) continue;
     // Star rooms get two small chests grouped near the centre instead of
     // a single one — feels more rewarding to clear.
     if (r.isLarge) {
@@ -828,10 +843,28 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     }
   }
 
+  // Archivo Prohibido: hand-place a legendary chest at the room centre
+  // (free, since the player paid by clearing the Sala de la Llave). The
+  // chest is tagged so the locked-door state never resets it.
+  for (const r of state.rooms) {
+    if (!r.isForbiddenArchive) continue;
+    state.loot.push({
+      type: 'chest', opened: false,
+      rare: false, legendary: true,
+      cost: 0,
+      x: r.cx * TILE + TILE / 2,
+      y: r.cy * TILE + TILE / 2,
+      age: 0, r: 12, vx: 0, vy: 0,
+      fromArchive: true,
+    });
+  }
+
   // Breakable props scattered through non-start rooms.
   for (const r of state.rooms) {
     if (r.isStartRoom) continue;
     if (r.isObservatory) continue;
+    if (r.isKeyRoom) continue;          // arena must stay clear
+    if (r.isForbiddenArchive) continue; // sealed vault, no clutter
     placeProps(r, floor);
   }
 }

@@ -8,7 +8,7 @@
 
 import { state } from './state.js';
 import {
-  TILE, MAP_W, MAP_H, VIEW_W, VIEW_H, T_FLOOR, T_STAIR,
+  TILE, MAP_W, MAP_H, VIEW_W, VIEW_H, T_FLOOR, T_STAIR, T_DOOR_LOCKED,
 } from './config.js';
 import { mulberry32 } from './utils.js';
 
@@ -46,6 +46,9 @@ export function rebuildMapCache() {
         if (decorRng() < biome.decorChance) {
           drawDecoration(ctx, px, py, biome, decorRng);
         }
+      } else if (t === T_DOOR_LOCKED) {
+        drawFloorTile(ctx, px, py, x, y, biome);
+        drawLockedDoor(ctx, px, py);
       } else {
         drawWallTile(ctx, px, py, x, y, biome);
       }
@@ -774,6 +777,11 @@ function drawLibraryProp(ctx, p) {
   if (p.kind === 'tomeBookPile') { drawTomeBookPile(ctx, px, py, w, h, p); return; }
   if (p.kind === 'libraryRuneMark') { drawLibraryRuneMark(ctx, px, py, w, h, p); return; }
   if (p.kind === 'constellationRing') { drawConstellationRing(ctx, px, py, w, h, p); return; }
+  // Key dais and archive pedestal are floor decorations — same early
+  // return as the constellation ring so the underlying floor texture
+  // shows around the round shape.
+  if (p.kind === 'keyDais')          { drawKeyDais(ctx, px, py, w, h, p);          return; }
+  if (p.kind === 'archivePedestal')  { drawArchivePedestal(ctx, px, py, w, h, p);  return; }
   // Telescope sits on top of the constellation ring — skip the square
   // floor patch so the round ring (and the fog overlay) show through the
   // corners of the 3×3 footprint instead of being punched out.
@@ -1385,6 +1393,130 @@ function drawStarObelisk(ctx, px, py, w, h, p) {
   ctx.beginPath();
   ctx.arc(gemX - 0.6, gemY - 0.8, gemR * 0.45, 0, Math.PI * 2);
   ctx.fill();
+}
+
+/**
+ * Floor dais painted at the centre of the Sala de la Llave. Concentric
+ * rune circles in cool blue, with a small lock glyph at the centre.
+ * Walkable — drawn into the map cache so it doesn't redraw every frame.
+ */
+function drawKeyDais(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  const r0 = Math.min(w, h) * 0.46;
+  const r1 = r0 * 0.72;
+  const r2 = r0 * 0.42;
+  // Outer dim ring.
+  ctx.strokeStyle = 'rgba(150, 190, 240, 0.55)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(cx, cy, r0, 0, Math.PI * 2); ctx.stroke();
+  // Mid bright ring.
+  ctx.strokeStyle = 'rgba(180, 220, 255, 0.85)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(cx, cy, r1, 0, Math.PI * 2); ctx.stroke();
+  // Inner ring.
+  ctx.strokeStyle = 'rgba(220, 240, 255, 0.7)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, r2, 0, Math.PI * 2); ctx.stroke();
+  // Eight tick marks between mid and outer ring.
+  ctx.strokeStyle = 'rgba(200, 230, 255, 0.55)';
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4;
+    const x0 = cx + Math.cos(a) * r1;
+    const y0 = cy + Math.sin(a) * r1;
+    const x1 = cx + Math.cos(a) * r0;
+    const y1 = cy + Math.sin(a) * r0;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  }
+  // Centre keyhole glyph.
+  ctx.fillStyle = 'rgba(220, 240, 255, 0.85)';
+  ctx.beginPath(); ctx.arc(cx, cy - 2, 2.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillRect(cx - 0.8, cy - 1, 1.6, 5);
+}
+
+/**
+ * Floor pedestal painted under the Archivo Prohibido legendary chest.
+ * A square stone slab with a warm orange rune ring around it.
+ */
+function drawArchivePedestal(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  const size = Math.min(w, h) * 0.78;
+
+  // Stone slab.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(cx - size / 2 + 1, cy - size / 2 + 1, size, size);
+  const grad = ctx.createLinearGradient(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2);
+  grad.addColorStop(0, '#4a4030');
+  grad.addColorStop(1, '#2a2418');
+  ctx.fillStyle = grad;
+  ctx.fillRect(cx - size / 2, cy - size / 2, size, size);
+  ctx.fillStyle = 'rgba(255, 200, 130, 0.18)';
+  ctx.fillRect(cx - size / 2, cy - size / 2, size, 2);
+
+  // Rune ring around the slab — warm orange.
+  ctx.strokeStyle = 'rgba(255, 180, 90, 0.7)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(cx, cy, size * 0.78, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255, 220, 150, 0.45)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, size * 0.95, 0, Math.PI * 2); ctx.stroke();
+}
+
+/**
+ * Paint a rune-locked door on a corridor tile. Iron-bound oak panel with
+ * a glowing rune lock in the centre. Drawn into the map cache, so the
+ * "glow" here is static — the live pulse hint is drawn per-frame in
+ * keyRoom.js (drawArchiveDoorPrompt).
+ */
+function drawLockedDoor(ctx, px, py) {
+  // Slightly inset frame so the corridor floor texture frames the door.
+  const x = px + 2;
+  const y = py + 2;
+  const w = TILE - 4;
+  const h = TILE - 4;
+
+  // Iron studs strip across top and bottom.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(px, py, TILE, TILE);
+
+  // Oak panel.
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, '#5a3818');
+  grad.addColorStop(1, '#2a1808');
+  ctx.fillStyle = grad;
+  ctx.fillRect(x, y, w, h);
+
+  // Plank divides.
+  ctx.fillStyle = '#1a0e04';
+  ctx.fillRect(x + w / 2 - 1, y, 2, h);
+  // Iron bands.
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(x, y + 4, w, 3);
+  ctx.fillRect(x, y + h - 7, w, 3);
+  // Rivets.
+  ctx.fillStyle = '#3a3a3a';
+  for (const ry of [y + 5.5, y + h - 5.5]) {
+    for (let i = 0; i < 4; i++) {
+      const rx = x + 3 + i * (w / 4);
+      ctx.fillRect(rx - 1, ry - 1, 2, 2);
+    }
+  }
+
+  // Rune lock circle in the centre — glowing orange.
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  ctx.strokeStyle = 'rgba(255, 180, 80, 0.95)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255, 220, 130, 0.85)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2); ctx.stroke();
+  // Cross inside the rune.
+  ctx.fillStyle = 'rgba(255, 230, 160, 0.95)';
+  ctx.fillRect(cx - 0.6, cy - 4, 1.2, 8);
+  ctx.fillRect(cx - 4, cy - 0.6, 8, 1.2);
 }
 
 /** Tall bookshelf full of leaning books. Orientation follows p.orient. */
@@ -2846,6 +2978,10 @@ export function drawMinimap(mctx, w, h) {
         mctx.fillStyle = `rgba(200,120,255,${pulse})`;
         mctx.fillRect(x * sx - 2, y * sy - 2, sx + 4, sy + 4);
         mctx.fillStyle = '#fff';
+        mctx.fillRect(x * sx, y * sy, sx + 0.5, sy + 0.5);
+      } else if (t === T_DOOR_LOCKED) {
+        const pulse = 0.7 + Math.sin(state.time * 3) * 0.3;
+        mctx.fillStyle = `rgba(255,180,80,${pulse})`;
         mctx.fillRect(x * sx, y * sy, sx + 0.5, sy + 0.5);
       }
     }

@@ -25,6 +25,8 @@ export const T_WALL  = 0;
 export const T_FLOOR = 1;
 export const T_DOOR  = 2;
 export const T_STAIR = 3;
+/** Sealed rune door blocking the Archivo Prohibido until the key is picked up. */
+export const T_DOOR_LOCKED = 4;
 
 // ── High-level game states ────────────────────────────────────
 export const STATE_MENU    = 'menu';

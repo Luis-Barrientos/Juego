@@ -46,6 +46,11 @@ export function updateLoot(dt, toast) {
         p.mp = Math.min(p.maxMp, p.mp + 25);
         toast('+25 MP');
         Audio.pickup();
+      } else if (l.type === 'key') {
+        state.hasArchiveKey = true;
+        toast('Llave rúnica obtenida');
+        Audio.upgrade && Audio.upgrade();
+        spawnParticles(l.x, l.y, '#ffd040', 22);
       }
       state.loot.splice(i, 1);
     }
@@ -83,6 +88,8 @@ export function drawLoot(ctx) {
       drawChest(ctx, l, x, y);
     } else if (l.type === 'prop') {
       drawProp(ctx, l, x, y);
+    } else if (l.type === 'key') {
+      drawRuneKey(ctx, l, x, y);
     }
     ctx.restore();
   }
@@ -478,6 +485,50 @@ export function breakProp(prop) {
   prop._dead = true;
   const idx = state.loot.indexOf(prop);
   if (idx >= 0) state.loot.splice(idx, 1);
+}
+
+/**
+ * Draw the rune key dropped by the Sala de la Llave. Glowing brass key
+ * with a small rune at the bow; bobs and pulses to read as "important".
+ * @private
+ */
+function drawRuneKey(ctx, l, x, y) {
+  const bob   = Math.sin(l.age * 3) * 2;
+  const pulse = 0.6 + 0.4 * Math.sin(l.age * 5);
+  const cy    = y + bob;
+
+  // Halo.
+  const halo = ctx.createRadialGradient(x, cy, 2, x, cy, 28);
+  halo.addColorStop(0, `rgba(255,210,90,${0.55 * pulse})`);
+  halo.addColorStop(1, 'rgba(255,210,90,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(x, cy, 28, 0, Math.PI * 2); ctx.fill();
+
+  ctx.save();
+  ctx.translate(x, cy);
+  ctx.rotate(Math.sin(l.age * 1.8) * 0.18);
+  ctx.shadowColor = 'rgba(255,210,90,0.9)';
+  ctx.shadowBlur  = 10;
+
+  // Shaft.
+  ctx.fillStyle = '#d8a040';
+  ctx.fillRect(-1.5, -1, 14, 3);
+  // Teeth.
+  ctx.fillRect(8,  2, 2, 3);
+  ctx.fillRect(11, 2, 2, 4);
+  // Bow (ring at the back).
+  ctx.beginPath();
+  ctx.arc(-4, 0, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#e8b850';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(-4, 0, 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#5a3010';
+  ctx.fill();
+  // Rune dot on the bow.
+  ctx.fillStyle = `rgba(255,255,210,${pulse})`;
+  ctx.fillRect(-5, -0.8, 2, 1.5);
+  ctx.restore();
 }
 
 /**

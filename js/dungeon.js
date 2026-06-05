@@ -8,7 +8,7 @@
  */
 
 import {
-  TILE, MAP_W, MAP_H, T_WALL, T_FLOOR, T_STAIR, MAX_FLOOR,
+  TILE, MAP_W, MAP_H, T_WALL, T_FLOOR, T_STAIR, T_DOOR_LOCKED, MAX_FLOOR,
 } from './config.js';
 import { mulberry32 } from './utils.js';
 
@@ -80,6 +80,8 @@ export function generateDungeon(floor, seed, biome) {
   let greatLibraryRoom = null;
   let grandTomeRoom    = null;
   let observatoryRoom  = null;
+  let keyRoomRoom      = null;
+  let archiveRoom      = null;
   const bspRoots = [];
 
   // Debug overrides: when the F2 panel teleports to a set-piece on a
@@ -89,6 +91,7 @@ export function generateDungeon(floor, seed, biome) {
   const forceGrandTome   = !!FORCE.grandTome;
   const forceObservatory = !!FORCE.observatory;
   const forceGreatLib    = !!FORCE.greatLibrary;
+  const forceKeyPair     = !!FORCE.keyRoom || !!FORCE.archive;
 
   // Sala del Gran Tomo first: it's smaller (11×9) and easier to fit, so
   // reserving it before the Great Library guarantees it never gets
@@ -119,6 +122,49 @@ export function generateDungeon(floor, seed, biome) {
     }
   }
 
+  // Sala de la Llave + Archivo Prohibido: coupled pair. The key room
+  // hosts a kill-all puzzle that drops a rune key; the archive sits
+  // behind a locked door and rewards the player with a free legendary
+  // chest. Both must fit or neither spawns — a lone archive is unfair
+  // (no way to open it) and a lone key room is pointless.
+  if (isLibraryBiome && (forceKeyPair || rng() < 0.55)) {
+    const sourcesK = bspRoots.length ? bspRoots : [{ x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2 }];
+    const resKey = reserveInStrips(map, rng, 9, 8, 2, sourcesK);
+    if (resKey) {
+      // Provisionally update the strip list so the archive search sees
+      // the leftover space around the key room.
+      const ki = bspRoots.indexOf(resKey.consumedStrip);
+      if (ki >= 0) bspRoots.splice(ki, 1, ...resKey.strips);
+      else         bspRoots.push(...resKey.strips);
+
+      const sourcesA = bspRoots.length ? bspRoots : [{ x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2 }];
+      const resArch  = reserveInStrips(map, rng, 7, 6, 2, sourcesA);
+      if (resArch) {
+        resKey.room.isKeyRoom = true;
+        rooms.push(resKey.room);
+        keyRoomRoom = resKey.room;
+        resArch.room.isForbiddenArchive = true;
+        rooms.push(resArch.room);
+        archiveRoom = resArch.room;
+        const ai = bspRoots.indexOf(resArch.consumedStrip);
+        if (ai >= 0) bspRoots.splice(ai, 1, ...resArch.strips);
+        else         bspRoots.push(...resArch.strips);
+      } else {
+        // Roll back the key room: repaint walls and restore the strip
+        // list to the state before we tried to reserve it.
+        for (let y = resKey.room.y; y < resKey.room.y + resKey.room.h; y++) {
+          for (let x = resKey.room.x; x < resKey.room.x + resKey.room.w; x++) {
+            map[y][x] = T_WALL;
+          }
+        }
+        for (const s of resKey.strips) {
+          const idx = bspRoots.indexOf(s);
+          if (idx >= 0) bspRoots.splice(idx, 1);
+        }
+        bspRoots.push(resKey.consumedStrip);
+      }
+    }
+  }
   // Great Library second: claim the largest strip that fits its 20×16
   // footprint with a 3-tile margin, falling back to the full map if no
   // tome was reserved.
@@ -312,6 +358,10 @@ export function generateDungeon(floor, seed, biome) {
     }
     if (observatoryRoom) {
       placeObservatory(observatoryRoom, map, rng, libraryProps, lights, sunbeams, decorations);
+    }
+    if (keyRoomRoom && archiveRoom) {
+      placeKeyRoom(keyRoomRoom, map, rng, libraryProps, lights);
+      placeForbiddenArchive(archiveRoom, map, rng, libraryProps, lights);
     }
   }
 
@@ -570,6 +620,8 @@ function placeRoomWallDecorations(map, rooms, rng, decorations, lights, kinds) {
 
   for (const r of rooms) {
     if (r.isStartRoom) continue;
+    if (r.isKeyRoom) continue;          // arena room — no wall decor
+    if (r.isForbiddenArchive) continue; // sealed vault, hand-decorated
     if (r.w < 4 || r.h < 3) continue;
     const y = r.y - 1;
     if (y < 1) continue;
@@ -949,6 +1001,7 @@ function placeLibraryLeafSpawners(rooms, rng, leafSpawners) {
     if (r.isStartRoom) continue;
     if (r.isGrandTome) continue;
     if (r.isObservatory) continue; // sealed-roof room has its own ambience
+    if (r.isForbiddenArchive) continue; // sealed vault, no falling leaves
     if (r.w < 4 || r.h < 4) continue;
     const count = r.isLarge || r.isGreatLibrary
       ? 3 + Math.floor(rng() * 2)
@@ -985,6 +1038,8 @@ function placeShelves(rooms, map, rng, libraryProps) {
     if (r.isGreatLibrary) continue; // hand-decorated by the set-piece placer
     if (r.isGrandTome) continue;    // pedestal is the only prop in here
     if (r.isObservatory) continue;  // hand-decorated by the observatory placer
+    if (r.isKeyRoom) continue;       // arena room — must stay clear for combat
+    if (r.isForbiddenArchive) continue; // hand-decorated by the archive placer
     if (r.w < 4 || r.h < 4) continue;
     if (!r.isLarge && rng() > 0.55) continue;
 
@@ -1054,6 +1109,8 @@ function placeTables(rooms, map, rng, libraryProps) {
     if (r.isGreatLibrary) continue; // hand-decorated by the set-piece placer
     if (r.isGrandTome) continue;    // pedestal is the only prop in here
     if (r.isObservatory) continue;  // hand-decorated by the observatory placer
+    if (r.isKeyRoom) continue;       // arena room — must stay clear for combat
+    if (r.isForbiddenArchive) continue; // hand-decorated by the archive placer
     if (r.w < 5 || r.h < 4) continue;
     if (rng() > 0.6) continue;
 
@@ -1731,6 +1788,191 @@ function placeObservatory(room, map, rng, libraryProps, lights, sunbeams, decora
   }
 }
 
+/**
+ * Library biome: "Sala de la Llave". Mid-sized arena room (9×8). Empty
+ * by design — its only prop is a small rune dais painted on the floor
+ * at the centre. When the player enters, every entrance is sealed and a
+ * wave of bonus enemies spawns. Killing them all drops a rune key
+ * pickup. Logic lives in keyRoom.js; here we just paint the room and
+ * register the dais as a walkable decorative prop.
+ *
+ * @private
+ */
+function placeKeyRoom(room, map, rng, libraryProps, lights) {
+  if (!room) return;
+  room.isKeyRoom = true;
+
+  // Wipe any prop that might have been laid down inside the footprint
+  // (shelves/tables already skip via isKeyRoom, but magic flames or
+  // rune marks could still land here). We want a clean arena.
+  for (let i = libraryProps.length - 1; i >= 0; i--) {
+    const p = libraryProps[i];
+    if (p.tx + p.w <= room.x || p.tx >= room.x + room.w) continue;
+    if (p.ty + p.h <= room.y || p.ty >= room.y + room.h) continue;
+    for (let yy = p.ty; yy < p.ty + p.h; yy++) {
+      for (let xx = p.tx; xx < p.tx + p.w; xx++) {
+        if (map[yy] && map[yy][xx] === T_WALL) map[yy][xx] = T_FLOOR;
+      }
+    }
+    libraryProps.splice(i, 1);
+  }
+
+  // Central rune dais (3×3, walkable). Pure visual marker that signals
+  // "this is the arena". Drawn in render.js.
+  libraryProps.push({
+    kind: 'keyDais',
+    tx:   room.cx - 1,
+    ty:   room.cy - 1,
+    w:    3, h: 3,
+    seed: Math.floor(rng() * 1e9),
+  });
+
+  // Two cool-blue magical lights flanking the dais so the arena has a
+  // distinct visual identity (no flames, no shelves, just the rune
+  // glow).
+  if (lights) {
+    const offs = [{ dx: -3, dy: 0 }, { dx: 3, dy: 0 }];
+    for (const o of offs) {
+      const lx = (room.cx + o.dx) * TILE + TILE / 2;
+      const ly = (room.cy + o.dy) * TILE + TILE / 2;
+      lights.push({
+        type:    'magicFlame',
+        ax: lx,  ay: ly,
+        bx: lx,  by: ly,
+        x:  lx,  y:  ly,
+        phase:   rng() * Math.PI * 2,
+        speed:   0.20 + rng() * 0.20,
+        wobble:  rng() * Math.PI * 2,
+        color:   [120, 180, 255],
+        r:       110,
+        flicker: rng() * Math.PI * 2,
+      });
+    }
+  }
+}
+
+/**
+ * Library biome: "Archivo Prohibido". Small (7×6) sealed vault. The
+ * room contains a single legendary chest at its centre and is barred
+ * from the rest of the dungeon by a single rune-locked door tile placed
+ * on a corridor connection. The player must clear the Sala de la Llave
+ * to obtain the rune key that opens this door.
+ *
+ * The locked door is placed AFTER corridors are carved, so the flow is:
+ *   • room footprint already painted as floor (reservation step)
+ *   • corridors carved by buildConnections
+ *   • this placer scans the room perimeter for entrance tiles, picks
+ *     one, converts it to T_DOOR_LOCKED and stores its coordinates on
+ *     `room.doorTile` for the gameplay layer to consume.
+ *
+ * The legendary chest is registered as a libraryProp marker; the
+ * `populateFloor` step in enemies.js reads it and pushes the actual
+ * loot.chest entity (so loot lifecycle stays in one place).
+ *
+ * @private
+ */
+function placeForbiddenArchive(room, map, rng, libraryProps, lights) {
+  if (!room) return;
+  room.isForbiddenArchive = true;
+
+  // Wipe any stray props inside.
+  for (let i = libraryProps.length - 1; i >= 0; i--) {
+    const p = libraryProps[i];
+    if (p.tx + p.w <= room.x || p.tx >= room.x + room.w) continue;
+    if (p.ty + p.h <= room.y || p.ty >= room.y + room.h) continue;
+    for (let yy = p.ty; yy < p.ty + p.h; yy++) {
+      for (let xx = p.tx; xx < p.tx + p.w; xx++) {
+        if (map[yy] && map[yy][xx] === T_WALL) map[yy][xx] = T_FLOOR;
+      }
+    }
+    libraryProps.splice(i, 1);
+  }
+
+  // Find every entrance tile (floor tile just outside the room border).
+  // The corridor carver may have created several; lock the first.
+  const entrances = [];
+  const x0 = room.x - 1, x1 = room.x + room.w;
+  const y0 = room.y - 1, y1 = room.y + room.h;
+  for (let x = room.x; x < room.x + room.w; x++) {
+    if (map[y0] && map[y0][x] === T_FLOOR) entrances.push({ tx: x, ty: y0 });
+    if (map[y1] && map[y1][x] === T_FLOOR) entrances.push({ tx: x, ty: y1 });
+  }
+  for (let y = room.y; y < room.y + room.h; y++) {
+    if (map[y] && map[y][x0] === T_FLOOR) entrances.push({ tx: x0, ty: y });
+    if (map[y] && map[y][x1] === T_FLOOR) entrances.push({ tx: x1, ty: y });
+  }
+
+  // Pick a deterministic entrance and seal it with a rune-locked door.
+  // If the corridor carver left several entrances (loop shortcuts), the
+  // first one becomes the rune lock and the others are bricked up so
+  // the puzzle can't be circumvented. The door tile coords are stashed
+  // on `room.doorTile` for the gameplay layer to consume.
+  if (entrances.length > 0) {
+    const idx = Math.floor(rng() * entrances.length);
+    const door = entrances[idx];
+    map[door.ty][door.tx] = T_DOOR_LOCKED;
+    room.doorTile = door;
+    for (let i = 0; i < entrances.length; i++) {
+      if (i === idx) continue;
+      const e = entrances[i];
+      map[e.ty][e.tx] = T_WALL;
+    }
+  }
+
+  // Decorative perimeter shelves: the archive looks like an old vault.
+  for (let xx = room.x + 1; xx <= room.x + room.w - 2; xx++) {
+    for (const ty of [room.y, room.y + room.h - 1]) {
+      if (!map[ty] || map[ty][xx] !== T_FLOOR) continue;
+      if (isNearDoor(map, xx, ty, room)) continue;
+      // Don't seal too tightly: keep some gaps for visual rhythm.
+      if (rng() < 0.45) continue;
+      map[ty][xx] = T_WALL;
+      libraryProps.push({
+        kind: 'shelf',
+        tx: xx, ty, w: 1, h: 1,
+        orient: 'h',
+        face:   ty === room.y ? 'S' : 'N',
+        seed:   Math.floor(rng() * 1e9),
+      });
+    }
+  }
+
+  // Central pedestal-with-chest marker. The actual loot.chest entity is
+  // spawned by populateFloor (enemies.js) so chest lifecycle stays in
+  // one place. The marker exists so the renderer can paint a stone
+  // pedestal underneath the chest.
+  libraryProps.push({
+    kind: 'archivePedestal',
+    tx:   room.cx,
+    ty:   room.cy,
+    w:    1, h: 1,
+    seed: Math.floor(rng() * 1e9),
+  });
+
+  // Two warm orange lights flanking the pedestal — feels like a
+  // forbidden vault rather than a library wing.
+  if (lights) {
+    const offs = [{ dx: -2, dy: 0 }, { dx: 2, dy: 0 }];
+    for (const o of offs) {
+      const tx = room.cx + o.dx;
+      const ty = room.cy + o.dy;
+      if (!map[ty] || map[ty][tx] !== T_FLOOR) continue;
+      lights.push({
+        type:    'magicFlame',
+        ax: tx * TILE + TILE / 2,  ay: ty * TILE + TILE / 2,
+        bx: tx * TILE + TILE / 2,  by: ty * TILE + TILE / 2,
+        x:  tx * TILE + TILE / 2,  y:  ty * TILE + TILE / 2,
+        phase:   rng() * Math.PI * 2,
+        speed:   0.18,
+        wobble:  rng() * Math.PI * 2,
+        color:   [255, 170, 90],
+        r:       95,
+        flicker: rng() * Math.PI * 2,
+      });
+    }
+  }
+}
+
 function placeSarcophagi(rooms, map, rng, sarcophagi, lights) {
   for (const r of rooms) {
     if (r.isStartRoom || r.isStairsRoom) continue;
@@ -2243,7 +2485,8 @@ function carveCorridor(map, a, b, allRooms, rng, w = 1) {
  */
 export function isWall(map, tx, ty) {
   if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;
-  return map[ty][tx] === T_WALL;
+  const t = map[ty][tx];
+  return t === T_WALL || t === T_DOOR_LOCKED;
 }
 
 /**

@@ -57,6 +57,7 @@ import { initChangelogUI }                from './changelog.js';
 import { tryStartChallenge, updateChallenge, resetChallenge, drawAltarPrompt } from './challenge.js';
 import { tryStartLibraryEvent, updateLibraryEvent, resetLibraryEvent, drawCirclePrompt } from './librarySetPiece.js';
 import { tryStartGrandTome, updateGrandTome, resetGrandTome, drawGrandTome, drawTomePrompt } from './grandTome.js';
+import { resetKeyRoom, updateKeyRoom, drawArchiveDoorPrompt } from './keyRoom.js';
 
 /* ─────────────────────────── DOM bootstrap ─────────────────────────── */
 const canvas  = document.getElementById('game');
@@ -110,6 +111,9 @@ function startGame() {
   state.libraryProps = [];
   state.librarySetPiece = null;
   state.grandTome    = null;
+  state.keyRoom      = null;
+  state.archiveDoor  = null;
+  state.hasArchiveKey = false;
   state.soulSpawners = [];
   state.leafSpawners = [];
   state._whisperTimer = 6;
@@ -149,6 +153,7 @@ function buildFloor(floor) {
   resetChallenge();
   resetLibraryEvent();
   resetGrandTome();
+  resetKeyRoom();
 
   const start = d.startRoom;
   if (state.player) {
@@ -546,6 +551,7 @@ function update(dt) {
   updateChallenge(dt, showToast);
   updateLibraryEvent(dt, showToast, spawnLibraryRewards);
   updateGrandTome(dt, showToast, spawnGrandTomeRewards);
+  updateKeyRoom(dt, showToast);
   updateAmbient(dt);
   updateCamera();
   updateHUD();
@@ -586,6 +592,7 @@ function render() {
   drawAltarPrompt(ctx);
   drawCirclePrompt(ctx);
   drawTomePrompt(ctx);
+  drawArchiveDoorPrompt(ctx);
   drawSunbeams(ctx);
   drawLighting(ctx);
   drawObservatoryFog(ctx);
