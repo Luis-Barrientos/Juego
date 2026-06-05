@@ -15,6 +15,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.7.4',
+    date: '2026-06-05',
+    title: 'El Observatorio',
+    items: [
+      'La Biblioteca puede esconder ahora un Observatorio: una sala sellada de 9×9 con un gran telescopio de latón apuntando al cielo.',
+      'Sobre el telescopio se abre una columna de luz estelar fría que ilumina un círculo de constelaciones pintado en el suelo.',
+      'Cuatro obeliscos rematados en cristal azul marcan las esquinas y emiten un suave resplandor astral.',
+      'Mientras permanezcas dentro de la sala, las estrellas regeneran tu vida y tu maná de forma constante — un santuario seguro entre los pasillos de la Biblioteca.',
+    ],
+  },
+  {
     version: '0.7.3',
     date: '2026-06-05',
     title: 'Aire arcano en la Biblioteca',

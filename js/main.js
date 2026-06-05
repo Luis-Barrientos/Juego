@@ -139,6 +139,8 @@ function buildFloor(floor) {
   state.grandTome       = d.grandTome       || null;
   state.soulSpawners = d.soulSpawners || [];
   state.leafSpawners = d.leafSpawners || [];
+  state.observatoryRoom = d.rooms.find(r => r.isObservatory) || null;
+  state._observatoryEntered = false;
   state._whisperTimer = 6 + Math.random() * 6;
   state._creakTimer   = 8 + Math.random() * 14;
 
@@ -387,6 +389,28 @@ function applyBiomeModifiers(dt) {
 }
 
 /**
+ * While the player stands inside the Observatorio, restore HP and MP at
+ * a steady tick. First-time entry on each floor pops a flavour toast.
+ */
+function applyObservatoryBuff(dt) {
+  const room = state.observatoryRoom;
+  const p    = state.player;
+  if (!room || !p) return;
+  const tx = Math.floor(p.x / TILE);
+  const ty = Math.floor(p.y / TILE);
+  const inside =
+    tx >= room.x && tx < room.x + room.w &&
+    ty >= room.y && ty < room.y + room.h;
+  if (!inside) return;
+  if (!state._observatoryEntered) {
+    state._observatoryEntered = true;
+    showToast('Bajo las estrellas, tus heridas sanan.');
+  }
+  if (p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + 6 * dt);
+  if (p.mp < p.maxMp) p.mp = Math.min(p.maxMp, p.mp + 4 * dt);
+}
+
+/**
  * Per-biome ambient layer.
  * - Catacombs: drifting soul wisps + procedural whispers.
  * - Library:   drifting leaves / paper scraps + occasional wood creaks.
@@ -461,6 +485,7 @@ function update(dt) {
   updateTouchAim();
   playerUpdate(state.player, dt, playerHooks);
   applyBiomeModifiers(dt);
+  applyObservatoryBuff(dt);
   state.currentRoom = getRoomAt(state.rooms, state.player);
 
   for (const e of state.enemies) enemyUpdate(e, dt, enemyHooks);

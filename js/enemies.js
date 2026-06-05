@@ -781,6 +781,8 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     // Sala del Gran Tomo: the Simon-Says encounter spawns its own wave on
     // failure; pre-populating the room would defeat the puzzle.
     if (r.isGrandTome) continue;
+    // Observatorio: pacific buff room, no hostile spawns.
+    if (r.isObservatory) continue;
     // Density scales with room area: ~1 enemy per 28 tiles, clamped to a
     // sensible band so tiny rooms still pose a threat and star rooms
     // don't become slaughterhouses.
@@ -810,6 +812,8 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     // The Sala del Gran Tomo gives chests on Simon-Says success and
     // spawns a hostile wave on failure — no random chests on entry.
     if (r.isGrandTome) continue;
+    // Observatorio: the buff is the reward, no chests inside.
+    if (r.isObservatory) continue;
     // Star rooms get two small chests grouped near the centre instead of
     // a single one — feels more rewarding to clear.
     if (r.isLarge) {
@@ -827,6 +831,7 @@ export function populateFloor(floor, maxFloor, spawnChest) {
   // Breakable props scattered through non-start rooms.
   for (const r of state.rooms) {
     if (r.isStartRoom) continue;
+    if (r.isObservatory) continue;
     placeProps(r, floor);
   }
 }

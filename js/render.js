@@ -773,6 +773,7 @@ function drawLibraryProp(ctx, p) {
   if (p.kind === 'tomeCircle')   { drawTomeCircle(ctx, px, py, w, h, p);   return; }
   if (p.kind === 'tomeBookPile') { drawTomeBookPile(ctx, px, py, w, h, p); return; }
   if (p.kind === 'libraryRuneMark') { drawLibraryRuneMark(ctx, px, py, w, h, p); return; }
+  if (p.kind === 'constellationRing') { drawConstellationRing(ctx, px, py, w, h, p); return; }
 
   // Wipe the underlying wall tile back to floor tone so the prop has its
   // own silhouette instead of inheriting the dark wall fill.
@@ -784,6 +785,8 @@ function drawLibraryProp(ctx, p) {
   else if (p.kind === 'tableBroken')  drawTable(ctx, px, py, w, h, p, true);
   else if (p.kind === 'tomePedestal') drawTomePedestal(ctx, px, py, w, h, p);
   else if (p.kind === 'tomeBrazier')  drawTomeBrazier(ctx, px, py, w, h, p);
+  else if (p.kind === 'telescope')    drawTelescope(ctx, px, py, w, h, p);
+  else if (p.kind === 'starObelisk')  drawStarObelisk(ctx, px, py, w, h, p);
 }
 
 /**
@@ -1094,6 +1097,269 @@ function drawLibraryRuneMark(ctx, px, py, w, h, p) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+/**
+ * Walkable 7×7 constellation ring painted under the telescope. Dark base
+ * (so the player silhouette pops), a few concentric thin rings in pale
+ * cyan, and a scattering of small "stars" — fixed positions seeded by
+ * `p.seed` so the pattern is stable across frames but unique per floor.
+ */
+function drawConstellationRing(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  const R  = Math.min(w, h) * 0.46;
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+
+  ctx.save();
+
+  // Dark disc base — a sliver lighter at the centre so the eye is drawn
+  // toward the telescope above.
+  const base = ctx.createRadialGradient(cx, cy, 1, cx, cy, R);
+  base.addColorStop(0,    'rgba(20, 30, 60, 0.78)');
+  base.addColorStop(0.75, 'rgba(10, 16, 36, 0.65)');
+  base.addColorStop(1,    'rgba(10, 16, 36, 0)');
+  ctx.fillStyle = base;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Three concentric thin rings (pale cyan).
+  ctx.strokeStyle = 'rgba(180, 220, 255, 0.42)';
+  ctx.lineWidth   = 0.8;
+  for (let i = 0; i < 3; i++) {
+    const r = R * (0.35 + i * 0.18);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Cardinal tick marks along the outer ring (N/E/S/W).
+  ctx.strokeStyle = 'rgba(220, 240, 255, 0.7)';
+  ctx.lineWidth   = 1;
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    const r1 = R * 0.78;
+    const r2 = R * 0.92;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+    ctx.lineTo(cx + Math.cos(a) * r2, cy + Math.sin(a) * r2);
+    ctx.stroke();
+  }
+
+  // Star dots scattered inside the ring.
+  const STARS = 18;
+  for (let i = 0; i < STARS; i++) {
+    const ang = rnd() * Math.PI * 2;
+    const rad = (0.10 + rnd() * 0.82) * R;
+    const sx  = cx + Math.cos(ang) * rad;
+    const sy  = cy + Math.sin(ang) * rad;
+    const sz  = 0.6 + rnd() * 1.4;
+    // Small halo for the brighter ones.
+    if (sz > 1.4) {
+      const halo = ctx.createRadialGradient(sx, sy, 0, sx, sy, sz * 3);
+      halo.addColorStop(0, 'rgba(220, 240, 255, 0.55)');
+      halo.addColorStop(1, 'rgba(220, 240, 255, 0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(sx, sy, sz * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(240, 248, 255, 0.95)';
+    ctx.beginPath();
+    ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Connect a handful of stars with thin lines so it reads as a
+  // constellation rather than random dots.
+  ctx.strokeStyle = 'rgba(180, 220, 255, 0.32)';
+  ctx.lineWidth   = 0.6;
+  s = (p.seed | 0) || 1;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = rnd() * Math.PI * 2;
+    const r = (0.20 + rnd() * 0.70) * R;
+    const x = cx + Math.cos(a) * r;
+    const y = cy + Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
+ * Brass telescope on a tripod, occupying a 3×3 footprint. Tube is angled
+ * up-right toward the skylight; tripod legs splay outward. A faint
+ * starlight glow leaks from the eyepiece.
+ */
+function drawTelescope(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  const t  = (typeof state !== 'undefined' ? state.time : 0) || 0;
+
+  ctx.save();
+
+  // Soft halo on the floor below the telescope (so it reads as a
+  // luminous instrument even when the lighting overlay is harsh).
+  const halo = ctx.createRadialGradient(cx, cy + h * 0.25, 4, cx, cy + h * 0.25, w * 0.55);
+  halo.addColorStop(0, 'rgba(140, 180, 255, 0.30)');
+  halo.addColorStop(1, 'rgba(20, 40, 80, 0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(cx, cy + h * 0.25, w * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tripod base — three legs from a central hub down to the floor.
+  ctx.strokeStyle = '#3a2818';
+  ctx.lineWidth   = 3;
+  const hubX = cx;
+  const hubY = cy + h * 0.15;
+  const legs = [
+    { x: cx - w * 0.32, y: py + h - 4 },
+    { x: cx + w * 0.32, y: py + h - 4 },
+    { x: cx,            y: py + h - 4 },
+  ];
+  for (const lg of legs) {
+    ctx.beginPath();
+    ctx.moveTo(hubX, hubY);
+    ctx.lineTo(lg.x, lg.y);
+    ctx.stroke();
+  }
+  // Leg feet.
+  ctx.fillStyle = '#221408';
+  for (const lg of legs) ctx.fillRect(lg.x - 2, lg.y - 2, 4, 3);
+
+  // Tripod hub: dark iron ball.
+  ctx.fillStyle = '#1c1208';
+  ctx.beginPath();
+  ctx.arc(hubX, hubY, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Brass tube — angled up-right from the hub.
+  const angle  = -Math.PI / 3.2; // ~56° above horizontal, tilted right
+  const tubeLen = w * 0.72;
+  const tubeR   = h * 0.10;
+  const ex = hubX + Math.cos(angle) * tubeLen; // eyepiece end (lower-left)
+  const ey = hubY + Math.sin(angle) * tubeLen;
+  const ox = hubX - Math.cos(angle) * tubeLen * 0.25; // opposite end (the "down" stub near hub)
+  const oy = hubY - Math.sin(angle) * tubeLen * 0.25;
+
+  // Tube body as a thick stroke with brass gradient effect.
+  const grad = ctx.createLinearGradient(
+    hubX + Math.sin(angle) * tubeR,
+    hubY - Math.cos(angle) * tubeR,
+    hubX - Math.sin(angle) * tubeR,
+    hubY + Math.cos(angle) * tubeR,
+  );
+  grad.addColorStop(0,    '#d4a04c');
+  grad.addColorStop(0.5,  '#a87830');
+  grad.addColorStop(1,    '#5a3818');
+  ctx.strokeStyle = grad;
+  ctx.lineWidth   = tubeR * 2;
+  ctx.lineCap     = 'round';
+  ctx.beginPath();
+  ctx.moveTo(ox, oy);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+
+  // Brass rings around the tube.
+  ctx.strokeStyle = '#3a2410';
+  ctx.lineWidth   = 1.2;
+  for (let i = 0.25; i <= 0.85; i += 0.20) {
+    const rx = hubX + Math.cos(angle) * tubeLen * i;
+    const ry = hubY + Math.sin(angle) * tubeLen * i;
+    ctx.beginPath();
+    ctx.moveTo(rx + Math.sin(angle) * tubeR, ry - Math.cos(angle) * tubeR);
+    ctx.lineTo(rx - Math.sin(angle) * tubeR, ry + Math.cos(angle) * tubeR);
+    ctx.stroke();
+  }
+
+  // Eyepiece (small cylinder at the lower-left end).
+  ctx.fillStyle = '#2a1808';
+  ctx.beginPath();
+  ctx.arc(ex, ey, tubeR * 0.85, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#caa050';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(ex, ey, tubeR * 0.85, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Lens aperture at the upper-right end — glowing starlight.
+  const apX = hubX + Math.cos(angle) * tubeLen * 1.06;
+  const apY = hubY + Math.sin(angle) * tubeLen * 1.06;
+  const lensPulse = 0.55 + Math.sin(t * 1.7) * 0.20;
+  const lensHalo = ctx.createRadialGradient(apX, apY, 0, apX, apY, tubeR * 3.2);
+  lensHalo.addColorStop(0, `rgba(220, 230, 255, ${0.70 * lensPulse})`);
+  lensHalo.addColorStop(1, 'rgba(220, 230, 255, 0)');
+  ctx.fillStyle = lensHalo;
+  ctx.beginPath();
+  ctx.arc(apX, apY, tubeR * 3.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#e8eeff';
+  ctx.beginPath();
+  ctx.arc(apX, apY, tubeR * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Slim 1×1 stone obelisk with a glowing blue crystal capstone — used as
+ * a corner pillar inside the Observatorio.
+ */
+function drawStarObelisk(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const t  = (typeof state !== 'undefined' ? state.time : 0) || 0;
+  const baseY = py + h - 2;
+  const topY  = py + 4;
+
+  // Drop shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  ctx.moveTo(cx - w * 0.34, baseY);
+  ctx.lineTo(cx + w * 0.34, baseY);
+  ctx.lineTo(cx + w * 0.18, topY);
+  ctx.lineTo(cx - w * 0.18, topY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Stone body (tapered).
+  const stoneGrad = ctx.createLinearGradient(px, py, px + w, py + h);
+  stoneGrad.addColorStop(0, '#4a4458');
+  stoneGrad.addColorStop(1, '#2a2438');
+  ctx.fillStyle = stoneGrad;
+  ctx.beginPath();
+  ctx.moveTo(cx - w * 0.32, baseY);
+  ctx.lineTo(cx + w * 0.32, baseY);
+  ctx.lineTo(cx + w * 0.16, topY);
+  ctx.lineTo(cx - w * 0.16, topY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Vertical highlight stripe.
+  ctx.fillStyle = 'rgba(180, 180, 220, 0.20)';
+  ctx.fillRect(cx - 1, topY, 2, baseY - topY);
+
+  // Capstone crystal (small glowing gem).
+  const pulse = 0.7 + Math.sin(t * 2.4 + (p.seed || 0)) * 0.25;
+  const gemX = cx;
+  const gemY = topY - 1;
+  const gemR = 2.4;
+  const gemHalo = ctx.createRadialGradient(gemX, gemY, 0, gemX, gemY, gemR * 4);
+  gemHalo.addColorStop(0, `rgba(140, 200, 255, ${0.55 * pulse})`);
+  gemHalo.addColorStop(1, 'rgba(40, 80, 160, 0)');
+  ctx.fillStyle = gemHalo;
+  ctx.beginPath();
+  ctx.arc(gemX, gemY, gemR * 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#c8e0ff';
+  ctx.beginPath();
+  ctx.arc(gemX, gemY, gemR, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 /** Tall bookshelf full of leaning books. Orientation follows p.orient. */
@@ -2309,12 +2575,18 @@ export function drawSunbeams(ctx) {
 
     // Main body — warm vertical gradient.
     const isThin = sb.kind === 'thin';
+    const isObservatory = sb.kind === 'observatory';
     const grad = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
     if (isThin) {
       // Cool, delicate, no god-rays or dust — just a sliver of moonlight.
       grad.addColorStop(0,    'rgba(220, 230, 255, 0.18)');
       grad.addColorStop(0.7,  'rgba(220, 230, 255, 0.06)');
       grad.addColorStop(1,    'rgba(220, 230, 255, 0)');
+    } else if (isObservatory) {
+      // Starlight column: bright cool white, brightest near the top.
+      grad.addColorStop(0,    'rgba(200, 220, 255, 0.42)');
+      grad.addColorStop(0.55, 'rgba(180, 210, 255, 0.18)');
+      grad.addColorStop(1,    'rgba(180, 210, 255, 0.00)');
     } else {
       grad.addColorStop(0,    'rgba(255, 240, 180, 0.26)');
       grad.addColorStop(0.55, 'rgba(255, 230, 160, 0.12)');
@@ -2335,9 +2607,15 @@ export function drawSunbeams(ctx) {
         const width  = 6 + Math.sin(t * 0.7 + phase) * 1.5;
         const alpha  = 0.05 + (Math.sin(t * 0.9 + phase) * 0.5 + 0.5) * 0.06;
         const rgrad  = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
-        rgrad.addColorStop(0,   `rgba(255, 245, 200, ${alpha * 1.3})`);
-        rgrad.addColorStop(0.7, `rgba(255, 235, 170, ${alpha * 0.6})`);
-        rgrad.addColorStop(1,   'rgba(255, 220, 140, 0)');
+        if (isObservatory) {
+          rgrad.addColorStop(0,   `rgba(220, 235, 255, ${alpha * 1.3})`);
+          rgrad.addColorStop(0.7, `rgba(200, 220, 255, ${alpha * 0.6})`);
+          rgrad.addColorStop(1,   'rgba(180, 210, 255, 0)');
+        } else {
+          rgrad.addColorStop(0,   `rgba(255, 245, 200, ${alpha * 1.3})`);
+          rgrad.addColorStop(0.7, `rgba(255, 235, 170, ${alpha * 0.6})`);
+          rgrad.addColorStop(1,   'rgba(255, 220, 140, 0)');
+        }
         ctx.fillStyle = rgrad;
         ctx.fillRect(baseX - width / 2, sy, width, sb.h);
       }
@@ -2369,7 +2647,10 @@ export function drawSunbeams(ctx) {
         ctx.fillStyle = `rgba(255, 252, 230, ${Math.min(1, a * 1.6)})`;
         ctx.fillRect(dx - size, dy - size, size * 2, size * 2);
       } else {
-        ctx.fillStyle = `rgba(255, 245, 200, ${a})`;
+        const fill = isObservatory
+          ? `rgba(220, 235, 255, ${a})`
+          : `rgba(255, 245, 200, ${a})`;
+        ctx.fillStyle = fill;
         ctx.fillRect(dx, dy, size, size);
       }
     }

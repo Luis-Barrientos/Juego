@@ -79,6 +79,7 @@ export function generateDungeon(floor, seed, biome) {
   const isLibraryBiome = biome && biome.id === 'library';
   let greatLibraryRoom = null;
   let grandTomeRoom    = null;
+  let observatoryRoom  = null;
   const bspRoots = [];
 
   // Sala del Gran Tomo first: it's smaller (11×9) and easier to fit, so
@@ -91,6 +92,22 @@ export function generateDungeon(floor, seed, biome) {
       rooms.push(reservation.room);
       grandTomeRoom = reservation.room;
       bspRoots.push(...reservation.strips);
+    }
+  }
+
+  // Observatorio: standalone 9×9 buff room. Reserved before the Great
+  // Library so it's never squeezed out. Odd-sized so the telescope (3×3)
+  // aligns pixel-perfect with the central skylight beam.
+  if (isLibraryBiome && rng() < 0.55) {
+    const sources = bspRoots.length ? bspRoots : [{ x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2 }];
+    const res = reserveInStrips(map, rng, 9, 9, 2, sources);
+    if (res) {
+      res.room.isObservatory = true;
+      rooms.push(res.room);
+      observatoryRoom = res.room;
+      const idx = bspRoots.indexOf(res.consumedStrip);
+      if (idx >= 0) bspRoots.splice(idx, 1, ...res.strips);
+      else          bspRoots.push(...res.strips);
     }
   }
 
@@ -284,6 +301,9 @@ export function generateDungeon(floor, seed, biome) {
     }
     if (grandTomeRoom) {
       grandTome = placeGrandTome(grandTomeRoom, map, rng, libraryProps, lights);
+    }
+    if (observatoryRoom) {
+      placeObservatory(observatoryRoom, map, rng, libraryProps, lights, sunbeams);
     }
   }
 
@@ -826,6 +846,7 @@ function placeSoulSpawners(rooms, rng, soulSpawners, sarcophagi) {
 function placeMagicFlames(rooms, rng, lights) {
   for (const r of rooms) {
     if (r.isStartRoom) continue;
+    if (r.isObservatory) continue; // own corner candles, no roaming flames
     if (r.w < 4 || r.h < 3) continue;
 
     const count = 1 + Math.floor(rng() * 2) + (r.isLarge ? 1 : 0);
@@ -919,6 +940,7 @@ function placeLibraryLeafSpawners(rooms, rng, leafSpawners) {
   for (const r of rooms) {
     if (r.isStartRoom) continue;
     if (r.isGrandTome) continue;
+    if (r.isObservatory) continue; // sealed-roof room has its own ambience
     if (r.w < 4 || r.h < 4) continue;
     const count = r.isLarge || r.isGreatLibrary
       ? 3 + Math.floor(rng() * 2)
@@ -954,6 +976,7 @@ function placeShelves(rooms, map, rng, libraryProps) {
     if (r.isStartRoom || r.isStairsRoom) continue;
     if (r.isGreatLibrary) continue; // hand-decorated by the set-piece placer
     if (r.isGrandTome) continue;    // pedestal is the only prop in here
+    if (r.isObservatory) continue;  // hand-decorated by the observatory placer
     if (r.w < 4 || r.h < 4) continue;
     if (!r.isLarge && rng() > 0.55) continue;
 
@@ -1022,6 +1045,7 @@ function placeTables(rooms, map, rng, libraryProps) {
     if (r.isStartRoom || r.isStairsRoom) continue;
     if (r.isGreatLibrary) continue; // hand-decorated by the set-piece placer
     if (r.isGrandTome) continue;    // pedestal is the only prop in here
+    if (r.isObservatory) continue;  // hand-decorated by the observatory placer
     if (r.w < 5 || r.h < 4) continue;
     if (rng() > 0.6) continue;
 
@@ -1555,6 +1579,141 @@ function isNearDoor(map, x, y, room) {
     }
   }
   return false;
+}
+
+/**
+ * Library biome: an "Observatorio". 9×9 sealed-roof room with a 3×3
+ * telescope at the centre, a bright skylight beam falling on the
+ * telescope, painted constellations on the floor, and four corner stone
+ * obelisks. While the player stands inside, a passive HP/MP regen buff
+ * applies (handled in main.js by checking room.isObservatory).
+ *
+ * Layout (cx = room.x+4, cy = room.y+4):
+ *   • Telescope 3×3 at (cx-1, cy-1) — solid (T_WALL).
+ *   • Floor circle 7×7 at (cx-3, cy-3) — walkable rune ring.
+ *   • Skylight beam: single beam centred on the room, length = room.h.
+ *   • Corner obelisks: 1×1 solid pillars in the 4 inner corners.
+ *   • Bookstands lining inner perimeter, gap of 5 tiles centred on the
+ *     telescope so the constellation stays visible from every door.
+ *
+ * @private
+ */
+function placeObservatory(room, map, rng, libraryProps, lights, sunbeams) {
+  if (!room) return;
+  room.isObservatory = true;
+
+  const cx = room.cx;
+  const cy = room.cy;
+  const teleSize = 3;
+  const teleTx = cx - 1;
+  const teleTy = cy - 1;
+  const ringSize = 7;
+  const ringTx = cx - 3;
+  const ringTy = cy - 3;
+
+  // Wipe any prop overlapping the telescope footprint.
+  for (let i = libraryProps.length - 1; i >= 0; i--) {
+    const p = libraryProps[i];
+    if (p.tx + p.w <= ringTx || p.tx >= ringTx + ringSize) continue;
+    if (p.ty + p.h <= ringTy || p.ty >= ringTy + ringSize) continue;
+    for (let yy = p.ty; yy < p.ty + p.h; yy++) {
+      for (let xx = p.tx; xx < p.tx + p.w; xx++) {
+        if (map[yy] && map[yy][xx] === T_WALL) map[yy][xx] = T_FLOOR;
+      }
+    }
+    libraryProps.splice(i, 1);
+  }
+
+  // 1. Constellation ring painted on the floor (walkable, 7×7).
+  libraryProps.push({
+    kind: 'constellationRing',
+    tx: ringTx, ty: ringTy, w: ringSize, h: ringSize,
+    seed: Math.floor(rng() * 1e9),
+  });
+
+  // 2. Telescope: 3×3 solid prop carved as walls.
+  for (let yy = teleTy; yy < teleTy + teleSize; yy++) {
+    for (let xx = teleTx; xx < teleTx + teleSize; xx++) map[yy][xx] = T_WALL;
+  }
+  libraryProps.push({
+    kind: 'telescope',
+    tx: teleTx, ty: teleTy, w: teleSize, h: teleSize,
+    seed: Math.floor(rng() * 1e9),
+  });
+
+  // 3. Skylight beam: centred on the room, length spans the whole room.
+  //    Re-use the existing sunbeams system so render handles the shape
+  //    cutout in the ambient overlay automatically.
+  const beamLen = (room.w - 2) * TILE; // ~7 tiles wide cone
+  const beam = {
+    kind: 'observatory',
+    x: (room.x + room.w / 2) * TILE,
+    y: room.y * TILE,
+    h: room.h * TILE,
+    length: beamLen,
+    splay: TILE * 0.9,
+    seed: Math.floor(rng() * 1e9),
+    wallRow: room.y - 1,
+  };
+  beam.shape = buildBeamShape(beam, rng);
+  beam.crack = buildCrackPath(beam, rng);
+  sunbeams.push(beam);
+
+  // 4. Four corner obelisks: 1×1 solid props at the interior corners.
+  //    Cool blue moon-glow light attached so the ambience reads as
+  //    "open to the night sky".
+  const corners = [
+    { x: room.x,                 y: room.y },
+    { x: room.x + room.w - 1,    y: room.y },
+    { x: room.x,                 y: room.y + room.h - 1 },
+    { x: room.x + room.w - 1,    y: room.y + room.h - 1 },
+  ];
+  for (const c of corners) {
+    if (!map[c.y] || map[c.y][c.x] !== T_FLOOR) continue;
+    if (isNearDoor(map, c.x, c.y, room)) continue;
+    map[c.y][c.x] = T_WALL;
+    libraryProps.push({
+      kind: 'starObelisk',
+      tx: c.x, ty: c.y, w: 1, h: 1,
+      seed: Math.floor(rng() * 1e9),
+    });
+    if (lights) {
+      lights.push({
+        type:    'candle',
+        x:       c.x * TILE + TILE / 2,
+        y:       c.y * TILE + 6,
+        r:       80,
+        flicker: rng() * Math.PI * 2,
+      });
+    }
+  }
+
+  // 5. Bookstands (single-tile shelves) along the inner perimeter with
+  //    a 5-tile gap centred on the telescope so the constellation is
+  //    visible from every approach.
+  const GAP = 2;
+  const tryShelf = (xx, yy, orient, face) => {
+    if (!map[yy] || map[yy][xx] !== T_FLOOR) return false;
+    if (isNearDoor(map, xx, yy, room)) return false;
+    map[yy][xx] = T_WALL;
+    libraryProps.push({
+      kind: 'shelf',
+      tx: xx, ty: yy, w: 1, h: 1,
+      orient, face,
+      seed: Math.floor(rng() * 1e9),
+    });
+    return true;
+  };
+  for (let xx = room.x + 1; xx <= room.x + room.w - 2; xx++) {
+    if (Math.abs(xx - cx) <= GAP) continue;
+    tryShelf(xx, room.y,             'h', 'S');
+    tryShelf(xx, room.y + room.h - 1, 'h', 'N');
+  }
+  for (let yy = room.y + 1; yy <= room.y + room.h - 2; yy++) {
+    if (Math.abs(yy - cy) <= GAP) continue;
+    tryShelf(room.x,             yy, 'v', 'E');
+    tryShelf(room.x + room.w - 1, yy, 'v', 'W');
+  }
 }
 
 function placeSarcophagi(rooms, map, rng, sarcophagi, lights) {
