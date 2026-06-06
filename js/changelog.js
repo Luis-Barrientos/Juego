@@ -15,6 +15,15 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.1',
+    date: '2026-06-06',
+    title: 'Sala de la Llave: sin trampas mortales',
+    items: [
+      'Arreglado: el Archivo Prohibido podía cerrar el único camino entre la entrada y la escalera, dejando el piso intransitable. Ahora se valida después de generar el cerrojo y, si bloquea, la puerta se desactiva y las entradas alternativas se restauran (te llevas el cofre legendario gratis).',
+      'Arreglado: si entrabas a la Sala de la Llave justo en la línea de la puerta, los muros podían materializarse encima de ti y dejarte atrapado. Ahora la sala espera a que estés un paso por dentro antes de sellarse.',
+    ],
+  },
+  {
     version: '0.8.0',
     date: '2026-06-05',
     title: 'La Sala de la Llave y el Archivo Prohibido',

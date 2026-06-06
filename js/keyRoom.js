@@ -90,6 +90,31 @@ function playerInside(room) {
 }
 
 /**
+ * @private Is the player far enough from any entrance tile to safely
+ * seal the room? The player's hitbox is a circle of radius `r`; if its
+ * AABB still overlaps an entrance tile and we wrote a wall there, the
+ * collision system would push the player outside the room — or worse,
+ * trap them sliding against an instant wall. We require a 1-tile gap
+ * (the entrance plus the room border) plus a small margin for the
+ * hitbox radius.
+ */
+function playerSafeFromEntrances(entrances) {
+  const p = state.player;
+  if (!p) return false;
+  const margin = (p.r || 10) + 2;
+  for (const e of entrances) {
+    const cx = (e.tx + 0.5) * TILE;
+    const cy = (e.ty + 0.5) * TILE;
+    // Manhattan check on tile distance: must be at least 2 tiles away
+    // (one tile of room border + one tile of corridor entrance).
+    const dx = Math.abs(p.x - cx);
+    const dy = Math.abs(p.y - cy);
+    if (dx < TILE + margin && dy < TILE + margin) return false;
+  }
+  return true;
+}
+
+/**
  * Per-frame update: drives the kill-all puzzle and the rune-locked
  * archive door.
  *
@@ -120,8 +145,14 @@ export function updateKeyRoom(dt, toast) {
 
   if (k.state === 'idle') {
     if (!playerInside(k.room)) return;
-    // Seal every entrance the moment the player crosses the threshold.
-    k.sealedTiles = findEntranceTiles(k.room);
+    // Wait until the player has stepped fully clear of every entrance
+    // before slamming the seals down — otherwise a wall can spawn on
+    // top of the player's collision circle the very frame they cross
+    // the threshold and trap them in the door.
+    const entrances = findEntranceTiles(k.room);
+    if (entrances.length === 0) return;
+    if (!playerSafeFromEntrances(entrances)) return;
+    k.sealedTiles = entrances;
     for (const t of k.sealedTiles) state.map[t.ty][t.tx] = T_WALL;
     k.state = 'active';
     rebuildMapCache();

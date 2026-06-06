@@ -362,10 +362,74 @@ export function generateDungeon(floor, seed, biome) {
     if (keyRoomRoom && archiveRoom) {
       placeKeyRoom(keyRoomRoom, map, rng, libraryProps, lights);
       placeForbiddenArchive(archiveRoom, map, rng, libraryProps, lights);
+      // Validate: the locked archive door must NOT cut the path between
+      // the start and stair rooms. If it does, undo the lock (turn
+      // every locked-door tile back into floor) so the player can
+      // always progress. The chest still spawns inside, just without
+      // the puzzle gate — better a freebie than a softlock.
+      if (!isReachable(map, startRoom, stairsRoom)) {
+        unlockArchive(map, archiveRoom);
+      }
     }
   }
 
   return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, libraryProps, soulSpawners, leafSpawners, librarySetPiece, grandTome, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+}
+
+/**
+ * BFS from the start room's centre to the stairs room's centre, treating
+ * `T_DOOR_LOCKED` as blocking. Returns true if a path exists.
+ * @private
+ */
+function isReachable(map, startRoom, stairsRoom) {
+  const sx = startRoom.cx, sy = startRoom.cy;
+  const tx = stairsRoom.cx, ty = stairsRoom.cy;
+  const seen = new Uint8Array(MAP_W * MAP_H);
+  const queue = [[sx, sy]];
+  seen[sy * MAP_W + sx] = 1;
+  while (queue.length) {
+    const [x, y] = queue.shift();
+    if (x === tx && y === ty) return true;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+      const idx = ny * MAP_W + nx;
+      if (seen[idx]) continue;
+      const t = map[ny][nx];
+      // Locked doors block here — that's the whole point of the test.
+      if (t === T_WALL || t === T_DOOR_LOCKED) continue;
+      seen[idx] = 1;
+      queue.push([nx, ny]);
+    }
+  }
+  return false;
+}
+
+/**
+ * Defuse the Archivo Prohibido lock when the validator detects a
+ * softlock: turn every locked-door tile in the floor back into a
+ * walkable floor tile, restore any alternate entrances that were
+ * bricked up to enforce the puzzle, and clear the room's `doorTile`
+ * reference so the gameplay layer doesn't try to consume the key.
+ * @private
+ */
+function unlockArchive(map, archiveRoom) {
+  for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (map[y][x] === T_DOOR_LOCKED) map[y][x] = T_FLOOR;
+    }
+  }
+  if (archiveRoom) {
+    if (archiveRoom.bricked) {
+      for (const t of archiveRoom.bricked) {
+        if (map[t.ty]) map[t.ty][t.tx] = T_FLOOR;
+      }
+      archiveRoom.bricked = [];
+    }
+    archiveRoom.doorTile = null;
+    // Re-check after restoring alternates: if start→stairs now reaches,
+    // the validator's caller is happy. Nothing else to do.
+  }
 }
 
 /**
@@ -1906,7 +1970,10 @@ function placeForbiddenArchive(room, map, rng, libraryProps, lights) {
   // If the corridor carver left several entrances (loop shortcuts), the
   // first one becomes the rune lock and the others are bricked up so
   // the puzzle can't be circumvented. The door tile coords are stashed
-  // on `room.doorTile` for the gameplay layer to consume.
+  // on `room.doorTile` for the gameplay layer to consume; the bricked
+  // tiles on `room.bricked` so the validator can restore them if the
+  // lock would softlock the floor.
+  room.bricked = [];
   if (entrances.length > 0) {
     const idx = Math.floor(rng() * entrances.length);
     const door = entrances[idx];
@@ -1916,6 +1983,7 @@ function placeForbiddenArchive(room, map, rng, libraryProps, lights) {
       if (i === idx) continue;
       const e = entrances[i];
       map[e.ty][e.tx] = T_WALL;
+      room.bricked.push(e);
     }
   }
 
