@@ -138,7 +138,24 @@ export function generateDungeon(floor, seed, biome) {
       else         bspRoots.push(...resKey.strips);
 
       const sourcesA = bspRoots.length ? bspRoots : [{ x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2 }];
-      const resArch  = reserveInStrips(map, rng, 7, 6, 2, sourcesA);
+      // Bias the archive toward the top-right or bottom-left quadrant:
+      // the start room is always top-left (min cx+cy) and the stairs
+      // room is the farthest from it (usually bottom-right), so those
+      // two corners belong to the critical path. Tucking the archive
+      // into a free corner keeps its locked door off that path. If
+      // neither quadrant has space, fall back to anywhere — the BFS
+      // validator further down still defuses the lock if it would
+      // softlock the floor.
+      const inSafeQuadrant = (rx, ry) => {
+        const ccx = rx + (7 >> 1);
+        const ccy = ry + (6 >> 1);
+        const right  = ccx >= (MAP_W >> 1);
+        const bottom = ccy >= (MAP_H >> 1);
+        return (right && !bottom) || (!right && bottom);
+      };
+      const resArch =
+        reserveInStrips(map, rng, 7, 6, 2, sourcesA, inSafeQuadrant) ||
+        reserveInStrips(map, rng, 7, 6, 2, sourcesA);
       if (resArch) {
         resKey.room.isKeyRoom = true;
         rooms.push(resKey.room);
@@ -1302,55 +1319,69 @@ function reserveSpecialRoom(map, rng, w, h, margin = 3) {
  *
  * @private
  */
-function reserveInStrips(map, rng, w, h, margin, strips) {
+function reserveInStrips(map, rng, w, h, margin, strips, prefer = null) {
   const fits = strips.filter(s => s.w >= w + margin * 2 && s.h >= h + margin * 2);
   if (!fits.length) return null;
   fits.sort((a, b) => (b.w * b.h) - (a.w * a.h));
-  const strip = fits[0];
 
-  const maxX = strip.x + strip.w - margin - w;
-  const maxY = strip.y + strip.h - margin - h;
-  const minX = strip.x + margin;
-  const minY = strip.y + margin;
-  const rx = minX + Math.floor(rng() * Math.max(1, maxX - minX + 1));
-  const ry = minY + Math.floor(rng() * Math.max(1, maxY - minY + 1));
+  // With a `prefer(rx, ry)` filter active, walk every fitting strip from
+  // largest to smallest and sample up to 16 random positions per strip
+  // looking for one that satisfies the predicate. Without a filter,
+  // keep the legacy single-shot pick on the largest strip.
+  for (const strip of fits) {
+    const maxX = strip.x + strip.w - margin - w;
+    const maxY = strip.y + strip.h - margin - h;
+    const minX = strip.x + margin;
+    const minY = strip.y + margin;
 
-  for (let y = ry; y < ry + h; y++) {
-    for (let x = rx; x < rx + w; x++) map[y][x] = T_FLOOR;
-  }
+    let rx, ry;
+    if (prefer) {
+      let found = false;
+      for (let i = 0; i < 16; i++) {
+        const tx = minX + Math.floor(rng() * Math.max(1, maxX - minX + 1));
+        const ty = minY + Math.floor(rng() * Math.max(1, maxY - minY + 1));
+        if (prefer(tx, ty)) { rx = tx; ry = ty; found = true; break; }
+      }
+      if (!found) continue;
+    } else {
+      rx = minX + Math.floor(rng() * Math.max(1, maxX - minX + 1));
+      ry = minY + Math.floor(rng() * Math.max(1, maxY - minY + 1));
+    }
 
-  const room = {
-    x: rx, y: ry, w, h,
-    cx: rx + (w >> 1),
-    cy: ry + (h >> 1),
-    enemies: [],
-    cleared: false,
-    visited: false,
-  };
+    for (let y = ry; y < ry + h; y++) {
+      for (let x = rx; x < rx + w; x++) map[y][x] = T_FLOOR;
+    }
 
-  // Cut the consumed strip into up to 4 leftover strips around the room.
-  const MIN_STRIP = 6;
-  const leftover = [];
-  // top of strip → y of room
-  if (ry - strip.y - 2 >= MIN_STRIP) {
-    leftover.push({ x: strip.x, y: strip.y, w: strip.w, h: ry - strip.y - 2 });
-  }
-  // bottom of room → bottom of strip
-  const bottomY = ry + h + 1;
-  if (strip.y + strip.h - bottomY >= MIN_STRIP) {
-    leftover.push({ x: strip.x, y: bottomY, w: strip.w, h: strip.y + strip.h - bottomY });
-  }
-  // left side of strip → x of room (only spans the room's vertical band)
-  if (rx - strip.x - 2 >= MIN_STRIP) {
-    leftover.push({ x: strip.x, y: ry, w: rx - strip.x - 2, h });
-  }
-  // right side
-  const rightX = rx + w + 1;
-  if (strip.x + strip.w - rightX >= MIN_STRIP) {
-    leftover.push({ x: rightX, y: ry, w: strip.x + strip.w - rightX, h });
-  }
+    const room = {
+      x: rx, y: ry, w, h,
+      cx: rx + (w >> 1),
+      cy: ry + (h >> 1),
+      enemies: [],
+      cleared: false,
+      visited: false,
+    };
 
-  return { room, strips: leftover, consumedStrip: strip };
+    // Cut the consumed strip into up to 4 leftover strips around the room.
+    const MIN_STRIP = 6;
+    const leftover = [];
+    if (ry - strip.y - 2 >= MIN_STRIP) {
+      leftover.push({ x: strip.x, y: strip.y, w: strip.w, h: ry - strip.y - 2 });
+    }
+    const bottomY = ry + h + 1;
+    if (strip.y + strip.h - bottomY >= MIN_STRIP) {
+      leftover.push({ x: strip.x, y: bottomY, w: strip.w, h: strip.y + strip.h - bottomY });
+    }
+    if (rx - strip.x - 2 >= MIN_STRIP) {
+      leftover.push({ x: strip.x, y: ry, w: rx - strip.x - 2, h });
+    }
+    const rightX = rx + w + 1;
+    if (strip.x + strip.w - rightX >= MIN_STRIP) {
+      leftover.push({ x: rightX, y: ry, w: strip.x + strip.w - rightX, h });
+    }
+
+    return { room, strips: leftover, consumedStrip: strip };
+  }
+  return null;
 }
 
 /**

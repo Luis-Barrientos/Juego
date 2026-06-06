@@ -15,6 +15,15 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.2',
+    date: '2026-06-06',
+    title: 'Archivo Prohibido: generación dirigida',
+    items: [
+      'El Archivo Prohibido ahora se genera preferentemente en la esquina superior-derecha o inferior-izquierda del piso, fuera del corredor crítico entre la entrada y la escalera. Esto evita que su puerta cerrada bloquee el avance.',
+      'Si por las dimensiones del piso no cabe en ninguna esquina segura, se genera donde quepa y el validador de softlock sigue desbloqueando la puerta automáticamente cuando es necesario.',
+    ],
+  },
+  {
     version: '0.8.1',
     date: '2026-06-06',
     title: 'Sala de la Llave: sin trampas mortales',
