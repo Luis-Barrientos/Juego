@@ -199,15 +199,24 @@ function teleportTo(floor, entry) {
   }
 
   // Need to regenerate. Force the special if applicable, then rebuild.
+  // The force flag only biases the *roll* — `reserveInStrips` can still
+  // fail if the seed has no room for the set-piece (more likely now
+  // that the Archive is biased to the TR/BL quadrant). Retry with new
+  // seeds until the requested room actually exists, up to a hard cap.
   window.__DEBUG_FORCE = window.__DEBUG_FORCE || {};
   if (entry.force) window.__DEBUG_FORCE[entry.force] = true;
 
   state.floor = floor;
-  buildFloorFn(floor);
+  const MAX_RETRIES = entry.force ? 30 : 1;
+  let hit = null;
+  for (let i = 0; i < MAX_RETRIES; i++) {
+    buildFloorFn(floor);
+    hit = state.rooms.find(r => entry.match(r));
+    if (hit) break;
+  }
   // Clear the force flag so future natural floors stay random.
   if (entry.force) delete window.__DEBUG_FORCE[entry.force];
 
-  const hit = state.rooms.find(r => entry.match(r));
   if (hit) placePlayerInRoom(hit);
   state.state = STATE_PLAY;
   toggle();

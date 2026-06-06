@@ -15,6 +15,14 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.4',
+    date: '2026-06-06',
+    title: 'Debug: forzado de set-pieces fiable',
+    items: [
+      'Arreglado: el panel de debug podía dejarte en el inicio del piso en lugar de teletransportarte al Archivo Prohibido (u otra set-piece) si el seed actual no tenía espacio físico para colocarla. Ahora se reintenta hasta 30 veces con seeds distintos hasta encontrar uno que la genere.',
+    ],
+  },
+  {
     version: '0.8.3',
     date: '2026-06-06',
     title: 'Las escaleras ya no caen dentro de set-pieces',
