@@ -57,7 +57,7 @@ import { initChangelogUI }                from './changelog.js';
 import { tryStartChallenge, updateChallenge, resetChallenge, drawAltarPrompt } from './challenge.js';
 import { tryStartLibraryEvent, updateLibraryEvent, resetLibraryEvent, drawCirclePrompt } from './librarySetPiece.js';
 import { tryStartGrandTome, updateGrandTome, resetGrandTome, drawGrandTome, drawTomePrompt } from './grandTome.js';
-import { resetKeyRoom, updateKeyRoom, drawArchiveDoorPrompt } from './keyRoom.js';
+import { resetKeyRoom, updateKeyRoom, drawArchiveDoorPrompt, drawKeyPedestals, tryActivateKeyPedestal } from './keyRoom.js';
 
 /* ─────────────────────────── DOM bootstrap ─────────────────────────── */
 const canvas  = document.getElementById('game');
@@ -369,6 +369,7 @@ const playerHooks = {
   onAltar:     () => tryStartChallenge(showToast),
   onCircle:    () => tryStartLibraryEvent(showToast),
   onTome:      () => tryStartGrandTome(showToast),
+  onKeyPedestal: () => tryActivateKeyPedestal(),
 };
 
 /* ─────────────────────────── Update / render ─────────────────────────── */
@@ -589,6 +590,7 @@ function render() {
   drawSarcophagiOverlay(ctx);
   drawLibrarySetPiece(ctx);
   drawGrandTome(ctx);
+  drawKeyPedestals(ctx);
   drawAltarPrompt(ctx);
   drawCirclePrompt(ctx);
   drawTomePrompt(ctx);

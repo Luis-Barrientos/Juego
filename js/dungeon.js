@@ -91,7 +91,8 @@ export function generateDungeon(floor, seed, biome) {
   const forceGrandTome   = !!FORCE.grandTome;
   const forceObservatory = !!FORCE.observatory;
   const forceGreatLib    = !!FORCE.greatLibrary;
-  const forceKeyPair     = !!FORCE.keyRoom || !!FORCE.archive;
+  const forceKeyPair     = !!FORCE.keyRoom || !!FORCE.keyRoomKill || !!FORCE.keyRoomRune || !!FORCE.archive;
+  const forceKeyVariant  = FORCE.keyRoomRune ? 'rune' : FORCE.keyRoomKill ? 'kill' : null;
 
   // Sala del Gran Tomo first: it's smaller (11×9) and easier to fit, so
   // reserving it before the Great Library guarantees it never gets
@@ -385,6 +386,7 @@ export function generateDungeon(floor, seed, biome) {
       placeObservatory(observatoryRoom, map, rng, libraryProps, lights, sunbeams, decorations);
     }
     if (keyRoomRoom && archiveRoom) {
+      if (forceKeyVariant) keyRoomRoom.keyVariant = forceKeyVariant;
       placeKeyRoom(keyRoomRoom, map, rng, libraryProps, lights);
       placeForbiddenArchive(archiveRoom, map, rng, libraryProps, lights, startRoom);
       // Two safety nets after the lock is placed:
@@ -1989,6 +1991,15 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
   if (!room) return;
   room.isKeyRoom = true;
 
+  // Pick a puzzle variant for this floor unless a debug flag already
+  // fixed it. 50/50 between the original kill-all arena and the new
+  // rune-pair matching puzzle. A future 'candle' variant will join the
+  // pool here.
+  if (!room.keyVariant) {
+    room.keyVariant = rng() < 0.5 ? 'rune' : 'kill';
+  }
+  const variant = room.keyVariant;
+
   // Wipe any prop that might have been laid down inside the footprint
   // (shelves/tables already skip via isKeyRoom, but magic flames or
   // rune marks could still land here). We want a clean arena.
@@ -2014,10 +2025,34 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
     seed: Math.floor(rng() * 1e9),
   });
 
-  // Two cool-blue magical lights flanking the dais so the arena has a
-  // distinct visual identity (no flames, no shelves, just the rune
-  // glow).
+  // Rune-pair puzzle: place 4 pedestals around the dais arranged as 2
+  // matching pairs (runeId 0 × 2, runeId 1 × 2). Positions are pulled
+  // toward the room corners but kept inside the walkable area so the
+  // player can circle every pedestal freely. The live state lives in
+  // keyRoom.js; here we just stash the layout on the room.
+  if (variant === 'rune') {
+    const slots = [
+      { tx: room.cx - 3, ty: room.cy - 2 },
+      { tx: room.cx + 3, ty: room.cy - 2 },
+      { tx: room.cx - 3, ty: room.cy + 2 },
+      { tx: room.cx + 3, ty: room.cy + 2 },
+    ];
+    const ids = [0, 0, 1, 1];
+    // Fisher-Yates so each seed gets a different rune layout.
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    room.keyPedestals = slots.map((s, i) => ({
+      tx: s.tx, ty: s.ty, runeId: ids[i],
+    }));
+  }
+
+  // Flanking magic lights. Colour swaps with the variant so the room
+  // reads at a glance: cool blue for the arena, warm purple-ish for
+  // the puzzle.
   if (lights) {
+    const tint = variant === 'rune' ? [180, 140, 255] : [120, 180, 255];
     const offs = [{ dx: -3, dy: 0 }, { dx: 3, dy: 0 }];
     for (const o of offs) {
       const lx = (room.cx + o.dx) * TILE + TILE / 2;
@@ -2030,7 +2065,7 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
         phase:   rng() * Math.PI * 2,
         speed:   0.20 + rng() * 0.20,
         wobble:  rng() * Math.PI * 2,
-        color:   [120, 180, 255],
+        color:   tint,
         r:       110,
         flicker: rng() * Math.PI * 2,
       });

@@ -34,7 +34,8 @@ const ROOM_CATALOGUE = {
     { label: 'Sala del Gran Tomo',      match: r => r.isGrandTome,     force: 'grandTome' },
     { label: 'Gran Biblioteca',         match: r => r.isGreatLibrary,  force: 'greatLibrary' },
     { label: 'Observatorio',            match: r => r.isObservatory,   force: 'observatory' },
-    { label: 'Sala de la Llave',        match: r => r.isKeyRoom,       force: 'keyRoom' },
+    { label: 'Sala de la Llave (oleada)', match: r => r.isKeyRoom && r.keyVariant === 'kill', force: 'keyRoomKill' },
+    { label: 'Sala de la Llave (runas)',  match: r => r.isKeyRoom && r.keyVariant === 'rune', force: 'keyRoomRune' },
     { label: 'Archivo Prohibido',       match: r => r.isForbiddenArchive, force: 'archive' },
   ],
   crypt: [

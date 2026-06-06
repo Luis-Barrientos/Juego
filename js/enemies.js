@@ -793,10 +793,11 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     const area = r.w * r.h;
     const base = Math.ceil(area / 28);
     let n      = Math.max(2, Math.min(4 + floor, base + irand(0, 1 + Math.floor(floor / 2))));
-    // Sala de la Llave: extra mobs so the kill-all puzzle feels like a
-    // real arena rather than a normal room. Tagged so the puzzle can
-    // detect when every challenger is down and drop the rune key.
+    // Sala de la Llave: extra mobs only for the kill-all variant. The
+    // rune-pair puzzle is a mechanical room — spawning enemies in it
+    // would block the pedestals and turn the puzzle into a brawl.
     const isKeyRoom = !!r.isKeyRoom;
+    if (isKeyRoom && r.keyVariant === 'rune') continue;
     if (isKeyRoom) n += 3;
     for (let i = 0; i < n; i++) {
       let ex, ey, safety = 12;
