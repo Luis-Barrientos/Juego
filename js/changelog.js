@@ -15,6 +15,14 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.5',
+    date: '2026-06-06',
+    title: 'Archivo Prohibido: cerrojo siempre alcanzable',
+    items: [
+      'Arreglado: la puerta rúnica del Archivo podía colocarse sobre una entrada cuyo otro lado era un bolsillo de pasillo aislado del resto del piso, dejando el cofre legendario inaccesible. Ahora se eligen solo entradas cuyo exterior conecta de verdad con la entrada del piso; si ninguna lo hace, el archivo se deja abierto.',
+    ],
+  },
+  {
     version: '0.8.4',
     date: '2026-06-06',
     title: 'Debug: forzado de set-pieces fiable',
