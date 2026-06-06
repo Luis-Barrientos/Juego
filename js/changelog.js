@@ -15,6 +15,14 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.3',
+    date: '2026-06-06',
+    title: 'Las escaleras ya no caen dentro de set-pieces',
+    items: [
+      'Arreglado: la escalera al siguiente piso (y la posición de inicio) podían generarse dentro de la Sala de la Llave, el Archivo Prohibido, el Gran Tomo, el Observatorio o la Gran Biblioteca, pisando su contenido. Ahora la selección de sala de inicio y de escaleras ignora todas las salas temáticas.',
+    ],
+  },
+  {
     version: '0.8.2',
     date: '2026-06-06',
     title: 'Archivo Prohibido: generación dirigida',

@@ -252,13 +252,24 @@ export function generateDungeon(floor, seed, biome) {
   // Detect start (top-left-most) and stairs (farthest from start) rooms
   // BEFORE placing pillars/sarcophagi so those placers can skip them.
   // The actual T_STAIR tile is written later, after structural placers.
-  let startRoom = rooms[0];
-  for (const r of rooms) {
+  // Set-pieces (Sala de la Llave, Archivo, Gran Tomo, Observatorio, Gran
+  // Biblioteca) are excluded from both picks: they have their own
+  // bespoke contents and putting the spawn or the staircase inside one
+  // would either softlock the run (locked archive) or overwrite the
+  // set-piece (e.g. stairs over the kill-all rune dais).
+  const isSetPiece = (r) =>
+    r.isKeyRoom || r.isForbiddenArchive || r.isObservatory ||
+    r.isGrandTome || r.isGreatLibrary;
+  const normalRooms = rooms.filter(r => !isSetPiece(r));
+  // Fallback: if nothing else exists (very small floor) accept any room.
+  const candidates = normalRooms.length ? normalRooms : rooms;
+  let startRoom = candidates[0];
+  for (const r of candidates) {
     if (r.cx + r.cy < startRoom.cx + startRoom.cy) startRoom = r;
   }
   let stairsRoom = startRoom;
   let bestD = 0;
-  for (const r of rooms) {
+  for (const r of candidates) {
     const d = Math.hypot(r.cx - startRoom.cx, r.cy - startRoom.cy);
     if (d > bestD) { bestD = d; stairsRoom = r; }
   }
