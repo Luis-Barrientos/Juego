@@ -15,6 +15,15 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.6',
+    date: '2026-06-06',
+    title: 'Archivo Prohibido: esquinas estrictas',
+    items: [
+      'El Archivo Prohibido ahora SOLO se genera en la esquina superior-derecha o inferior-izquierda del piso. Si por geometría no cabe en ninguna de las dos, el par Sala de la Llave + Archivo no se genera ese piso.',
+      'Arreglado: la puerta rúnica podía quedar inaccesible aunque el resto del piso siguiera transitable (un muro tapaba el pasillo justo delante de la puerta). Ahora se valida que se pueda caminar hasta la puerta desde la entrada del piso, y si no, el archivo se desbloquea automáticamente.',
+    ],
+  },
+  {
     version: '0.8.5',
     date: '2026-06-06',
     title: 'Archivo Prohibido: cerrojo siempre alcanzable',

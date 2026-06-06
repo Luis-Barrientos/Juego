@@ -138,14 +138,13 @@ export function generateDungeon(floor, seed, biome) {
       else         bspRoots.push(...resKey.strips);
 
       const sourcesA = bspRoots.length ? bspRoots : [{ x: 1, y: 1, w: MAP_W - 2, h: MAP_H - 2 }];
-      // Bias the archive toward the top-right or bottom-left quadrant:
-      // the start room is always top-left (min cx+cy) and the stairs
-      // room is the farthest from it (usually bottom-right), so those
-      // two corners belong to the critical path. Tucking the archive
-      // into a free corner keeps its locked door off that path. If
-      // neither quadrant has space, fall back to anywhere — the BFS
-      // validator further down still defuses the lock if it would
-      // softlock the floor.
+      // STRICT TR/BL placement: the archive MUST land on the top-right
+      // or bottom-left quadrant. The start room is always top-left and
+      // the stairs are usually bottom-right, so those two corners host
+      // the critical path. Forcing the archive into a free corner
+      // guarantees the locked door cannot sit on the spine of the
+      // floor. If neither quadrant has room, the whole pair is rolled
+      // back — the player just gets an archive-less floor that run.
       const inSafeQuadrant = (rx, ry) => {
         const ccx = rx + (7 >> 1);
         const ccy = ry + (6 >> 1);
@@ -153,9 +152,7 @@ export function generateDungeon(floor, seed, biome) {
         const bottom = ccy >= (MAP_H >> 1);
         return (right && !bottom) || (!right && bottom);
       };
-      const resArch =
-        reserveInStrips(map, rng, 7, 6, 2, sourcesA, inSafeQuadrant) ||
-        reserveInStrips(map, rng, 7, 6, 2, sourcesA);
+      const resArch = reserveInStrips(map, rng, 7, 6, 2, sourcesA, inSafeQuadrant);
       if (resArch) {
         resKey.room.isKeyRoom = true;
         rooms.push(resKey.room);
@@ -390,12 +387,16 @@ export function generateDungeon(floor, seed, biome) {
     if (keyRoomRoom && archiveRoom) {
       placeKeyRoom(keyRoomRoom, map, rng, libraryProps, lights);
       placeForbiddenArchive(archiveRoom, map, rng, libraryProps, lights, startRoom);
-      // Validate: the locked archive door must NOT cut the path between
-      // the start and stair rooms. If it does, undo the lock (turn
-      // every locked-door tile back into floor) so the player can
-      // always progress. The chest still spawns inside, just without
-      // the puzzle gate — better a freebie than a softlock.
-      if (!isReachable(map, startRoom, stairsRoom)) {
+      // Two safety nets after the lock is placed:
+      //  1) The locked door must NOT cut the start→stairs path.
+      //  2) The locked door tile itself must be reachable from start
+      //     (an outside neighbour of the door tile, walking around the
+      //     archive). Otherwise the player cannot use the key even with
+      //     it in hand — the door is buried in an isolated pocket.
+      // Failing either check unlocks the archive entirely (chest stays
+      // as a freebie reward — strictly better than softlocking the run).
+      if (!isReachable(map, startRoom, stairsRoom) ||
+          !isDoorReachableFromStart(map, archiveRoom, startRoom)) {
         unlockArchive(map, archiveRoom);
       }
     }
@@ -425,6 +426,49 @@ function isReachable(map, startRoom, stairsRoom) {
       if (seen[idx]) continue;
       const t = map[ny][nx];
       // Locked doors block here — that's the whole point of the test.
+      if (t === T_WALL || t === T_DOOR_LOCKED) continue;
+      seen[idx] = 1;
+      queue.push([nx, ny]);
+    }
+  }
+  return false;
+}
+
+/**
+ * Final reachability check for the locked archive door. Returns true if
+ * any of the 4 outside neighbours of the door tile is reachable from
+ * the start room (BFS treats archive interior and T_DOOR_LOCKED as
+ * walls). False means the player can't even *walk up* to the door, so
+ * the lock should be defused.
+ * @private
+ */
+function isDoorReachableFromStart(map, archiveRoom, startRoom) {
+  if (!archiveRoom || !archiveRoom.doorTile) return true;
+  const door = archiveRoom.doorTile;
+  const ax0 = archiveRoom.x, ax1 = archiveRoom.x + archiveRoom.w;
+  const ay0 = archiveRoom.y, ay1 = archiveRoom.y + archiveRoom.h;
+  const inArchive = (x, y) => x >= ax0 && x < ax1 && y >= ay0 && y < ay1;
+  const approaches = [];
+  for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+    const nx = door.tx + dx, ny = door.ty + dy;
+    if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+    if (inArchive(nx, ny)) continue;
+    if (map[ny][nx] === T_FLOOR) approaches.push({ tx: nx, ty: ny });
+  }
+  if (approaches.length === 0) return false;
+  const seen = new Uint8Array(MAP_W * MAP_H);
+  const queue = [[startRoom.cx, startRoom.cy]];
+  seen[startRoom.cy * MAP_W + startRoom.cx] = 1;
+  while (queue.length) {
+    const [x, y] = queue.shift();
+    for (const a of approaches) if (a.tx === x && a.ty === y) return true;
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+      const idx = ny * MAP_W + nx;
+      if (seen[idx]) continue;
+      if (inArchive(nx, ny)) continue;
+      const t = map[ny][nx];
       if (t === T_WALL || t === T_DOOR_LOCKED) continue;
       seen[idx] = 1;
       queue.push([nx, ny]);
@@ -1385,7 +1429,7 @@ function reserveInStrips(map, rng, w, h, margin, strips, prefer = null) {
     let rx, ry;
     if (prefer) {
       let found = false;
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < 64; i++) {
         const tx = minX + Math.floor(rng() * Math.max(1, maxX - minX + 1));
         const ty = minY + Math.floor(rng() * Math.max(1, maxY - minY + 1));
         if (prefer(tx, ty)) { rx = tx; ry = ty; found = true; break; }
