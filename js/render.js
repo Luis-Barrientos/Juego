@@ -3140,6 +3140,7 @@ export function drawPuddles(ctx) {
 
 /**
  * Render the minimap onto the supplied canvas.
+ * Only rooms the player has visited are visible (fog of war).
  */
 export function drawMinimap(mctx, w, h) {
   mctx.clearRect(0, 0, w, h);
@@ -3148,11 +3149,30 @@ export function drawMinimap(mctx, w, h) {
   const sx = w / MAP_W;
   const sy = h / MAP_H;
 
+  // Build a quick lookup: tile -> room id (only for floor tiles in rooms)
+  const roomAt = new Map();
+  for (const r of state.rooms) {
+    const id = `${r.x},${r.y},${r.w},${r.h}`;
+    for (let yy = r.y; yy < r.y + r.h; yy++) {
+      for (let xx = r.x; xx < r.x + r.w; xx++) {
+        roomAt.set(`${xx},${yy}`, id);
+      }
+    }
+  }
+
   for (let y = 0; y < MAP_H; y++) {
     for (let x = 0; x < MAP_W; x++) {
       const t = state.map[y][x];
+      if (t !== T_FLOOR && t !== T_STAIR && t !== T_DOOR_LOCKED) continue;
+
+      const roomId = roomAt.get(`${x},${y}`);
+      const visited = roomId && state.roomsVisited.has(roomId);
+      const isCurrent = state.currentRoom && roomId === `${state.currentRoom.x},${state.currentRoom.y},${state.currentRoom.w},${state.currentRoom.h}`;
+
+      if (!visited && !isCurrent) continue;
+
       if (t === T_FLOOR) {
-        mctx.fillStyle = '#3a2818';
+        mctx.fillStyle = isCurrent ? '#4a3820' : '#3a2818';
         mctx.fillRect(x * sx, y * sy, sx + 0.5, sy + 0.5);
       } else if (t === T_STAIR) {
         const pulse = 0.7 + Math.sin(state.time * 4) * 0.3;
@@ -3168,8 +3188,16 @@ export function drawMinimap(mctx, w, h) {
     }
   }
 
+  // Only draw enemies in visited/current rooms
   for (const e of state.enemies) {
     if (e.dead) continue;
+    const exTile = Math.floor(e.x / TILE);
+    const eyTile = Math.floor(e.y / TILE);
+    const roomId = roomAt.get(`${exTile},${eyTile}`);
+    const visited = roomId && state.roomsVisited.has(roomId);
+    const isCurrent = state.currentRoom && roomId === `${state.currentRoom.x},${state.currentRoom.y},${state.currentRoom.w},${state.currentRoom.h}`;
+    if (!visited && !isCurrent) continue;
+
     mctx.fillStyle = e.isBoss ? '#ff4040' : '#ff6060';
     const ex = (e.x / TILE) * sx, ey = (e.y / TILE) * sy;
     mctx.fillRect(ex - 1.5, ey - 1.5, 3, 3);

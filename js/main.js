@@ -160,6 +160,8 @@ function buildFloor(floor) {
   resetGrandTome();
   resetKeyRoom();
 
+  state.roomsVisited.clear();
+
   const start = d.startRoom;
   if (state.player) {
     state.player.x = start.cx * TILE + TILE / 2;
@@ -167,6 +169,8 @@ function buildFloor(floor) {
   } else {
     state.player = createPlayer(start.cx * TILE + TILE / 2, start.cy * TILE + TILE / 2);
   }
+
+  state.roomsVisited.add(`${start.x},${start.y},${start.w},${start.h}`);
 
   populateFloor(floor, MAX_FLOOR, spawnChest);
   rebuildMapCache();
@@ -628,6 +632,10 @@ function update(dt) {
   updateArchiveRoom(dt);
   applySunbeamRegen(dt);
   state.currentRoom = getRoomAt(state.rooms, state.player);
+  if (state.currentRoom) {
+    const id = `${state.currentRoom.x},${state.currentRoom.y},${state.currentRoom.w},${state.currentRoom.h}`;
+    state.roomsVisited.add(id);
+  }
 
   for (const e of state.enemies) enemyUpdate(e, dt, enemyHooks);
   state.enemies = state.enemies.filter(e => !e.dead);

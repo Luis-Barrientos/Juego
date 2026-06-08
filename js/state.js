@@ -29,6 +29,7 @@ export const state = {
   challenge: null,        // crypta challenge state (see challenge.js)
   soulSpawners: [],       // catacombs ambient soul anchors (see main.js)
   leafSpawners: [],       // library ambient leaf / paper-scrap anchors
+  roomsVisited: new Set(), // room ids the player has entered
   _whisperTimer: 0,       // seconds until the next whisper sound
   _creakTimer: 0,         // seconds until the next library wood-creak sound
   cameraX: 0,
