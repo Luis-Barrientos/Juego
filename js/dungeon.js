@@ -91,8 +91,8 @@ export function generateDungeon(floor, seed, biome) {
   const forceGrandTome   = !!FORCE.grandTome;
   const forceObservatory = !!FORCE.observatory;
   const forceGreatLib    = !!FORCE.greatLibrary;
-  const forceKeyPair     = !!FORCE.keyRoom || !!FORCE.keyRoomKill || !!FORCE.keyRoomRune || !!FORCE.archive;
-  const forceKeyVariant  = FORCE.keyRoomRune ? 'rune' : FORCE.keyRoomKill ? 'kill' : null;
+  const forceKeyPair     = !!FORCE.keyRoom || !!FORCE.keyRoomKill || !!FORCE.keyRoomRune || !!FORCE.keyRoomCandle || !!FORCE.archive;
+  const forceKeyVariant  = FORCE.keyRoomRune ? 'rune' : FORCE.keyRoomKill ? 'kill' : FORCE.keyRoomCandle ? 'candle' : null;
 
   // Sala del Gran Tomo first: it's smaller (11×9) and easier to fit, so
   // reserving it before the Great Library guarantees it never gets
@@ -1950,11 +1950,10 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
   room.isKeyRoom = true;
 
   // Pick a puzzle variant for this floor unless a debug flag already
-  // fixed it. 50/50 between the original kill-all arena and the new
-  // rune-pair matching puzzle. A future 'candle' variant will join the
-  // pool here.
+  // fixed it. 33% each between kill, rune and candle.
   if (!room.keyVariant) {
-    room.keyVariant = rng() < 0.5 ? 'rune' : 'kill';
+    const roll = rng();
+    room.keyVariant = roll < 0.33 ? 'rune' : roll < 0.66 ? 'kill' : 'candle';
   }
   const variant = room.keyVariant;
 
@@ -1996,7 +1995,6 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
       { tx: room.cx + 3, ty: room.cy + 2 },
     ];
     const ids = [0, 0, 1, 1];
-    // Fisher-Yates so each seed gets a different rune layout.
     for (let i = ids.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
       [ids[i], ids[j]] = [ids[j], ids[i]];
@@ -2006,11 +2004,35 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
     }));
   }
 
+  // Candle puzzle: place 5 candles around the perimeter. The player
+  // must light them in the correct sequence by pressing E. The order
+  // is a random permutation of [0..4].
+  if (variant === 'candle') {
+    const slots = [
+      { tx: room.cx - 2, ty: room.cy - 3 },
+      { tx: room.cx + 2, ty: room.cy - 3 },
+      { tx: room.cx - 3, ty: room.cy      },
+      { tx: room.cx - 2, ty: room.cy + 2 },
+      { tx: room.cx + 2, ty: room.cy + 2 },
+    ];
+    const seq = [0, 1, 2, 3, 4];
+    for (let i = seq.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [seq[i], seq[j]] = [seq[j], seq[i]];
+    }
+    room.keyCandles = slots.map((s, i) => ({
+      tx: s.tx, ty: s.ty, index: i,
+    }));
+    room.keyCandleSeq = seq;
+  }
+
   // Flanking magic lights. Colour swaps with the variant so the room
   // reads at a glance: cool blue for the arena, warm purple-ish for
   // the puzzle.
   if (lights) {
-    const tint = variant === 'rune' ? [180, 140, 255] : [120, 180, 255];
+    const tint = variant === 'rune' ? [180, 140, 255]
+      : variant === 'candle' ? [255, 200, 100]
+      : [120, 180, 255];
     const offs = [{ dx: -3, dy: 0 }, { dx: 3, dy: 0 }];
     for (const o of offs) {
       const lx = (room.cx + o.dx) * TILE + TILE / 2;

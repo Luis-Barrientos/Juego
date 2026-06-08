@@ -3,21 +3,18 @@
  * --------------------------------------------------------------------------
  * Library "Sala de la Llave" set-piece. The room hosts one of several
  * puzzles; clearing it spawns a rune key pickup that opens the locked
- * door of the Archivo Prohibido.
+ * door(s) of the Archivo Prohibido.
  *
  * Implemented variants:
  *   • 'kill' — every entrance seals, an extra wave spawns inside,
- *              clearing them all drops the key. (Original v1 puzzle.)
- *   • 'rune' — every entrance seals; four rune pedestals stand around
- *              the dais arranged as two matching pairs. The player must
- *              stand on the central dais to activate the runes, then hit
- *              them with magic projectiles to light them. Hitting two
- *              with the same rune validates them (they turn green).
- *              Mismatches flash red and reset. Leaving the dais deactivates
- *              the runes. Validating all four completes the puzzle.
+ *              clearing them all drops the key.
+ *   • 'rune' — stand on the central dais and hit the four rune pedestals
+ *              with magic projectiles to match pairs.
+ *   • 'candle' — press E on five candles around the room in the correct
+ *              sequence. A mistake resets the sequence.
  *
- * Both variants share the seal-on-entry behaviour, the key drop and the
- * locked-door logic. A future 'candle' variant will plug in here too.
+ * All variants share the seal-on-entry behaviour, the key drop and the
+ * locked-door logic.
  */
 
 import { state }              from './state.js';
@@ -59,7 +56,7 @@ export function resetKeyRoom() {
       sealedTiles: [],
       keyDropped: false,
 
-      // Rune-puzzle live state. For 'kill' these stay empty/unused.
+      // Rune-puzzle live state. For 'kill' and 'candle' these stay empty.
       pedestals: (room.keyPedestals || []).map(p => ({
         tx: p.tx, ty: p.ty,
         runeId: p.runeId,
@@ -71,6 +68,16 @@ export function resetKeyRoom() {
       mismatchTimer: 0,
       mismatchA:     -1,
       mismatchB:     -1,
+
+      // Candle-puzzle live state. For 'kill' and 'rune' these stay empty.
+      candles: (room.keyCandles || []).map(c => ({
+        tx: c.tx, ty: c.ty,
+        index: c.index,
+        lit: false,
+      })),
+      candleSeq:    room.keyCandleSeq || [],
+      candleStep:   0,
+      candleMistakeTimer: 0,
     };
   }
   const archive = state.rooms.find(r => r.isForbiddenArchive);
@@ -227,6 +234,8 @@ export function updateKeyRoom(dt, toast) {
     Audio.bossHit && Audio.bossHit();
     if (k.variant === 'rune') {
       toast && toast('¡La sala se sella! Empareja las runas de los pedestales.');
+    } else if (k.variant === 'candle') {
+      toast && toast('¡La sala se sella! Enciende las velas en el orden correcto.');
     } else {
       toast && toast('¡La sala se sella! Acaba con todos los enemigos.');
     }
@@ -272,6 +281,22 @@ export function updateKeyRoom(dt, toast) {
       }
     }
     if (k.pedestals.length > 0 && k.pedestals.every(p => p.validated)) {
+      completePuzzle(k, toast);
+    }
+    return;
+  }
+
+  // 'candle' variant — mistake timer reset.
+  if (k.variant === 'candle') {
+    if (k.candleMistakeTimer > 0) {
+      k.candleMistakeTimer = Math.max(0, k.candleMistakeTimer - dt);
+      if (k.candleMistakeTimer === 0) {
+        // Reset all candles and sequence.
+        for (const c of k.candles) c.lit = false;
+        k.candleStep = 0;
+      }
+    }
+    if (k.candleStep >= k.candles.length) {
       completePuzzle(k, toast);
     }
     return;
@@ -330,6 +355,56 @@ export function hitRunePedestal(tx, ty) {
   return true;
 }
 
+/* ─────────────────────────── candle E-handler ─────────────────────────── */
+
+/** @private Find the candle closest to the player within reach. */
+function nearestCandleInRange(k) {
+  if (!k.candles.length) return -1;
+  const p = state.player;
+  let best = -1, bestD = TILE * 1.6;
+  for (let i = 0; i < k.candles.length; i++) {
+    const c = k.candles[i];
+    const cx = (c.tx + 0.5) * TILE;
+    const cy = (c.ty + 0.5) * TILE;
+    const d  = Math.hypot(p.x - cx, p.y - cy);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+/**
+ * Player E-handler for the candle puzzle. If the player is near a
+ * candle, lights it and checks if it's the next in sequence.
+ */
+export function tryLightCandle() {
+  const k = state.keyRoom;
+  if (!k || k.variant !== 'candle') return false;
+  if (k.state !== 'active') return false;
+  if (k.candleMistakeTimer > 0) return false;
+
+  const idx = nearestCandleInRange(k);
+  if (idx < 0) return false;
+  const c = k.candles[idx];
+  if (c.lit) return false;
+
+  // Check if this candle is the next in sequence.
+  const expectedIdx = k.candleSeq[k.candleStep];
+  if (c.index === expectedIdx) {
+    c.lit = true;
+    k.candleStep++;
+    spawnParticles((c.tx + 0.5) * TILE, (c.ty + 0.5) * TILE, '#ffd080', 10);
+    Audio.bossHit && Audio.bossHit();
+  } else {
+    // Wrong candle — flash and reset the sequence.
+    k.candleMistakeTimer = 0.8;
+    for (const cc of k.candles) cc.lit = false;
+    k.candleStep = 0;
+    spawnParticles((c.tx + 0.5) * TILE, (c.ty + 0.5) * TILE, '#ff4040', 14);
+    Audio.bossHit && Audio.bossHit();
+  }
+  return true;
+}
+
 /* ─────────────────────────── render ─────────────────────────── */
 
 /**
@@ -338,52 +413,81 @@ export function hitRunePedestal(tx, ty) {
  */
 export function drawKeyPedestals(ctx) {
   const k = state.keyRoom;
-  if (!k || k.variant !== 'rune') return;
+  if (!k) return;
   const t = state.time || 0;
 
-  const playerInCenter = isPlayerInCenter(k);
+  if (k.variant === 'rune') {
+    const playerInCenter = isPlayerInCenter(k);
 
-  // Draw a subtle glowing ring on the centre dais.
-  if (k.state === 'active') {
-    const cx = (k.room.cx + 0.5) * TILE - state.cameraX;
-    const cy = (k.room.cy + 0.5) * TILE - state.cameraY;
-    const pulse = 0.15 + 0.1 * Math.sin(t * 2);
-    ctx.save();
-    ctx.globalAlpha = playerInCenter ? 1 : 0.35;
-    const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, TILE * CENTER_RADIUS);
-    grad.addColorStop(0, `rgba(180, 140, 255, ${pulse})`);
-    grad.addColorStop(1, 'rgba(180, 140, 255, 0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, TILE * CENTER_RADIUS, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // Draw pedestals, dimmed when player is away from centre.
-  for (const ped of k.pedestals) {
-    drawRunePedestal(ctx, ped, t, playerInCenter && k.state === 'active');
-  }
-
-  // Context-sensitive hint text above the dais.
-  if (k.state === 'active') {
-    const cx = (k.room.cx + 0.5) * TILE - state.cameraX;
-    const sy = (k.room.cy - 0.5) * TILE - state.cameraY;
-    const pulse = 0.6 + 0.4 * Math.sin(t * 3);
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.shadowColor = 'rgba(0,0,0,0.85)';
-    ctx.shadowBlur  = 4;
-    if (!playerInCenter) {
-      ctx.fillStyle = `rgba(255, 220, 160, ${pulse})`;
-      ctx.font      = 'bold 12px sans-serif';
-      ctx.fillText('Párate en el centro para activar las runas', cx, sy - 14);
-    } else if (k.mismatchTimer === 0 && k.pedestals.some(p => !p.validated)) {
-      ctx.fillStyle = `rgba(180, 200, 255, ${pulse})`;
-      ctx.font      = 'bold 12px sans-serif';
-      ctx.fillText('Dispara a las runas para emparejarlas', cx, sy - 14);
+    // Draw a subtle glowing ring on the centre dais.
+    if (k.state === 'active') {
+      const cx = (k.room.cx + 0.5) * TILE - state.cameraX;
+      const cy = (k.room.cy + 0.5) * TILE - state.cameraY;
+      const pulse = 0.15 + 0.1 * Math.sin(t * 2);
+      ctx.save();
+      ctx.globalAlpha = playerInCenter ? 1 : 0.35;
+      const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, TILE * CENTER_RADIUS);
+      grad.addColorStop(0, `rgba(180, 140, 255, ${pulse})`);
+      grad.addColorStop(1, 'rgba(180, 140, 255, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, TILE * CENTER_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
-    ctx.restore();
+
+    // Draw pedestals, dimmed when player is away from centre.
+    for (const ped of k.pedestals) {
+      drawRunePedestal(ctx, ped, t, playerInCenter && k.state === 'active');
+    }
+
+    // Context-sensitive hint text above the dais.
+    if (k.state === 'active') {
+      const cx = (k.room.cx + 0.5) * TILE - state.cameraX;
+      const sy = (k.room.cy - 0.5) * TILE - state.cameraY;
+      const pulse = 0.6 + 0.4 * Math.sin(t * 3);
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur  = 4;
+      if (!playerInCenter) {
+        ctx.fillStyle = `rgba(255, 220, 160, ${pulse})`;
+        ctx.font      = 'bold 12px sans-serif';
+        ctx.fillText('Párate en el centro para activar las runas', cx, sy - 14);
+      } else if (k.mismatchTimer === 0 && k.pedestals.some(p => !p.validated)) {
+        ctx.fillStyle = `rgba(180, 200, 255, ${pulse})`;
+        ctx.font      = 'bold 12px sans-serif';
+        ctx.fillText('Dispara a las runas para emparejarlas', cx, sy - 14);
+      }
+      ctx.restore();
+    }
+    return;
+  }
+
+  // Candle variant rendering.
+  if (k.variant === 'candle') {
+    if (k.state === 'active') {
+      const cx = (k.room.cx + 0.5) * TILE - state.cameraX;
+      const sy = (k.room.cy - 0.5) * TILE - state.cameraY;
+      const pulse = 0.6 + 0.4 * Math.sin(t * 3);
+      const mistake = k.candleMistakeTimer > 0;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur  = 4;
+      if (mistake) {
+        ctx.fillStyle = `rgba(255, 80, 60, ${pulse})`;
+        ctx.font      = 'bold 12px sans-serif';
+        ctx.fillText('¡Orden incorrecto! Vuelve a empezar', cx, sy - 14);
+      } else if (k.candleStep < k.candles.length) {
+        ctx.fillStyle = `rgba(255, 220, 160, ${pulse})`;
+        ctx.font      = 'bold 12px sans-serif';
+        ctx.fillText(`Enciende las velas en orden (${k.candleStep + 1}/${k.candles.length})`, cx, sy - 14);
+      }
+      ctx.restore();
+    }
+    drawCandles(ctx, k, t);
+    return;
   }
 }
 
@@ -469,6 +573,87 @@ function drawRunePedestal(ctx, ped, time, active) {
     ctx.closePath();
   }
   ctx.stroke();
+  ctx.restore();
+}
+
+/* ─────────────────────────── candle rendering ─────────────────────────── */
+
+/** @private Draw all candles for the 'candle' variant. */
+function drawCandles(ctx, k, time) {
+  for (const c of k.candles) {
+    drawOneCandle(ctx, c, time, k.candleMistakeTimer > 0);
+  }
+  // Draw [E] hint near the nearest unlit candle.
+  if (k.state === 'active' && k.candleMistakeTimer === 0) {
+    const idx = nearestCandleInRange(k);
+    if (idx >= 0 && !k.candles[idx].lit) {
+      const c = k.candles[idx];
+      const cx = (c.tx + 0.5) * TILE - state.cameraX;
+      const cy = (c.ty + 0.5) * TILE - state.cameraY;
+      const pulse = 0.6 + 0.4 * Math.sin(time * 5);
+      ctx.save();
+      ctx.fillStyle = `rgba(255, 220, 160, ${pulse})`;
+      ctx.font      = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.85)';
+      ctx.shadowBlur  = 4;
+      ctx.fillText('[E]', cx, cy - 22);
+      ctx.restore();
+    }
+  }
+}
+
+/** @private Draw a single candle. */
+function drawOneCandle(ctx, c, time, mistakeFlash) {
+  const cx = (c.tx + 0.5) * TILE - state.cameraX;
+  const cy = (c.ty + 0.5) * TILE - state.cameraY;
+  const lit = c.lit;
+
+  ctx.save();
+
+  // Candle body.
+  const bodyH = 10;
+  const bodyW = 4;
+  if (lit) {
+    // Lit: warm glow around the candle.
+    const pulse = 0.5 + 0.3 * Math.sin(time * 4 + c.tx + c.ty);
+    const grad = ctx.createRadialGradient(cx, cy - bodyH * 0.5, 2, cx, cy - bodyH * 0.5, 14);
+    grad.addColorStop(0, `rgba(255, 200, 100, ${pulse})`);
+    grad.addColorStop(1, 'rgba(255, 200, 100, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy - bodyH * 0.5, 14, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Wax body.
+  ctx.fillStyle = mistakeFlash ? '#ff6060' : (lit ? '#e8d8b8' : '#c8b898');
+  ctx.fillRect(cx - bodyW / 2, cy - bodyH, bodyW, bodyH);
+
+  // Wick.
+  ctx.strokeStyle = '#222';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - bodyH);
+  ctx.lineTo(cx, cy - bodyH - 2);
+  ctx.stroke();
+
+  // Flame (only if lit).
+  if (lit) {
+    const fl = 2 + Math.sin(time * 6 + c.tx) * 0.5;
+    ctx.fillStyle = '#ffd080';
+    ctx.shadowColor = '#ffa040';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - bodyH - fl, 1.5, 3 + fl * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - bodyH - fl - 0.5, 0.8, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.restore();
 }
 

@@ -50,7 +50,7 @@ export function createPlayer(x, y) {
  * @param {(e: object, dmg: number, crit: boolean) => void} onEnemyHit
  */
 export function playerUpdate(p, dt, hooks) {
-  const { onStairs, onChest, onEnemyHit, onAltar, onCircle, onTome } = hooks;
+  const { onStairs, onChest, onEnemyHit, onAltar, onCircle, onTome, onCandle } = hooks;
 
   // Movement
   let mx = 0, my = 0;
@@ -137,6 +137,10 @@ export function playerUpdate(p, dt, hooks) {
     }
     // Library Sala del Gran Tomo (Simon-Says).
     if (input.keys['KeyE'] && onTome && onTome()) {
+      input.keys['KeyE'] = false;
+    }
+    // Library Sala de la Llave — candle puzzle.
+    if (input.keys['KeyE'] && onCandle && onCandle()) {
       input.keys['KeyE'] = false;
     }
   }

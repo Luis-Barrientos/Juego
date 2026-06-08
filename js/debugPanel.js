@@ -36,6 +36,7 @@ const ROOM_CATALOGUE = {
     { label: 'Observatorio',            match: r => r.isObservatory,   force: 'observatory' },
     { label: 'Sala de la Llave (oleada)', match: r => r.isKeyRoom && r.keyVariant === 'kill', force: 'keyRoomKill' },
     { label: 'Sala de la Llave (runas)',  match: r => r.isKeyRoom && r.keyVariant === 'rune', force: 'keyRoomRune' },
+    { label: 'Sala de la Llave (velas)',  match: r => r.isKeyRoom && r.keyVariant === 'candle', force: 'keyRoomCandle' },
     { label: 'Archivo Prohibido',       match: r => r.isForbiddenArchive, force: 'archive' },
   ],
   crypt: [

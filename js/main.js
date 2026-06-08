@@ -57,7 +57,7 @@ import { initChangelogUI }                from './changelog.js';
 import { tryStartChallenge, updateChallenge, resetChallenge, drawAltarPrompt } from './challenge.js';
 import { tryStartLibraryEvent, updateLibraryEvent, resetLibraryEvent, drawCirclePrompt } from './librarySetPiece.js';
 import { tryStartGrandTome, updateGrandTome, resetGrandTome, drawGrandTome, drawTomePrompt } from './grandTome.js';
-import { resetKeyRoom, updateKeyRoom, drawArchiveDoorPrompt, drawKeyPedestals } from './keyRoom.js';
+import { resetKeyRoom, updateKeyRoom, drawArchiveDoorPrompt, drawKeyPedestals, tryLightCandle } from './keyRoom.js';
 
 /* ─────────────────────────── DOM bootstrap ─────────────────────────── */
 const canvas  = document.getElementById('game');
@@ -369,6 +369,7 @@ const playerHooks = {
   onAltar:     () => tryStartChallenge(showToast),
   onCircle:    () => tryStartLibraryEvent(showToast),
   onTome:      () => tryStartGrandTome(showToast),
+  onCandle:    () => tryLightCandle(),
 };
 
 /* ─────────────────────────── Update / render ─────────────────────────── */
