@@ -15,11 +15,21 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.8',
+    date: '2026-06-08',
+    title: 'Runas: apunta con la magia',
+    items: [
+      'El puzzle de runas ya no se resuelve pulsando E sobre los pedestales. Ahora tienes que colocarte en el centro de la sala (sobre el círculo brillante del suelo) y disparar magia a las runas para encenderlas.',
+      'Si te sales del centro, las runas se apagan y pierdes la selección que llevases. Vuelve al centro para reactivarlas.',
+      'Al igual que antes, encender dos runas iguales las valida (se ponen verdes). Si fallas, parpadean en rojo y se reinician. Al validar las cuatro, la sala se libera y cae la llave.',
+    ],
+  },
+  {
     version: '0.8.7',
     date: '2026-06-06',
     title: 'Sala de la Llave: puzzle de runas',
     items: [
-      'Nueva variante de la Sala de la Llave: “Emparejar runas”. Al sellarse la sala, cuatro pedestales con runas aparecen alrededor del dais central. Pulsa E sobre un pedestal para encenderlo; empareja los dos pedestales con la misma runa para validarlos (verde). Si fallas, ambos parpadean en rojo y se apagan. Validar los cuatro libera la sala y deja caer la llave.',
+      'Nueva variante de la Sala de la Llave: "Emparejar runas". Al sellarse la sala, cuatro pedestales con runas aparecen alrededor del dais central. Pulsa E sobre un pedestal para encenderlo; empareja los dos pedestales con la misma runa para validarlos (verde). Si fallas, ambos parpadean en rojo y se apagan. Validar los cuatro libera la sala y deja caer la llave.',
       'La variante se decide al azar al generar el piso (50% oleada, 50% runas). Para fines de debug se pueden forzar por separado desde el panel (ç).',
       'La luz mágica que flanquea el dais cambia de color según la variante: azul frío para la oleada, morado-azul para el puzzle de runas.',
     ],
