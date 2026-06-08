@@ -15,7 +15,7 @@
 
 export const CHANGELOG = [
   {
-    version: '0.9.0',
+    version: '0.8.10',
     date: '2026-06-08',
     title: 'Archivo Prohibido: todas las entradas son puertas',
     items: [
