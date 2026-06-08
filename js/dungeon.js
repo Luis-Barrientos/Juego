@@ -328,8 +328,9 @@ export function generateDungeon(floor, seed, biome) {
     } else if (isCatacombs) {
       placeWallCandles(map, r, rng, lights, style.torchDensity);
     } else if (isLibrary) {
-      // Library uses magic flames as primary lighting; wall sconces would
-      // double the light count for no visual benefit.
+      // Library uses magic flames as primary lighting; a couple of warm
+      // sconces per room prevent the floor from feeling too dark.
+      placeWallSconces(map, r, rng, lights, style.torchDensity * 0.15);
     } else {
       placeFloorTorches(r, rng, lights, style.torchDensity);
     }

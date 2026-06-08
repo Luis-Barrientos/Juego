@@ -64,10 +64,10 @@ export const BIOMES = {
     floor: { base: [44, 32, 22], alt: [60, 44, 30], crackTint: 'rgba(180,140,200,0.18)' },
     wall:  { top: '#3a2818', side: '#22180c', bottom: '#0a0604', edge: '#806030' },
     accent: '#b890ff',
-    /** Warm sconces are the dominant light; magic flames add cool accents. */
+    /** Magic flames are the primary light; a few warm sconces accent. */
     torchColor:    [255, 200, 130],
     torchTint:     'rgba(255, 200, 130, 0.20)',
-    ambientAlpha:  0.80,
+    ambientAlpha:  0.68,
     ambientTint:   'rgba(14, 8, 18, 0.80)',
     decorChance:   0.20,
     decorations:   ['books', 'paper', 'pages'],
