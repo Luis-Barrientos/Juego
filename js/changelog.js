@@ -15,6 +15,16 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.11',
+    date: '2026-06-08',
+    title: 'Nuevo puzzle: enciende las velas en orden',
+    items: [
+      'La Sala de la Llave tiene una tercera variante: cinco velas repartidas por la sala. Pulsa E sobre cada una en el orden correcto para liberar la sala y obtener la llave rúnica.',
+      'Si te equivocas de vela, todas se apagan y tienes que volver a empezar desde la primera. La secuencia cambia en cada partida.',
+      'Las otras variantes (oleada y runas) siguen saliendo con la misma probabilidad — ahora hay un 33 % para cada una.',
+    ],
+  },
+  {
     version: '0.8.10',
     date: '2026-06-08',
     title: 'Archivo Prohibido: todas las entradas son puertas',
