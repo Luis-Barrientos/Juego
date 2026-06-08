@@ -26,6 +26,7 @@ const ROOM_CATALOGUE = {
   ruins: [
     { label: 'Entrada (start)',     match: r => r.isStartRoom },
     { label: 'Escalera (stairs)',   match: r => r.isStairsRoom },
+    { label: 'Guarida del Alfa',    match: r => r.isAlphaLair, force: 'alphaLair' },
     { label: 'Sala grande (rayo)',  match: r => r.isLarge && !r.isStartRoom && !r.isStairsRoom },
   ],
   library: [
