@@ -2238,12 +2238,7 @@ function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom) 
   }
 
   // Dark mist spawner — particles slowly rise from the pedestal.
-  if (!state.archiveMistSpawners) state.archiveMistSpawners = [];
-  state.archiveMistSpawners.push({
-    x: (room.cx + 0.5) * TILE,
-    y: (room.cy + 0.5) * TILE,
-    timer: 0,
-  });
+  // The spawner is registered in main.js after generateDungeon returns.
 }
 
 function placeSarcophagi(rooms, map, rng, sarcophagi, lights) {

@@ -143,6 +143,15 @@ function buildFloor(floor) {
   state.sarcophagi  = d.sarcophagi  || [];
   state.libraryProps = d.libraryProps || [];
   state.archiveMistSpawners = [];
+  // Register a dark mist spawner over the archive pedestal.
+  const archiveRoom = d.rooms.find(r => r.isForbiddenArchive);
+  if (archiveRoom) {
+    state.archiveMistSpawners.push({
+      x: (archiveRoom.cx + 0.5) * TILE,
+      y: (archiveRoom.cy + 0.5) * TILE,
+      timer: 0,
+    });
+  }
   state.librarySetPiece = d.librarySetPiece || null;
   state.grandTome       = d.grandTome       || null;
   state.soulSpawners = d.soulSpawners || [];
