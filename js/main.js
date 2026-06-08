@@ -58,6 +58,7 @@ import { tryStartChallenge, updateChallenge, resetChallenge, drawAltarPrompt } f
 import { tryStartLibraryEvent, updateLibraryEvent, resetLibraryEvent, drawCirclePrompt } from './librarySetPiece.js';
 import { tryStartGrandTome, updateGrandTome, resetGrandTome, drawGrandTome, drawTomePrompt } from './grandTome.js';
 import { resetKeyRoom, updateKeyRoom, drawArchiveDoorPrompt, drawKeyPedestals, tryLightCandle } from './keyRoom.js';
+import { resetAlphaLair, updateAlphaLair } from './alphaLair.js';
 
 /* ─────────────────────────── DOM bootstrap ─────────────────────────── */
 const canvas  = document.getElementById('game');

@@ -39,6 +39,34 @@ export const ENEMY_TYPES = {
     range: 22, attackCool: 0.6, behavior: 'melee',
   },
   /**
+   * Wolf: fast pack hunter. Runs in packs, high speed, moderate HP.
+   * Used as minions for the Alpha Wolf.
+   */
+  wolf: {
+    hp: 45, dmg: 12, speed: 110, r: 10,
+    color: '#5a4a3a', glow: '#806040',
+    score: 22, gold: [4, 10],
+    range: 24, attackCool: 0.7, behavior: 'melee',
+  },
+  /**
+   * Alpha Wolf: mini-boss of the Ruins floor. Territorial, summons pack,
+   * enrages at low HP with projectile fan and nova ring.
+   */
+  alphaWolf: {
+    hp: 220, dmg: 24, speed: 65, r: 16,
+    color: '#3a2a1a', glow: '#a08050',
+    score: 280, gold: [50, 90],
+    range: 32, attackCool: 0.9, behavior: 'alphaWolf',
+    /** Howl summon cooldown (seconds). */
+    howlCool: 8.0,
+    /** Min HP fraction to trigger enrage. */
+    enrageThreshold: 0.5,
+    /** Projectile fan cooldown when enraged. */
+    fanCool: 3.0,
+    /** Nova ring cooldown when enraged. */
+    novaCool: 6.0,
+  },
+  /**
    * Sepulchral: heavy melee elite that emerges from cracked sarcophagi
    * during the crypta challenge. Slow but tough; aura is cool blue so it
    * reads as undead-from-the-crypt instead of a regular skeleton.
@@ -385,6 +413,103 @@ export function enemyUpdate(e, dt, hooks) {
       });
       Audio.magicShoot();
     }
+  } else if (e.behavior === 'alphaWolf') {
+    alphaWolfAI(e, dt, dx, dy, d, hooks);
+  }
+}
+
+/** @private Alpha Wolf mini-boss AI: territorial, howl summons pack, enrages with fan + nova. */
+function alphaWolfAI(e, dt, dx, dy, d, hooks) {
+  const t = ENEMY_TYPES.alphaWolf;
+  const enraged = e.hp <= e.maxHp * t.enrageThreshold;
+  const p = state.player;
+
+  // Territorial: if player leaves the room, alpha heals to full and disengages.
+  if (e.room && e.room !== state.currentRoom) {
+    if (e.hp < e.maxHp) {
+      e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.5 * dt); // fast heal outside room
+    }
+    if (d > 400) return; // stop chasing far away
+  }
+
+  // Howl summon: periodically spawn 2-3 wolves nearby.
+  e.howlCool = (e.howlCool || t.howlCool) - dt;
+  if (e.howlCool <= 0) {
+    e.howlCool = t.howlCool + Math.random() * 2.0;
+    const n = 2 + Math.floor(Math.random() * 2); // 2-3 wolves
+    for (let i = 0; i < n; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 60 + Math.random() * 40;
+      const wx = e.x + Math.cos(ang) * dist;
+      const wy = e.y + Math.sin(ang) * dist;
+      // Ensure spawn is on floor.
+      const tx = Math.floor(wx / TILE), ty = Math.floor(wy / TILE);
+      if (!isWall(state.map, tx, ty)) {
+        const wolf = createEnemy('wolf', wx, wy, state.floor);
+        wolf.room = e.room;
+        wolf.fromAlpha = true;
+        state.enemies.push(wolf);
+        spawnParticles(wx, wy, '#806040', 10);
+      }
+    }
+    state.shake = Math.max(state.shake || 0, 4);
+    Audio.bossHit && Audio.bossHit();
+  }
+
+  // Enraged abilities: projectile fan + nova ring.
+  if (enraged) {
+    e.fanCool = (e.fanCool || t.fanCool) - dt;
+    if (e.fanCool <= 0 && d > 80 && d < 350) {
+      e.fanCool = t.fanCool + Math.random() * 0.8;
+      const a = Math.atan2(dy, dx);
+      const count = 5;
+      const spread = 0.3;
+      const half = (count - 1) / 2;
+      for (let i = 0; i < count; i++) {
+        const ang = a + (i - half) * spread;
+        state.projectiles.push({
+          friendly: false, x: e.x, y: e.y, r: 6,
+          vx: Math.cos(ang) * 240, vy: Math.sin(ang) * 240,
+          life: 2.2, dmg: e.dmg * 0.65,
+          color: '#c08040', glow: '#e0a060',
+          type: 'magic',
+        });
+      }
+      Audio.magicShoot && Audio.magicShoot();
+      e.state = 'attack';
+    }
+    e.novaCool = (e.novaCool || t.novaCool) - dt;
+    if (e.novaCool <= 0) {
+      e.novaCool = t.novaCool + Math.random() * 1.5;
+      const N = 16;
+      const speed = 140;
+      for (let i = 0; i < N; i++) {
+        const ang = (Math.PI * 2 * i) / N;
+        state.projectiles.push({
+          friendly: false, x: e.x, y: e.y, r: 7,
+          vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
+          life: 2.5, dmg: e.dmg * 0.55,
+          color: '#a06030', glow: '#d09050',
+          type: 'magic',
+        });
+      }
+      state.shake = Math.max(state.shake || 0, 8);
+      spawnParticles(e.x, e.y + 8, '#a06030', 20);
+      Audio.bossHit && Audio.bossHit();
+    }
+  }
+
+  // Movement & melee.
+  if (d > e.range + p.r) {
+    const sp = enraged ? e.speed * 1.2 : e.speed;
+    tryMove(state.map, e, (dx / d) * sp * dt, (dy / d) * sp * dt);
+    e.state = 'chase';
+  } else {
+    e.state = 'attack';
+    if (e.attackCool <= 0) {
+      e.attackCool = e.attackRate;
+      hooks.onPlayerHit(e.dmg, e);
+    }
   }
 }
 
@@ -695,6 +820,60 @@ export function drawEnemy(ctx, e) {
     ctx.fillStyle = '#f80';
     ctx.fillRect(x - 2, y - 1, 1, 1);
     ctx.fillRect(x + 1, y - 1, 1, 1);
+  } else if (e.type === 'wolf') {
+    // Quadruped wolf: elongated body, pointed ears, bushy tail.
+    ctx.fillStyle = flash ? '#fff' : e.color;
+    ctx.shadowColor = e.glow; ctx.shadowBlur = 10;
+    // Body
+    ctx.beginPath();
+    ctx.ellipse(x, y + bob, e.r * 1.3, e.r * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Head
+    ctx.beginPath();
+    ctx.ellipse(x + e.r * 1.1, y - e.r * 0.2 + bob, e.r * 0.7, e.r * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Ears
+    ctx.fillStyle = flash ? '#fff' : '#4a3a2a';
+    ctx.beginPath(); ctx.moveTo(x + e.r * 1.3, y - e.r * 0.7 + bob); ctx.lineTo(x + e.r * 1.5, y - e.r * 1.3 + bob); ctx.lineTo(x + e.r * 1.7, y - e.r * 0.7 + bob); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + e.r * 1.5, y - e.r * 0.7 + bob); ctx.lineTo(x + e.r * 1.7, y - e.r * 1.3 + bob); ctx.lineTo(x + e.r * 1.9, y - e.r * 0.7 + bob); ctx.closePath(); ctx.fill();
+    // Tail
+    ctx.beginPath(); ctx.moveTo(x - e.r * 1.2, y + bob); ctx.lineTo(x - e.r * 1.8, y - e.r * 0.5 + bob); ctx.lineTo(x - e.r * 1.5, y + e.r * 0.3 + bob); ctx.closePath(); ctx.fill();
+    // Eyes
+    ctx.fillStyle = '#ff0';
+    ctx.shadowColor = '#ff0'; ctx.shadowBlur = 6;
+    ctx.fillRect(x + e.r * 1.4, y - e.r * 0.3 + bob, 1.5, 1.5);
+  } else if (e.type === 'alphaWolf') {
+    // Larger, scarred alpha with glowing eyes and battle-worn fur.
+    ctx.fillStyle = flash ? '#fff' : e.color;
+    ctx.shadowColor = e.glow; ctx.shadowBlur = 16;
+    // Body (larger, more muscular)
+    ctx.beginPath();
+    ctx.ellipse(x, y + bob, e.r * 1.4, e.r * 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Head
+    ctx.beginPath();
+    ctx.ellipse(x + e.r * 1.2, y - e.r * 0.1 + bob, e.r * 0.8, e.r * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Ears (torn)
+    ctx.fillStyle = flash ? '#fff' : '#2a1a0a';
+    ctx.beginPath(); ctx.moveTo(x + e.r * 1.4, y - e.r * 0.8 + bob); ctx.lineTo(x + e.r * 1.7, y - e.r * 1.5 + bob); ctx.lineTo(x + e.r * 2.0, y - e.r * 0.8 + bob); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + e.r * 1.6, y - e.r * 0.8 + bob); ctx.lineTo(x + e.r * 1.9, y - e.r * 1.5 + bob); ctx.lineTo(x + e.r * 2.2, y - e.r * 0.8 + bob); ctx.closePath(); ctx.fill();
+    // Mane / scruff
+    ctx.fillStyle = flash ? '#fff' : '#4a3a2a';
+    ctx.beginPath(); ctx.ellipse(x + e.r * 0.3, y - e.r * 0.3 + bob, e.r * 0.9, e.r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+    // Tail (bushy)
+    ctx.beginPath(); ctx.moveTo(x - e.r * 1.3, y + bob); ctx.lineTo(x - e.r * 2.0, y - e.r * 0.6 + bob); ctx.lineTo(x - e.r * 1.6, y + e.r * 0.4 + bob); ctx.closePath(); ctx.fill();
+    // Eyes (glowing amber/red)
+    ctx.fillStyle = e.hp <= e.maxHp * 0.5 ? '#ff3030' : '#ffaa00';
+    ctx.shadowColor = e.hp <= e.maxHp * 0.5 ? '#ff3030' : '#ffaa00'; ctx.shadowBlur = 10;
+    ctx.fillRect(x + e.r * 1.5, y - e.r * 0.2 + bob, 2, 2);
+    ctx.fillRect(x + e.r * 1.5, y + e.r * 0.1 + bob, 2, 2);
+    // Scars
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x + e.r * 0.8, y - e.r * 0.2 + bob); ctx.lineTo(x + e.r * 1.6, y + e.r * 0.3 + bob); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - e.r * 0.5, y + e.r * 0.2 + bob); ctx.lineTo(x + e.r * 0.5, y + e.r * 0.6 + bob); ctx.stroke();
   } else if (e.type === 'boss') {
     ctx.shadowColor = e.glow; ctx.shadowBlur = 24;
     ctx.fillStyle = flash ? '#fff' : (e.phase === 2 ? '#801010' : e.color);

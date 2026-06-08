@@ -339,7 +339,7 @@ export function generateDungeon(floor, seed, biome) {
   // Sunbeams are rare and biased toward the largest rooms. We pick the
   // top candidates by area and roll a low-probability per candidate, with
   // a hard cap so the floor never feels like an open courtyard.
-  if (isRuins) {
+    if (isRuins) {
     placeSunbeams(rooms, rng, sunbeams);
     placeCampfires(rooms, rng, lights);
     placeGlowMushrooms(map, rooms, rng, lights);
@@ -347,6 +347,13 @@ export function generateDungeon(floor, seed, biome) {
     placePuddles(map, rooms, rng, puddles);
     placeRoomWallDecorations(map, rooms, rng, decorations, lights,
       ['plaque', 'crack', 'sconceBroken']);
+    if (rng() < 0.55) {
+      const starRooms = rooms.filter(r => r.isLarge);
+      if (starRooms.length) {
+        const lairRoom = starRooms[Math.floor(rng() * starRooms.length)];
+        placeAlphaLair(lairRoom, map, rng, lights);
+      }
+    }
   }
 
   if (isCatacombs) {
@@ -2809,6 +2816,32 @@ export function isBlocked(map, x, y, r) {
 /**
  * Try to move an entity by (dx, dy), sliding along walls.
  */
+/**
+ * Ruins biome: Alpha Wolf Lair. A star room sealed on entry, hosting the
+ * Alpha Wolf mini-boss and his pack. Clearing it drops a legendary chest.
+ * @private
+ */
+function placeAlphaLair(room, map, rng, lights) {
+  if (!room) return;
+  room.isAlphaLair = true;
+
+  const brazierPos = [
+    { tx: room.x + 2, ty: room.y + 2 },
+    { tx: room.x + room.w - 3, ty: room.y + room.h - 3 },
+  ];
+  for (const bp of brazierPos) {
+    if (map[bp.ty] && map[bp.ty][bp.tx] === T_FLOOR) {
+      lights.push({
+        type: 'campfire',
+        x: bp.tx * TILE + TILE / 2,
+        y: bp.ty * TILE + TILE / 2,
+        r: 150 + rng() * 20,
+        flicker: rng() * Math.PI * 2,
+      });
+    }
+  }
+}
+
 export function tryMove(map, entity, dx, dy) {
   const r = entity.r || 10;
   if (!isBlocked(map, entity.x + dx, entity.y, r)) entity.x += dx;
