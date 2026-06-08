@@ -44,16 +44,15 @@ export function placeLibraryRuneMarks(map, rooms, rng, lights, libraryProps) {
     const candidates = [];
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
-        if (dx === 0 && dy === 0) continue;
-        const tx = cxT + dx, ty = cyT + dy;
-        if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) continue;
-        if (map[ty][tx] !== T_FLOOR) continue;
-        candidates.push({ tx, ty });
+        const xx = cxT + dx, yy = cyT + dy;
+        if (!map[yy] || map[yy][xx] !== T_FLOOR) continue;
+        candidates.push({ xx, yy });
       }
     }
-    if (candidates.length === 0) continue;
-    const pick = candidates[Math.floor(rng() * candidates.length)];
-    libraryProps.push({ kind: 'runeMark', tx: pick.tx, ty: pick.ty, shape: Math.floor(rng() * 3) });
+    if (!candidates.length) continue;
+    const c = candidates[Math.floor(rng() * candidates.length)];
+    if (libraryProps.some(p => p.kind === 'libraryRuneMark' && p.tx === c.xx && p.ty === c.yy)) continue;
+    libraryProps.push({ kind: 'libraryRuneMark', tx: c.xx, ty: c.yy, w: 1, h: 1, seed: Math.floor(rng() * 1e9) });
   }
 }
 

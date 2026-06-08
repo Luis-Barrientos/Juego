@@ -1,33 +1,61 @@
-import { TILE, MAP_H } from '../config.js';
-
-export function buildBeamShape(sb, rng) {
-  const steps = 14;
-  const shape = [];
-  const cx = (x) => x - sb.x;
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const y = sb.y + t * sb.h;
-    const spread = sb.splay * (t + 0.15 * Math.sin(t * Math.PI * 3 + sb.seed));
-    const wobble = (rng() - 0.5) * sb.length * 0.04 * (0.5 + t * 1.5);
-    const left  = cx(sb.x - spread * 0.5 + wobble);
-    const right = cx(sb.x + spread * 0.5 + wobble);
-    shape.push({ y, left, right });
-  }
-  return shape;
-}
+import { TILE } from '../config.js';
 
 export function buildCrackPath(sb, rng) {
-  const crackRng = () => { sb.seed = (sb.seed * 16807 + 0) % 2147483647; return (sb.seed & 0x7fffffff) / 2147483647; };
-  const steps = 8;
-  const path = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const jx = sb.wallRow >= 0 ? sb.x : sb.x;
-    const jy = sb.wallRow >= 0 ? sb.wallRow * TILE : sb.y;
-    const jitterX = (crackRng() - 0.5) * sb.length * 0.15;
-    const jitterY = (crackRng() - 0.5) * TILE * 0.3;
-    const depth = crackRng() * TILE * 0.4;
-    path.push({ x: jx + jitterX, y: jy + jitterY, depth });
+  const halfLen = sb.length * 0.5;
+  const baseY   = sb.wallRow * TILE + TILE * 0.55;
+  const n       = Math.max(8, Math.floor(sb.length / 8));
+  const pts     = [];
+  let y = baseY;
+  for (let i = 0; i < n; i++) {
+    const t  = i / (n - 1);
+    const x  = sb.x - halfLen + t * sb.length;
+    y += (rng() - 0.5) * 4;
+    const minY = sb.wallRow * TILE + 3;
+    const maxY = sb.wallRow * TILE + TILE - 3;
+    if (y < minY) y = minY;
+    if (y > maxY) y = maxY;
+    pts.push([x, y]);
   }
-  return path;
+  return pts;
+}
+
+export function buildBeamShape(sb, rng) {
+  const halfTop    = sb.length * 0.5;
+  const halfBottom = halfTop + sb.splay;
+  const h          = sb.h;
+  const pts        = [];
+
+  const nTop = Math.max(6, Math.floor(sb.length / 12));
+  for (let i = 0; i < nTop; i++) {
+    const t = i / (nTop - 1);
+    const x = -halfTop + t * (halfTop * 2);
+    const y = (rng() - 0.3) * 5;
+    pts.push([x + (rng() - 0.5) * 3, y]);
+  }
+
+  const rightKinks = 1 + Math.floor(rng() * 2);
+  for (let i = 1; i <= rightKinks; i++) {
+    const t = i / (rightKinks + 1);
+    const x = halfTop + t * sb.splay + (rng() - 0.5) * 4;
+    const y = t * h;
+    pts.push([x, y]);
+  }
+  pts.push([halfBottom + (rng() - 0.5) * 4, h]);
+
+  const nBot = Math.max(3, Math.floor(sb.length / 16));
+  for (let i = 0; i < nBot; i++) {
+    const t = (i + 1) / (nBot + 1);
+    const x = halfBottom - t * (halfBottom * 2);
+    pts.push([x + (rng() - 0.5) * 4, h + (rng() - 0.5) * 3]);
+  }
+  pts.push([-halfBottom + (rng() - 0.5) * 4, h]);
+
+  const leftKinks = 1 + Math.floor(rng() * 2);
+  for (let i = leftKinks; i >= 1; i--) {
+    const t = i / (leftKinks + 1);
+    const x = -halfTop - t * sb.splay + (rng() - 0.5) * 4;
+    const y = t * h;
+    pts.push([x, y]);
+  }
+  return pts;
 }
