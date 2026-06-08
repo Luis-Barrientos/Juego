@@ -15,6 +15,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.9',
+    date: '2026-06-08',
+    title: 'Optimización del rendimiento en la Biblioteca',
+    items: [
+      'La Biblioteca ya no va lenta. Reducimos la cantidad de luces flotantes, hojas cayendo y estrellas del Observatorio para que el piso vaya más fluido.',
+      'Menos luces mágicas por sala (1 en salas normales, 1-2 en grandes) y eliminamos las antorchas de pared (las llamas mágicas ya iluminaban suficiente).',
+      'Menos hojas y papeles cayendo: aparecen en menos salas, con menos frecuencia y duran menos tiempo.',
+      'Las estrellas del Observatorio pasan de 56 a 28, y las hojas lejanas se mueven más simple para ahorrar trabajo al juego.',
+    ],
+  },
+  {
     version: '0.8.8',
     date: '2026-06-08',
     title: 'Runas: apunta con la magia',

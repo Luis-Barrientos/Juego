@@ -328,7 +328,8 @@ export function generateDungeon(floor, seed, biome) {
     } else if (isCatacombs) {
       placeWallCandles(map, r, rng, lights, style.torchDensity);
     } else if (isLibrary) {
-      placeWallSconces(map, r, rng, lights, style.torchDensity);
+      // Library uses magic flames as primary lighting; wall sconces would
+      // double the light count for no visual benefit.
     } else {
       placeFloorTorches(r, rng, lights, style.torchDensity);
     }
@@ -1082,9 +1083,9 @@ function placeMagicFlames(rooms, rng, lights) {
   for (const r of rooms) {
     if (r.isStartRoom) continue;
     if (r.isObservatory) continue; // own corner candles, no roaming flames
-    if (r.w < 4 || r.h < 3) continue;
+    if (r.w < 5 || r.h < 4) continue;
 
-    const count = 1 + Math.floor(rng() * 2) + (r.isLarge ? 1 : 0);
+    const count = 1 + (r.isLarge ? Math.floor(rng() * 2) : 0);
     for (let i = 0; i < count; i++) {
       // Anchor A and B inside the room, kept away from the walls.
       const ax = (r.x + 1 + rng() * (r.w - 2)) * TILE;
@@ -1175,22 +1176,20 @@ function placeLibraryLeafSpawners(rooms, rng, leafSpawners) {
   for (const r of rooms) {
     if (r.isStartRoom) continue;
     if (r.isGrandTome) continue;
-    if (r.isObservatory) continue; // sealed-roof room has its own ambience
-    if (r.isForbiddenArchive) continue; // sealed vault, no falling leaves
-    if (r.w < 4 || r.h < 4) continue;
+    if (r.isObservatory) continue;
+    if (r.isForbiddenArchive) continue;
+    if (r.w < 5 || r.h < 4) continue;
+    if (rng() < 0.4) continue;
     const count = r.isLarge || r.isGreatLibrary
-      ? 3 + Math.floor(rng() * 2)
-      : 1 + (rng() < 0.5 ? 1 : 0);
+      ? 1 + Math.floor(rng() * 2)
+      : 1;
     for (let i = 0; i < count; i++) {
       const sx = (r.x + 1 + rng() * (r.w - 2)) * TILE;
-      // Spawn near the top of the room so the leaf has room to fall.
       const sy = (r.y + 0.5 + rng() * 1.5) * TILE;
       leafSpawners.push({
         x: sx,
         y: sy,
-        // Per-spawner emission cadence.
-        timer: 1 + rng() * 4,
-        // Half hue split — pale parchment vs cool moss / muted bookleather.
+        timer: 3 + rng() * 5,
         hue:   rng() < 0.5 ? 'paper' : 'leaf',
       });
     }

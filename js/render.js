@@ -2873,7 +2873,7 @@ export function drawObservatoryFog(ctx) {
 
   // 3. Twinkling star field suspended in the haze. Deterministic per-room
   //    so positions stay stable across frames.
-  const STARS = 56;
+  const STARS = 28;
   let s = ((room.x * 73856093) ^ (room.y * 19349663)) >>> 0;
   const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
   const PALETTE = [

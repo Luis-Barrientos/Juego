@@ -71,9 +71,11 @@ export function updateParticles(dt) {
     } else if (p.kind === 'leaf') {
       // Leaves: drift downward, wobble horizontally, rotate slowly.
       p.phase = (p.phase || 0) + dt;
-      p.x += Math.sin(p.phase * 1.8 + (p.seed || 0)) * 12 * dt;
+      // Skip wobble for leaves far from the player (cheap culling).
+      if (state.player && Math.hypot(p.x - state.player.x, p.y - state.player.y) < 250) {
+        p.x += Math.sin(p.phase * 1.8 + (p.seed || 0)) * 12 * dt;
+      }
       p.rot = (p.rot || 0) + (p.rotSp || 0) * dt;
-      // Very mild air drag on the fall velocity so they reach a terminal feel.
       p.vy *= 0.995;
     } else if (p.kind === 'guardianSlam') {
       // Expanding shockwave ring: radius grows from r to maxR over life.
