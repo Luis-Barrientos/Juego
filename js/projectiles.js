@@ -48,9 +48,7 @@ export function projectileUpdate(prj, dt, hooks) {
       }
     }
     // Check rune pedestal hits (rune puzzle in Sala de la Llave).
-    const pedTx = Math.floor(prj.x / TILE);
-    const pedTy = Math.floor(prj.y / TILE);
-    if (hitRunePedestal(pedTx, pedTy)) {
+    if (hitRunePedestal(prj.x, prj.y)) {
       spawnParticles(prj.x, prj.y, prj.glow, 10);
       prj._dead = true;
       return;

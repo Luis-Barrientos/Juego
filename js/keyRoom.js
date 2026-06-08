@@ -277,19 +277,23 @@ export function updateKeyRoom(dt, toast) {
 /* ─────────────────────────── projectile handler ─────────────────────────── */
 
 /**
- * Called when a friendly projectile lands on tile (tx, ty). If that tile
- * holds an unvalidated rune pedestal and the player is on the centre dais,
- * light it (and resolve pair matches). Returns true when the hit was
- * consumed.
+ * Called when a friendly projectile impacts near (px, py). If that point
+ * is close enough to an unvalidated rune pedestal and the player is on the
+ * centre dais, light it (and resolve pair matches). Returns true when the
+ * hit was consumed.
  */
-export function hitRunePedestal(tx, ty) {
+export function hitRunePedestal(px, py) {
   const k = state.keyRoom;
   if (!k || k.variant !== 'rune') return false;
   if (k.state !== 'active') return false;
   if (k.mismatchTimer > 0) return false;
   if (!isPlayerInCenter(k)) return false;
 
-  const idx = k.pedestals.findIndex(p => p.tx === tx && p.ty === ty);
+  const idx = k.pedestals.findIndex(p => {
+    const cx = (p.tx + 0.5) * TILE;
+    const cy = (p.ty + 0.5) * TILE;
+    return Math.hypot(px - cx, py - cy) < TILE * 0.55;
+  });
   if (idx < 0) return false;
   const ped = k.pedestals[idx];
   if (ped.validated || ped.picked) return false;
