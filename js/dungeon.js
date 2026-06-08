@@ -2028,8 +2028,9 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
 
   // Flanking magic lights. Colour swaps with the variant so the room
   // reads at a glance: cool blue for the arena, warm purple-ish for
-  // the puzzle.
-  if (lights) {
+  // the puzzle. Candle variant skips these — the puzzle candles
+  // themselves provide the visual beacon.
+  if (lights && variant !== 'candle') {
     const tint = variant === 'rune' ? [180, 140, 255]
       : variant === 'candle' ? [255, 200, 100]
       : [120, 180, 255];
