@@ -507,87 +507,11 @@ function unlockArchive(map, archiveRoom) {
   }
 }
 
-// --- Moved to generation/rooms.js ---
-// placeFloorTorches, placeWallSconces, placeWallCandles, placeRoomWallDecorations, placePillars
-
-// --- Moved to generation/crypt.js ---
-// placeSkullPedestals, placeLoculi, placeWebs, placeSoulSpawners
-
-// --- Moved to generation/ruins.js ---
-// placeSunbeams, placeCampfires, placeGlowMushrooms, placeMoonbeams
-
-// --- Moved to generation/library.js ---
-// placeMagicFlames, decorateMagicFlamesWithRunes, placeLibraryRuneMarks
-          if (dx === 0 && dy === 0) continue;
-          const nx = tx + dx, ny = ty + dy;
-          if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
-          // Only check inside the room (so room walls don't count).
-          if (nx < r.x || nx >= r.x + r.w || ny < r.y || ny >= r.y + r.h) continue;
-          if (map[ny][nx] === T_WALL) { touching = true; break; }
-        }
-      }
-      if (touching) continue;
-      map[ty][tx] = T_WALL;
-      placed++;
-    }
-  }
-}
-
-/**
- * Place stone sarcophagi in catacombs rooms. Each sarcophagus occupies a
- * 2×1 footprint (rotated 1×2 sometimes) of T_WALL tiles, blocking pathing
- * just like a pillar but reading visually as a tomb.
- *
- * Cubiculae: 30-40% chance of a single normal sarcophagus.
- * Crypta (star room): central 2×2 altar plus 2-3 'cracked' sarcophagi
- * along the inner border. Cracked variants are highlighted with a faint
- * blue aura at runtime — they are awakable/breakable in commit 5.
- * @private
- */
-// placeSoulSpawners → crypt.js
-
-// placeMagicFlames, decorateMagicFlamesWithRunes, placeLibraryRuneMarks → library.js
-
-// placeLibraryLeafSpawners, placeShelves, placeTables → library.js
-      const horizontal = rng() < 0.5;
-      const w = horizontal ? 2 : 1;
-      const h = horizontal ? 1 : (rng() < 0.4 ? 2 : 1);
-      // Stay one tile away from walls and avoid the room centre tile.
-      const tx = r.x + 2 + Math.floor(rng() * Math.max(1, r.w - 3 - w));
-      const ty = r.y + 2 + Math.floor(rng() * Math.max(1, r.h - 3 - h));
-
-      let blocksCentre = false;
-      for (let yy = ty; yy < ty + h; yy++) {
-        for (let xx = tx; xx < tx + w; xx++) {
-          if (xx === r.cx && yy === r.cy) blocksCentre = true;
-        }
-      }
-      if (blocksCentre) continue;
-
-      let ok = true;
-      for (let yy = ty; yy < ty + h && ok; yy++) {
-        for (let xx = tx; xx < tx + w; xx++) {
-          if (!map[yy] || map[yy][xx] !== T_FLOOR) { ok = false; break; }
-          if (libraryProps.some(p => xx >= p.tx && xx < p.tx + p.w && yy >= p.ty && yy < p.ty + p.h)) {
-            ok = false; break;
-          }
-        }
-      }
-      if (!ok) continue;
-
-      for (let yy = ty; yy < ty + h; yy++) {
-        for (let xx = tx; xx < tx + w; xx++) map[yy][xx] = T_WALL;
-      }
-      libraryProps.push({
-        kind:    rng() < 0.45 ? 'tableBroken' : 'table',
-        tx, ty, w, h,
-        orient:  horizontal ? 'h' : 'v',
-        seed:    Math.floor(rng() * 1e9),
-      });
-      placed++;
-    }
-  }
-}
+// All decoration functions moved to generation/ modules:
+//   rooms.js   → placeFloorTorches, placeWallSconces, placeWallCandles, placeRoomWallDecorations, placePillars
+//   crypt.js   → placeSkullPedestals, placeLoculi, placeWebs, placeSoulSpawners, placeSarcophagi
+//   ruins.js   → placeSunbeams, placeMoonbeams, placeCampfires, placeGlowMushrooms, placePuddles
+//   library.js → placeMagicFlames, decorateMagicFlamesWithRunes, placeLibraryRuneMarks, placeLeafSpawners, placeShelves, placeTables
 
 /**
  * Reserve a `w`×`h` rectangle in the map BEFORE BSP runs so a special
