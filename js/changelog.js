@@ -15,6 +15,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.9.0',
+    date: '2026-06-08',
+    title: 'Piso 1 (Ruinas): Minimap Fog of War + Guarida del Alfa',
+    items: [
+      'Minimapa con niebla de guerra: las salas solo se revelan al visitarlas. La sala inicial siempre es visible.',
+      'Completar el Claro Solar (nueva sala, ver abajo) revela todo el mapa del piso de golpe.',
+      'Nueva sala exclusiva: Guarida del Alfa. Una star room que se sella al entrar, con el Alfa Lobo (mini-boss) y su manada. El Alfa es territorial (si sales de la sala se cura y desengaja) y se enfurece al 50% HP con abanico de proyectiles y anillo nova. Al vencerlo aparece un cofre legendario (bendición + pociones + oro).',
+      'Nuevos enemigos: Lobo (rápido, melee) y Alfa Lobo (mini-boss con invocación de manada, proyectiles y nova).',
+    ],
+  },
+  {
     version: '0.8.13',
     date: '2026-06-08',
     title: 'Archivo Prohibido: más detalles oscuros',
