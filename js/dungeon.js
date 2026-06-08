@@ -11,10 +11,6 @@ import {
   TILE, MAP_W, MAP_H, T_WALL, T_FLOOR, T_STAIR, T_DOOR_LOCKED, T_FLOOR_DARK, MAX_FLOOR,
 } from './config.js';
 import { mulberry32 } from './utils.js';
-import { placeWallSconces, placeWallCandles, placeFloorTorches, placeRoomWallDecorations, placePillars } from './generation/rooms.js';
-import { placeSkullPedestals, placeLoculi, placeWebs, placeSoulSpawners, placeSarcophagi } from './generation/crypt.js';
-import { placeSunbeams, placeMoonbeams, placeCampfires, placeGlowMushrooms, placePuddles } from './generation/ruins.js';
-import { placeMagicFlames, decorateMagicFlamesWithRunes, placeLibraryRuneMarks, placeLeafSpawners, placeShelves, placeTables } from './generation/library.js';
 
 /**
  * Generation styles. Each tweaks BSP parameters to produce a distinct layout.
@@ -55,7 +51,7 @@ const STYLE_KEYS = ['RUINS', 'BALANCED', 'CATACOMBS', 'SPARSE'];
  * @param {number} [seed] Optional explicit seed; otherwise random.
  * @param {object} [biome] Active biome (see biomes.js). Used to vary lighting
  *                         (e.g. wall sconces and sunbeams in 'ruins').
- * @returns {{map: number[][], rooms: object[], lights: object[], sunbeams: object[], startRoom: object, stairsRoom: object, style: string, seed: number}}
+ * @returns {{map: number[][], rooms: object[], lights: object[], sunbeams: object[], puddles: object[], decorations: object[], sarcophagi: object[], libraryProps: object[], soulSpawners: object[], leafSpawners: object[], archiveMistSpawners: object[], startRoom: object, stairsRoom: object, style: string, seed: number}}
  */
 export function generateDungeon(floor, seed, biome) {
   const finalSeed = seed ?? Math.floor(Math.random() * 0xFFFFFFFF);
@@ -371,6 +367,7 @@ export function generateDungeon(floor, seed, biome) {
 
   let librarySetPiece = null;
   let grandTome       = null;
+  const archiveMistSpawners = [];
   if (isLibrary) {
     placeMagicFlames(rooms, rng, lights);
     placeRoomWallDecorations(map, rooms, rng, decorations, lights,
@@ -380,7 +377,7 @@ export function generateDungeon(floor, seed, biome) {
     // Attach a small floating rune glyph to every magic flame (live overlay).
     decorateMagicFlamesWithRunes(lights, rng);
     // Spawners for drifting leaves / paper scraps (per room).
-    placeLeafSpawners(rooms, rng, leafSpawners);
+    placeLibraryLeafSpawners(rooms, rng, leafSpawners);
     // Lay the Great Library set-piece on the room we reserved up top.
     if (greatLibraryRoom) {
       librarySetPiece = placeLibrarySetPiece(greatLibraryRoom, map, rng, libraryProps);
@@ -394,7 +391,7 @@ export function generateDungeon(floor, seed, biome) {
     if (keyRoomRoom && archiveRoom) {
       if (forceKeyVariant) keyRoomRoom.keyVariant = forceKeyVariant;
       placeKeyRoom(keyRoomRoom, map, rng, libraryProps, lights);
-      placeForbiddenArchive(archiveRoom, map, rng, libraryProps, lights, startRoom);
+      placeForbiddenArchive(archiveRoom, map, rng, libraryProps, lights, startRoom, archiveMistSpawners);
       // Two safety nets after the lock is placed:
       //  1) The locked door must NOT cut the start→stairs path.
       //  2) The locked door tile itself must be reachable from start
@@ -410,7 +407,7 @@ export function generateDungeon(floor, seed, biome) {
     }
   }
 
-  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, libraryProps, soulSpawners, leafSpawners, librarySetPiece, grandTome, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
+  return { map, rooms, lights, sunbeams, puddles, decorations, sarcophagi, libraryProps, soulSpawners, leafSpawners, archiveMistSpawners, librarySetPiece, grandTome, startRoom, stairsRoom, style: styleKey, seed: finalSeed };
 }
 
 /**
@@ -507,11 +504,793 @@ function unlockArchive(map, archiveRoom) {
   }
 }
 
-// All decoration functions moved to generation/ modules:
-//   rooms.js   → placeFloorTorches, placeWallSconces, placeWallCandles, placeRoomWallDecorations, placePillars
-//   crypt.js   → placeSkullPedestals, placeLoculi, placeWebs, placeSoulSpawners, placeSarcophagi
-//   ruins.js   → placeSunbeams, placeMoonbeams, placeCampfires, placeGlowMushrooms, placePuddles
-//   library.js → placeMagicFlames, decorateMagicFlamesWithRunes, placeLibraryRuneMarks, placeLeafSpawners, placeShelves, placeTables
+/**
+ * Place torches in floor corners of a room (default lighting style).
+ * @private
+ */
+function placeFloorTorches(r, rng, lights, density) {
+  const corners = [
+    { x: r.x + 1,         y: r.y + 1 },
+    { x: r.x + r.w - 2,   y: r.y + 1 },
+    { x: r.x + 1,         y: r.y + r.h - 2 },
+    { x: r.x + r.w - 2,   y: r.y + r.h - 2 },
+  ];
+  // Scale count with room area: ~1 torch per ~25 floor tiles, clamped.
+  const target = Math.round(density + r.w * r.h / 25);
+  const n = Math.max(1, Math.min(corners.length, target));
+  const used = new Set();
+  for (let i = 0; i < n; i++) {
+    let idx;
+    do { idx = Math.floor(rng() * corners.length); } while (used.has(idx) && used.size < corners.length);
+    used.add(idx);
+    const c = corners[idx];
+    lights.push({
+      type: 'torch',
+      x: c.x * TILE + TILE / 2,
+      y: c.y * TILE + TILE / 2,
+      r: 110 + rng() * 30,
+      flicker: rng() * Math.PI * 2,
+    });
+  }
+}
+
+/**
+ * Place wall-mounted sconces along vertical walls of a room. Each sconce
+ * is positioned just outside the floor area, attached to the inner edge
+ * of the bordering wall tile, and 'orient'ed left or right so the bracket
+ * sticks the right way.
+ * @private
+ */
+function placeWallSconces(map, r, rng, lights, density) {
+  const candidates = [];
+  // Left wall (sconce facing right into the room)
+  for (let y = r.y + 1; y < r.y + r.h - 1; y++) {
+    if (r.x - 1 >= 0 && map[y][r.x - 1] === T_WALL) {
+      candidates.push({ tx: r.x, ty: y, dir: 'right', edge: r.x * TILE + 2 });
+    }
+  }
+  // Right wall (sconce facing left)
+  for (let y = r.y + 1; y < r.y + r.h - 1; y++) {
+    const wx = r.x + r.w;
+    if (wx < MAP_W && map[y][wx] === T_WALL) {
+      candidates.push({ tx: r.x + r.w - 1, ty: y, dir: 'left', edge: (r.x + r.w) * TILE - 2 });
+    }
+  }
+  if (candidates.length === 0) {
+    placeFloorTorches(r, rng, lights, density);
+    return;
+  }
+  // Scale with room perimeter: roughly 1 sconce per 6 wall tiles.
+  const perimeter = (r.w + r.h) * 2;
+  const target = Math.max(2, Math.round(density + perimeter / 6));
+  const n = Math.min(target, candidates.length);
+  // Shuffle candidates and take the first N for a spread layout.
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  for (let i = 0; i < n; i++) {
+    const c = candidates[i];
+    lights.push({
+      type: 'sconce',
+      dir:  c.dir,
+      x:    c.edge,
+      y:    c.ty * TILE + TILE / 2,
+      r:    120 + rng() * 30,
+      flicker: rng() * Math.PI * 2,
+    });
+  }
+}
+
+/**
+ * Place small wall candles in niches around a catacombs room. Mechanically
+ * identical to sconces but with a denser distribution and a smaller, cooler
+ * pool of light — the room never feels fully lit, just punctuated.
+ * @private
+ */
+function placeWallCandles(map, r, rng, lights, density) {
+  const candidates = [];
+  // Left wall (candle facing right into the room)
+  for (let y = r.y + 1; y < r.y + r.h - 1; y++) {
+    if (r.x - 1 >= 0 && map[y][r.x - 1] === T_WALL) {
+      candidates.push({ tx: r.x, ty: y, dir: 'right', edge: r.x * TILE + 2 });
+    }
+  }
+  // Right wall (candle facing left)
+  for (let y = r.y + 1; y < r.y + r.h - 1; y++) {
+    const wx = r.x + r.w;
+    if (wx < MAP_W && map[y][wx] === T_WALL) {
+      candidates.push({ tx: r.x + r.w - 1, ty: y, dir: 'left', edge: (r.x + r.w) * TILE - 2 });
+    }
+  }
+  if (candidates.length === 0) {
+    placeFloorTorches(r, rng, lights, density);
+    return;
+  }
+  // Catacombs are darker but more punctuated — pack candles tighter.
+  const perimeter = (r.w + r.h) * 2;
+  const target = Math.max(2, Math.round(density + perimeter / 4));
+  const n = Math.min(target, candidates.length);
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  for (let i = 0; i < n; i++) {
+    const c = candidates[i];
+    lights.push({
+      type: 'candle',
+      dir:  c.dir,
+      x:    c.edge,
+      y:    c.ty * TILE + TILE / 2,
+      r:    85 + rng() * 20,
+      flicker: rng() * Math.PI * 2,
+    });
+  }
+}
+
+/**
+ * Drop a few luminous skull pedestals in catacombs rooms. Each emits a
+ * cool blue-white pulse and serves as the equivalent of glow mushrooms in
+ * the ruins biome. Pedestals sit on floor tiles, never on top of doorways
+ * or walls.
+ * @private
+ */
+function placeSkullPedestals(map, rooms, rng, lights) {
+  const GLOBAL_CAP = 10;
+  let placed = 0;
+  for (const r of rooms) {
+    if (placed >= GLOBAL_CAP) break;
+    if (r.w < 4 || r.h < 4) continue;
+    if (r.isStartRoom || r.isStairsRoom) continue;
+    // 50% chance per room. Star rooms (crypta) always try.
+    if (!r.isLarge && rng() > 0.50) continue;
+    const count = r.isLarge ? (2 + Math.floor(rng() * 2))   // crypta: 2-3
+                            : 1;                             // cubicula: 1
+    for (let i = 0; i < count && placed < GLOBAL_CAP; i++) {
+      // Place hugging an inner wall edge (1 tile inside the room border).
+      const wallSide = Math.floor(rng() * 4);
+      let tx, ty;
+      if (wallSide === 0)      { tx = r.x + 1 + Math.floor(rng() * (r.w - 2)); ty = r.y + 1; }
+      else if (wallSide === 1) { tx = r.x + r.w - 2;                            ty = r.y + 1 + Math.floor(rng() * (r.h - 2)); }
+      else if (wallSide === 2) { tx = r.x + 1 + Math.floor(rng() * (r.w - 2)); ty = r.y + r.h - 2; }
+      else                     { tx = r.x + 1;                                  ty = r.y + 1 + Math.floor(rng() * (r.h - 2)); }
+      if (map[ty][tx] !== T_FLOOR) continue;
+      lights.push({
+        type:  'skull',
+        x:     tx * TILE + TILE / 2,
+        y:     ty * TILE + TILE / 2,
+        r:     55 + rng() * 15,
+        phase: rng() * Math.PI * 2,
+      });
+      placed++;
+    }
+  }
+}
+
+/**
+ * Find painted-on loculi (burial niches) along walls bordering corridors.
+ * For every corridor-adjacent wall tile, with low probability, push a
+ * decoration entry that render.js will paint into the map cache.
+ * @private
+ */
+function placeLoculi(map, rooms, rng, decorations) {
+  const PER_TILE_CHANCE = 0.05;
+  const PER_FLOOR_CAP   = 28;
+  let placed = 0;
+  // We want loculi on walls that line corridors, not on room walls. A
+  // corridor tile is a floor tile that is NOT inside any room rect.
+  const inAnyRoom = (tx, ty) => {
+    for (const r of rooms) {
+      if (tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h) return true;
+    }
+    return false;
+  };
+  for (let y = 1; y < MAP_H - 1 && placed < PER_FLOOR_CAP; y++) {
+    for (let x = 1; x < MAP_W - 1 && placed < PER_FLOOR_CAP; x++) {
+      if (map[y][x] !== T_WALL) continue;
+      // Only walls whose tile below is a corridor floor. That way the
+      // niche faces the player as they walk past.
+      if (map[y + 1] && map[y + 1][x] === T_FLOOR && !inAnyRoom(x, y + 1)) {
+        if (rng() < PER_TILE_CHANCE) {
+          decorations.push({
+            kind:  'loculus',
+            tx: x, ty: y,
+            seed:  Math.floor(rng() * 1e9),
+          });
+          placed++;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Cobwebs in inner room corners. Decorative; ignored by collision and AI.
+ * @private
+ */
+function placeWebs(rooms, rng, decorations) {
+  for (const r of rooms) {
+    if (r.w < 4 || r.h < 4) continue;
+    if (r.isStartRoom) continue;
+    // Each of the 4 inner corners has an independent chance.
+    const corners = [
+      { tx: r.x + 1,         ty: r.y + 1,         q: 0 }, // TL
+      { tx: r.x + r.w - 2,   ty: r.y + 1,         q: 1 }, // TR
+      { tx: r.x + 1,         ty: r.y + r.h - 2,   q: 2 }, // BL
+      { tx: r.x + r.w - 2,   ty: r.y + r.h - 2,   q: 3 }, // BR
+    ];
+    for (const c of corners) {
+      if (rng() < 0.45) {
+        decorations.push({ kind: 'web', tx: c.tx, ty: c.ty, q: c.q });
+      }
+    }
+  }
+}
+
+/**
+ * Place biome-specific flat decorations on the inward face of the **top**
+ * wall of each room — i.e. wall tiles whose tile below is room floor.
+ * That is the face the player sees head-on with a top-down camera, which
+ * is why it looks "ambient" instead of buried (same rule that made the
+ * loculus work). One kind per pick, randomised from `kinds`.
+ *
+ * @param {Array<number[]>} map
+ * @param {object[]} rooms
+ * @param {() => number} rng
+ * @param {object[]} decorations  Output: each entry `{kind, tx, ty, face:'S', seed}`.
+ * @param {object[]} lights       Existing lights (to avoid placing on top of sconces/candles).
+ * @param {string[]} kinds        Decoration kinds for this biome.
+ * @private
+ */
+function placeRoomWallDecorations(map, rooms, rng, decorations, lights, kinds) {
+  const PER_TILE_CHANCE = 0.18;
+  const PER_ROOM_CAP    = 2;
+
+  // Quick lookup for tiles already taken by something visible on the wall.
+  const tileTaken = (tx, ty) => {
+    if (decorations.some(d => d.tx === tx && d.ty === ty)) return true;
+    if (lights && lights.some(l =>
+      Math.floor(l.x / TILE) === tx && Math.floor(l.y / TILE) === ty)) return true;
+    return false;
+  };
+
+  for (const r of rooms) {
+    if (r.isStartRoom) continue;
+    if (r.isKeyRoom) continue;          // arena room — no wall decor
+    if (r.isForbiddenArchive) continue; // sealed vault, hand-decorated
+    if (r.w < 4 || r.h < 3) continue;
+    const y = r.y - 1;
+    if (y < 1) continue;
+
+    let placedHere = 0;
+    // Skip the two corner tiles so decorations don't fight with the
+    // corner cobwebs / corner torches.
+    for (let x = r.x + 1; x < r.x + r.w - 1 && placedHere < PER_ROOM_CAP; x++) {
+      if (!map[y] || map[y][x] !== T_WALL) continue;
+      if (!map[y + 1] || map[y + 1][x] !== T_FLOOR) continue;
+      if (tileTaken(x, y)) continue;
+      if (rng() < PER_TILE_CHANCE) {
+        const kind = kinds[Math.floor(rng() * kinds.length)];
+        decorations.push({
+          kind, tx: x, ty: y, face: 'S',
+          seed: Math.floor(rng() * 1e9),
+        });
+        placedHere++;
+      }
+    }
+  }
+}
+
+/**
+ * Place a small number of sunbeams across the floor. Only the largest rooms
+ * are eligible, each with a low independent chance, and a hard cap of 2
+ * sunbeams per floor keeps them feeling rare and atmospheric — a collapsed
+ * dungeon, not an open courtyard.
+ * @private
+ */
+function placeSunbeams(rooms, rng, sunbeams) {
+  const HARD_CAP = 2;
+  // Only star rooms can host a ceiling crack — keeps the spectacle rare.
+  const eligible = rooms.filter(r => r.isLarge);
+  // High per-room chance: if the floor has a star room, it almost always
+  // has a beam through it. The contrast is the whole point.
+  const PER_ROOM_CHANCE = 0.85;
+
+  for (const r of eligible) {
+    if (sunbeams.length >= HARD_CAP) break;
+    if (rng() > PER_ROOM_CHANCE) continue;
+    // The crack runs across most of the ceiling: 60-90% of room width.
+    const lengthRatio = 0.60 + rng() * 0.30;
+    const length      = Math.max(4, Math.floor(r.w * lengthRatio)) * TILE;
+    // Centre the crack horizontally with a small offset.
+    const slack       = (r.w * TILE - length) * 0.5;
+    const startX      = r.x * TILE + slack + (rng() - 0.5) * slack * 0.6;
+    const h           = r.h * TILE;
+    const sb = {
+      // Anchor at the centre of the crack so render maths stay simple.
+      x: startX + length / 2,
+      y: r.y * TILE,
+      h,
+      length,
+      // Beam splays outward by `splay` pixels on each side at the floor.
+      splay: TILE * (0.8 + rng() * 0.6),
+      seed: Math.floor(rng() * 1e9),
+      // Tile row of the wall above this room — used to paint the visible
+      // ceiling fissure into the map cache.
+      wallRow: r.y - 1,
+    };
+    sb.shape = buildBeamShape(sb, rng);
+    sb.crack = buildCrackPath(sb, rng);
+    sunbeams.push(sb);
+  }
+}
+
+/**
+ * Place 1-2 traveller campfires across the floor in non-star, non-stairs
+ * rooms. Each campfire emits a wide warm light and is decorated with a
+ * stone ring + crossed logs, giving the impression that someone camped
+ * here before. Skips small rooms (no space for the ring).
+ * @private
+ */
+function placeCampfires(rooms, rng, lights) {
+  const HARD_CAP = 2;
+  const eligible = rooms.filter(r =>
+    !r.isLarge && !r.isStairsRoom && !r.isStartRoom &&
+    r.w >= 5 && r.h >= 5
+  );
+  // Shuffle and pick.
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+  const target = Math.min(HARD_CAP, eligible.length, 1 + Math.floor(rng() * 2));
+  for (let i = 0; i < target; i++) {
+    const r = eligible[i];
+    // Place near centre with a small offset so it doesn't sit on the
+    // exact pathing midpoint.
+    const ox = (rng() - 0.5) * Math.min(r.w - 4, 4);
+    const oy = (rng() - 0.5) * Math.min(r.h - 4, 3);
+    lights.push({
+      type:    'campfire',
+      x:       (r.x + r.w / 2 + ox) * TILE,
+      y:       (r.y + r.h / 2 + oy) * TILE,
+      r:       170 + rng() * 30,
+      flicker: rng() * Math.PI * 2,
+    });
+  }
+}
+
+/**
+ * Drop clusters of glowing mushrooms hugging the inside of room walls.
+ * Each mushroom emits a faint cool light, evoking the 'green ruins'
+ * biome. Total light count is capped to keep the lighting overlay cheap.
+ * @private
+ */
+function placeGlowMushrooms(map, rooms, rng, lights) {
+  const GLOBAL_CAP = 14;
+  let placed = 0;
+  for (const r of rooms) {
+    if (placed >= GLOBAL_CAP) break;
+    // Skip the smallest rooms; clusters need a wall edge with space.
+    if (r.w < 5 || r.h < 4) continue;
+    if (rng() > 0.65) continue;     // not every room
+    const clusterCount = 1 + Math.floor(rng() * 2); // 1-2 clusters
+    for (let c = 0; c < clusterCount && placed < GLOBAL_CAP; c++) {
+      const wallSide = Math.floor(rng() * 4); // 0=top 1=right 2=bot 3=left
+      // Pick anchor 1 tile inside the wall.
+      let ax, ay;
+      if (wallSide === 0)      { ax = r.x + 1 + Math.floor(rng() * (r.w - 2)); ay = r.y; }
+      else if (wallSide === 1) { ax = r.x + r.w - 1; ay = r.y + 1 + Math.floor(rng() * (r.h - 2)); }
+      else if (wallSide === 2) { ax = r.x + 1 + Math.floor(rng() * (r.w - 2)); ay = r.y + r.h - 1; }
+      else                     { ax = r.x; ay = r.y + 1 + Math.floor(rng() * (r.h - 2)); }
+      const groupSize = 2 + Math.floor(rng() * 3); // 2-4
+      for (let g = 0; g < groupSize && placed < GLOBAL_CAP; g++) {
+        const jx = ax + (rng() - 0.5) * 1.6;
+        const jy = ay + (rng() - 0.5) * 1.6;
+        // Skip if anchor isn't on a floor tile (safety).
+        const tx = Math.round(jx), ty = Math.round(jy);
+        if (ty < 0 || ty >= MAP_H || tx < 0 || tx >= MAP_W) continue;
+        if (map[ty][tx] !== T_FLOOR) continue;
+        lights.push({
+          type:    'glowMushroom',
+          x:       jx * TILE + TILE / 2,
+          y:       jy * TILE + TILE / 2,
+          r:       42 + rng() * 14,
+          // Variant 0 = blue-green, 1 = teal — picked deterministically.
+          variant: (placed + g) & 1,
+          phase:   rng() * Math.PI * 2,
+        });
+        placed++;
+      }
+    }
+  }
+}
+
+/**
+ * Thin moonbeams: small, fine shafts of light coming through tiny holes
+ * in the ceiling on rooms that are NOT star rooms. No god-rays or dust,
+ * just a delicate vertical sliver — gives texture to medium rooms.
+ * Re-uses the sunbeam container/render path with a `kind: 'thin'` tag.
+ * @private
+ */
+function placeMoonbeams(rooms, rng, beams) {
+  const HARD_CAP = 4;
+  const eligible = rooms.filter(r =>
+    !r.isLarge && r.w >= 5 && r.h >= 4
+  );
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+  let placed = 0;
+  for (const r of eligible) {
+    if (placed >= HARD_CAP) break;
+    if (rng() > 0.30) continue;
+    // Tiny crack: 8-14 px wide, slightly off-centre horizontally.
+    const length = 8 + Math.floor(rng() * 7);
+    const ox     = (rng() - 0.5) * (r.w - 2) * TILE * 0.6;
+    const sb = {
+      kind: 'thin',
+      x:    (r.x + r.w / 2) * TILE + ox,
+      y:    r.y * TILE,
+      h:    r.h * TILE,
+      length,
+      splay: 6 + rng() * 6,
+      seed:  Math.floor(rng() * 1e9),
+      wallRow: r.y - 1,
+    };
+    sb.shape = buildBeamShape(sb, rng);
+    sb.crack = buildCrackPath(sb, rng);
+    beams.push(sb);
+    placed++;
+  }
+}
+
+/**
+ * Drop a few stone pillars (single wall tiles) inside roomy spaces. Each
+ * pillar gives tactical cover and visual texture. Skips small rooms,
+ * keeps a 2-tile buffer to room edges, never blocks the room centre or
+ * adjacent tiles to start/stairs.
+ * @private
+ */
+function placePillars(rooms, map, rng) {
+  for (const r of rooms) {
+    if (r.w * r.h < 60) continue;
+    if (r.isStartRoom) continue;
+    const target = r.isLarge ? (3 + Math.floor(rng() * 3))   // 3-5 in stars
+                             : (1 + Math.floor(rng() * 2));  // 1-2 elsewhere
+    let placed = 0, safety = 30;
+    while (placed < target && safety-- > 0) {
+      const tx = r.x + 2 + Math.floor(rng() * (r.w - 4));
+      const ty = r.y + 2 + Math.floor(rng() * (r.h - 4));
+      // Avoid blocking centre tile (where stairs may sit) and its neighbours.
+      if (Math.abs(tx - r.cx) <= 1 && Math.abs(ty - r.cy) <= 1) continue;
+      if (map[ty][tx] !== T_FLOOR) continue;
+      // Don't drop a pillar adjacent to another pillar (no walls of pillars).
+      let touching = false;
+      for (let dy = -1; dy <= 1 && !touching; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = tx + dx, ny = ty + dy;
+          if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+          // Only check inside the room (so room walls don't count).
+          if (nx < r.x || nx >= r.x + r.w || ny < r.y || ny >= r.y + r.h) continue;
+          if (map[ny][nx] === T_WALL) { touching = true; break; }
+        }
+      }
+      if (touching) continue;
+      map[ty][tx] = T_WALL;
+      placed++;
+    }
+  }
+}
+
+/**
+ * Place stone sarcophagi in catacombs rooms. Each sarcophagus occupies a
+ * 2×1 footprint (rotated 1×2 sometimes) of T_WALL tiles, blocking pathing
+ * just like a pillar but reading visually as a tomb.
+ *
+ * Cubiculae: 30-40% chance of a single normal sarcophagus.
+ * Crypta (star room): central 2×2 altar plus 2-3 'cracked' sarcophagi
+ * along the inner border. Cracked variants are highlighted with a faint
+ * blue aura at runtime — they are awakable/breakable in commit 5.
+ * @private
+ */
+/**
+ * Anchor 5–8 ambient soul spawners across the catacombs floor. Each anchor
+ * stores world coordinates that main.js uses to emit drifting soul wisps.
+ * Anchors prefer cracked sarcophagi (and the altar) for thematic effect,
+ * filling the rest with random non-start, non-stairs room centres.
+ *
+ * @private
+ */
+function placeSoulSpawners(rooms, rng, soulSpawners, sarcophagi) {
+  // Cracked sarcophagi and the altar are the strongest narrative anchors.
+  for (const s of (sarcophagi || [])) {
+    if (s.variant === 'cracked' || s.variant === 'altar') {
+      soulSpawners.push({
+        x: s.tx * TILE + (s.w * TILE) / 2,
+        y: s.ty * TILE + (s.h * TILE) / 2,
+        timer: rng() * 2.5,
+      });
+    }
+  }
+  // Top up with random rooms until we have 5–8 anchors.
+  const target = 5 + Math.floor(rng() * 4);
+  const candidates = rooms.filter(r => !r.isStartRoom && !r.isStairsRoom);
+  let safety = 40;
+  while (soulSpawners.length < target && candidates.length && safety-- > 0) {
+    const r = candidates[Math.floor(rng() * candidates.length)];
+    const ox = r.x + 1 + Math.floor(rng() * Math.max(1, r.w - 2));
+    const oy = r.y + 1 + Math.floor(rng() * Math.max(1, r.h - 2));
+    soulSpawners.push({
+      x: ox * TILE + TILE / 2,
+      y: oy * TILE + TILE / 2,
+      timer: rng() * 2.5,
+    });
+  }
+}
+
+/**
+ * Library biome: place 1–3 floating magic flames per non-start room. Each
+ * flame oscillates between two anchor points inside the room, drifting
+ * irregularly so two flames never feel synced. Colour alternates between
+ * arcane purple and crimson per spawn for variety.
+ *
+ * @private
+ */
+function placeMagicFlames(rooms, rng, lights) {
+  for (const r of rooms) {
+    if (r.isStartRoom) continue;
+    if (r.isObservatory) continue; // own corner candles, no roaming flames
+    if (r.w < 5 || r.h < 4) continue;
+
+    const count = 1 + (r.isLarge ? Math.floor(rng() * 2) : 0);
+    for (let i = 0; i < count; i++) {
+      // Anchor A and B inside the room, kept away from the walls.
+      const ax = (r.x + 1 + rng() * (r.w - 2)) * TILE;
+      const ay = (r.y + 1 + rng() * (r.h - 2)) * TILE;
+      const bx = (r.x + 1 + rng() * (r.w - 2)) * TILE;
+      const by = (r.y + 1 + rng() * (r.h - 2)) * TILE;
+      const purple = rng() < 0.65;
+      lights.push({
+        type:    'magicFlame',
+        ax, ay, bx, by,
+        x:       ax,
+        y:       ay,
+        // Independent phase + frequency so flames desync.
+        phase:   rng() * Math.PI * 2,
+        speed:   0.25 + rng() * 0.35,
+        wobble:  rng() * Math.PI * 2,
+        color:   purple ? [180, 120, 255] : [255,  90, 110],
+        r:       70 + rng() * 25,
+        flicker: rng() * Math.PI * 2,
+      });
+    }
+  }
+}
+
+/**
+ * Attach a small levitating rune glyph to every existing magicFlame.
+ * The glyph orbits the flame at a fixed offset and pulses; rendered as
+ * a live overlay in render.js, never touches the map.
+ * @private
+ */
+function decorateMagicFlamesWithRunes(lights, rng) {
+  for (const l of lights) {
+    if (l.type !== 'magicFlame') continue;
+    l.rune = {
+      // 4 possible glyph shapes — picked once per flame for variety.
+      shape:    Math.floor(rng() * 4),
+      // Orbit offset relative to the flame: small radius, random initial angle.
+      orbitR:   8 + rng() * 4,
+      phase:    rng() * Math.PI * 2,
+      // Bob amplitude on the Y axis (in addition to orbiting).
+      bobAmp:   2 + rng() * 2,
+      bobSpeed: 1.4 + rng() * 0.8,
+    };
+  }
+}
+
+/**
+ * Paint a small (1×1) rune mark on the floor adjacent to ~40% of the
+ * magic flames. Walkable; stored as a 'libraryRuneMark' libraryProp so
+ * the existing draw pass picks it up.
+ * @private
+ */
+function placeLibraryRuneMarks(map, rooms, rng, lights, libraryProps) {
+  for (const l of lights) {
+    if (l.type !== 'magicFlame') continue;
+    if (rng() > 0.40) continue;
+    // Snap to the nearest interior floor tile within a 3-tile box.
+    const cxT = Math.floor(l.ax / TILE);
+    const cyT = Math.floor(l.ay / TILE);
+    const candidates = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const xx = cxT + dx, yy = cyT + dy;
+        if (!map[yy] || map[yy][xx] !== T_FLOOR) continue;
+        candidates.push({ xx, yy });
+      }
+    }
+    if (!candidates.length) continue;
+    const c = candidates[Math.floor(rng() * candidates.length)];
+    // Avoid stacking on a tile that already hosts a rune mark.
+    if (libraryProps.some(p => p.kind === 'libraryRuneMark' && p.tx === c.xx && p.ty === c.yy)) continue;
+    libraryProps.push({
+      kind: 'libraryRuneMark',
+      tx: c.xx, ty: c.yy, w: 1, h: 1,
+      seed: Math.floor(rng() * 1e9),
+    });
+  }
+}
+
+/**
+ * For each non-tiny library room, register 1-2 ambient leaf spawners
+ * anchored at random ceiling-side positions. Each spawner periodically
+ * emits a falling 'leaf' particle. Skips the Grand Tome and Great Library
+ * since those rooms already have their own atmosphere.
+ * @private
+ */
+function placeLibraryLeafSpawners(rooms, rng, leafSpawners) {
+  for (const r of rooms) {
+    if (r.isStartRoom) continue;
+    if (r.isGrandTome) continue;
+    if (r.isObservatory) continue;
+    if (r.isForbiddenArchive) continue;
+    if (r.w < 5 || r.h < 4) continue;
+    if (rng() < 0.4) continue;
+    const count = r.isLarge || r.isGreatLibrary
+      ? 1 + Math.floor(rng() * 2)
+      : 1;
+    for (let i = 0; i < count; i++) {
+      const sx = (r.x + 1 + rng() * (r.w - 2)) * TILE;
+      const sy = (r.y + 0.5 + rng() * 1.5) * TILE;
+      leafSpawners.push({
+        x: sx,
+        y: sy,
+        timer: 3 + rng() * 5,
+        hue:   rng() < 0.5 ? 'paper' : 'leaf',
+      });
+    }
+  }
+}
+
+/**
+ * Library biome: place tall bookshelves along the inner perimeter of each
+ * room (one tile in from a wall). Shelves are 2-tile wide solids written
+ * as T_WALL, oriented along the wall they hug.
+ *
+ * Skips start, stairs and any room shorter than 4 in either axis. Roughly
+ * 35% of eligible rooms get 1 shelf, large rooms get 2-3.
+ *
+ * @private
+ */
+function placeShelves(rooms, map, rng, libraryProps) {
+  for (const r of rooms) {
+    if (r.isStartRoom || r.isStairsRoom) continue;
+    if (r.isGreatLibrary) continue; // hand-decorated by the set-piece placer
+    if (r.isGrandTome) continue;    // pedestal is the only prop in here
+    if (r.isObservatory) continue;  // hand-decorated by the observatory placer
+    if (r.isKeyRoom) continue;       // arena room — must stay clear for combat
+    if (r.isForbiddenArchive) continue; // hand-decorated by the archive placer
+    if (r.w < 4 || r.h < 4) continue;
+    if (!r.isLarge && rng() > 0.55) continue;
+
+    const target = r.isLarge ? 2 + Math.floor(rng() * 2) : 1;
+    let placed = 0;
+    let safety = 16;
+    while (placed < target && safety-- > 0) {
+      // Side: 0=top, 1=right, 2=bottom, 3=left.
+      const side = Math.floor(rng() * 4);
+      const horizontal = side === 0 || side === 2;
+      const len = 2;
+      let tx, ty;
+      if (side === 0)      { tx = r.x + 1 + Math.floor(rng() * (r.w - 2 - len + 1)); ty = r.y + 1; }
+      else if (side === 2) { tx = r.x + 1 + Math.floor(rng() * (r.w - 2 - len + 1)); ty = r.y + r.h - 2; }
+      else if (side === 1) { tx = r.x + r.w - 2; ty = r.y + 1 + Math.floor(rng() * (r.h - 2 - len + 1)); }
+      else                 { tx = r.x + 1;       ty = r.y + 1 + Math.floor(rng() * (r.h - 2 - len + 1)); }
+
+      const w = horizontal ? len : 1;
+      const h = horizontal ? 1   : len;
+
+      // Skip if it covers the room centre (door axis area).
+      let blocksCentre = false;
+      for (let yy = ty; yy < ty + h; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) {
+          if (xx === r.cx && yy === r.cy) blocksCentre = true;
+        }
+      }
+      if (blocksCentre) continue;
+
+      // All target tiles must be floor and not already taken.
+      let ok = true;
+      for (let yy = ty; yy < ty + h && ok; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) {
+          if (!map[yy] || map[yy][xx] !== T_FLOOR) { ok = false; break; }
+          if (libraryProps.some(p => xx >= p.tx && xx < p.tx + p.w && yy >= p.ty && yy < p.ty + p.h)) {
+            ok = false; break;
+          }
+        }
+      }
+      if (!ok) continue;
+
+      for (let yy = ty; yy < ty + h; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) map[yy][xx] = T_WALL;
+      }
+      libraryProps.push({
+        kind: 'shelf',
+        tx, ty, w, h,
+        orient: horizontal ? 'h' : 'v',
+        // Which side it hugs determines which side of the prop is the front.
+        face:   side === 0 ? 'S' : side === 2 ? 'N' : side === 1 ? 'W' : 'E',
+        seed:   Math.floor(rng() * 1e9),
+      });
+      placed++;
+    }
+  }
+}
+
+/**
+ * Library biome: place 1-2 reading tables in the middle of each non-start
+ * room. Tables are 1×1 (small) or 2×1 (long) solids written as T_WALL.
+ *
+ * @private
+ */
+function placeTables(rooms, map, rng, libraryProps) {
+  for (const r of rooms) {
+    if (r.isStartRoom || r.isStairsRoom) continue;
+    if (r.isGreatLibrary) continue; // hand-decorated by the set-piece placer
+    if (r.isGrandTome) continue;    // pedestal is the only prop in here
+    if (r.isObservatory) continue;  // hand-decorated by the observatory placer
+    if (r.isKeyRoom) continue;       // arena room — must stay clear for combat
+    if (r.isForbiddenArchive) continue; // hand-decorated by the archive placer
+    if (r.w < 5 || r.h < 4) continue;
+    if (rng() > 0.6) continue;
+
+    const target = r.isLarge ? 2 : 1;
+    let placed = 0;
+    let safety = 12;
+    while (placed < target && safety-- > 0) {
+      const horizontal = rng() < 0.5;
+      const w = horizontal ? 2 : 1;
+      const h = horizontal ? 1 : (rng() < 0.4 ? 2 : 1);
+      // Stay one tile away from walls and avoid the room centre tile.
+      const tx = r.x + 2 + Math.floor(rng() * Math.max(1, r.w - 3 - w));
+      const ty = r.y + 2 + Math.floor(rng() * Math.max(1, r.h - 3 - h));
+
+      let blocksCentre = false;
+      for (let yy = ty; yy < ty + h; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) {
+          if (xx === r.cx && yy === r.cy) blocksCentre = true;
+        }
+      }
+      if (blocksCentre) continue;
+
+      let ok = true;
+      for (let yy = ty; yy < ty + h && ok; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) {
+          if (!map[yy] || map[yy][xx] !== T_FLOOR) { ok = false; break; }
+          if (libraryProps.some(p => xx >= p.tx && xx < p.tx + p.w && yy >= p.ty && yy < p.ty + p.h)) {
+            ok = false; break;
+          }
+        }
+      }
+      if (!ok) continue;
+
+      for (let yy = ty; yy < ty + h; yy++) {
+        for (let xx = tx; xx < tx + w; xx++) map[yy][xx] = T_WALL;
+      }
+      libraryProps.push({
+        kind:    rng() < 0.45 ? 'tableBroken' : 'table',
+        tx, ty, w, h,
+        orient:  horizontal ? 'h' : 'v',
+        seed:    Math.floor(rng() * 1e9),
+      });
+      placed++;
+    }
+  }
+}
 
 /**
  * Reserve a `w`×`h` rectangle in the map BEFORE BSP runs so a special
@@ -1362,7 +2141,7 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
  *
  * @private
  */
-function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom) {
+function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom, archiveMistSpawners) {
   if (!room) return;
   room.isForbiddenArchive = true;
 
@@ -1460,12 +2239,255 @@ function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom) 
   }
 
   // Dark mist spawner — particles slowly rise from the pedestal.
-  // The spawner is registered in main.js after generateDungeon returns.
+  archiveMistSpawners.push({
+    x: (room.cx + 0.5) * TILE,
+    y: (room.cy + 0.5) * TILE,
+    timer: 0,
+  });
 }
 
-// placeSarcophagi, placeAltar, placeCryptaSarcophagi, tryPlaceSarcophagus → crypt.js
-// placePuddles → ruins.js
-// buildCrackPath, buildBeamShape → beams.js
+function placeSarcophagi(rooms, map, rng, sarcophagi, lights) {
+  for (const r of rooms) {
+    if (r.isStartRoom || r.isStairsRoom) continue;
+    if (r.w < 4 || r.h < 4) continue;
+
+    if (r.isLarge) {
+      placeAltar(r, map, sarcophagi, lights);
+      placeCryptaSarcophagi(r, map, rng, sarcophagi);
+    } else {
+      // Cubicula: 35% chance of a normal sarcophagus.
+      if (rng() > 0.35) continue;
+      tryPlaceSarcophagus(r, map, rng, sarcophagi, 'normal');
+    }
+  }
+}
+
+/**
+ * Place the 2×2 altar at the centre of the crypta plus a cool blue light
+ * source coming from the bowl on top.
+ * @private
+ */
+function placeAltar(r, map, sarcophagi, lights) {
+  const tx = r.cx - 1;
+  const ty = r.cy - 1;
+  // Verify all 4 tiles are floor.
+  for (let y = ty; y < ty + 2; y++) {
+    for (let x = tx; x < tx + 2; x++) {
+      if (map[y] === undefined || map[y][x] !== T_FLOOR) return;
+    }
+  }
+  for (let y = ty; y < ty + 2; y++) {
+    for (let x = tx; x < tx + 2; x++) map[y][x] = T_WALL;
+  }
+  sarcophagi.push({
+    tx, ty, w: 2, h: 2,
+    variant: 'altar',
+    awakable: false, awakened: false,
+  });
+  // Flickering cool flame light on the bowl.
+  if (lights) {
+    lights.push({
+      type: 'altar',
+      x: (tx + 1) * TILE,           // centre of 2x2 footprint
+      y: (ty + 1) * TILE,           // bowl sits roughly at the centre row
+      r: 140,
+      seed: Math.floor(Math.random() * 1000),
+    });
+  }
+}
+
+/**
+ * Place 2-3 awakable (cracked) sarcophagi along the inner border of the
+ * crypta. They are placed against the room walls but still inside the
+ * floor area, leaving the centre clear for the player.
+ * @private
+ */
+function placeCryptaSarcophagi(r, map, rng, sarcophagi) {
+  const target = 2 + Math.floor(rng() * 2); // 2-3
+  let placed = 0, safety = 40;
+  while (placed < target && safety-- > 0) {
+    if (tryPlaceSarcophagus(r, map, rng, sarcophagi, 'cracked', /*nearWall*/ true)) {
+      placed++;
+    }
+  }
+}
+
+/**
+ * Try to place a single 2×1 (or 1×2) sarcophagus in the room. Marks the
+ * occupied tiles as T_WALL and pushes an entry to `sarcophagi`. Returns
+ * true on success, false if no spot was found.
+ * @private
+ */
+function tryPlaceSarcophagus(r, map, rng, sarcophagi, variant, nearWall = false) {
+  const horizontal = rng() < 0.5;
+  const w = horizontal ? 2 : 1;
+  const h = horizontal ? 1 : 2;
+  // Random anchor within the room interior (with 1-tile buffer to room walls).
+  const minX = r.x + 1;
+  const maxX = r.x + r.w - 1 - w;
+  const minY = r.y + 1;
+  const maxY = r.y + r.h - 1 - h;
+  if (maxX < minX || maxY < minY) return false;
+
+  for (let attempt = 0; attempt < 12; attempt++) {
+    let tx, ty;
+    if (nearWall) {
+      // Bias toward the room border — pick a wall side.
+      const side = Math.floor(rng() * 4);
+      if (side === 0)      { tx = minX + Math.floor(rng() * (maxX - minX + 1)); ty = minY; }
+      else if (side === 1) { tx = maxX;                                        ty = minY + Math.floor(rng() * (maxY - minY + 1)); }
+      else if (side === 2) { tx = minX + Math.floor(rng() * (maxX - minX + 1)); ty = maxY; }
+      else                 { tx = minX;                                        ty = minY + Math.floor(rng() * (maxY - minY + 1)); }
+    } else {
+      tx = minX + Math.floor(rng() * (maxX - minX + 1));
+      ty = minY + Math.floor(rng() * (maxY - minY + 1));
+    }
+    // Avoid blocking the room centre.
+    let blocksCentre = false;
+    for (let yy = ty; yy < ty + h; yy++) {
+      for (let xx = tx; xx < tx + w; xx++) {
+        if (Math.abs(xx - r.cx) <= 0 && Math.abs(yy - r.cy) <= 0) blocksCentre = true;
+      }
+    }
+    if (blocksCentre) continue;
+    // Verify all target tiles are floor.
+    let ok = true;
+    for (let yy = ty; yy < ty + h && ok; yy++) {
+      for (let xx = tx; xx < tx + w; xx++) {
+        if (map[yy] === undefined || map[yy][xx] !== T_FLOOR) { ok = false; break; }
+      }
+    }
+    if (!ok) continue;
+    for (let yy = ty; yy < ty + h; yy++) {
+      for (let xx = tx; xx < tx + w; xx++) map[yy][xx] = T_WALL;
+    }
+    sarcophagi.push({
+      tx, ty, w, h, variant,
+      awakable: variant === 'cracked',
+      awakened: false,
+      orient: horizontal ? 'h' : 'v',
+    });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Place small puddles of water on floor tiles. Each puddle records its
+ * tile centre and a deterministic ellipse radius so render passes can
+ * paint it (and its specular highlight) consistently.
+ * @private
+ */
+function placePuddles(map, rooms, rng, puddles) {
+  for (const r of rooms) {
+    if (r.w < 4 || r.h < 4) continue;
+    const target = r.isLarge ? (2 + Math.floor(rng() * 2))  // 2-3 in stars
+                             : (rng() < 0.55 ? 1 : 0);      // ~55% chance else
+    let placed = 0, safety = 20;
+    while (placed < target && safety-- > 0) {
+      const tx = r.x + 1 + Math.floor(rng() * (r.w - 2));
+      const ty = r.y + 1 + Math.floor(rng() * (r.h - 2));
+      if (map[ty][tx] !== T_FLOOR) continue;
+      // Avoid stair tile and pathing centre.
+      if (tx === r.cx && ty === r.cy) continue;
+      // Don't stack puddles.
+      let tooClose = false;
+      for (const p of puddles) {
+        if (Math.abs(p.tx - tx) <= 1 && Math.abs(p.ty - ty) <= 1) { tooClose = true; break; }
+      }
+      if (tooClose) continue;
+      puddles.push({
+        tx, ty,
+        x:  tx * TILE + TILE / 2,
+        y:  ty * TILE + TILE / 2,
+        rx: 8 + rng() * 4,         // 8-12 px ellipse radius x
+        ry: 4 + rng() * 2,         // 4-6 px radius y
+        seed: Math.floor(rng() * 1e9),
+      });
+      placed++;
+    }
+  }
+}
+
+/**
+ * Build a jagged polyline describing the visible ceiling crack on the wall
+ * tile row directly above the room. Coordinates are world-space pixels.
+ * The polyline is a horizontal random walk inside the wall row, ranging
+ * across ±length/2 around `sb.x` and biased toward y = wallRow*TILE + ~half.
+ * @private
+ */
+function buildCrackPath(sb, rng) {
+  const halfLen = sb.length * 0.5;
+  const baseY   = sb.wallRow * TILE + TILE * 0.55;
+  const n       = Math.max(8, Math.floor(sb.length / 8));
+  const pts     = [];
+  let y = baseY;
+  for (let i = 0; i < n; i++) {
+    const t  = i / (n - 1);
+    const x  = sb.x - halfLen + t * sb.length;
+    // Random-walk Y inside the wall row, clamped to stay visible.
+    y += (rng() - 0.5) * 4;
+    const minY = sb.wallRow * TILE + 3;
+    const maxY = sb.wallRow * TILE + TILE - 3;
+    if (y < minY) y = minY;
+    if (y > maxY) y = maxY;
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
+/**
+ * Build an irregular polygon for a long ceiling crack widening into a sheet
+ * of light. The top edge is a jagged line spanning `sb.length`, the sides
+ * slope outward by `sb.splay`, and the bottom is a wider uneven edge.
+ * Coordinates are relative to (sb.x, sb.y).
+ * @private
+ */
+function buildBeamShape(sb, rng) {
+  const halfTop    = sb.length * 0.5;
+  const halfBottom = halfTop + sb.splay;
+  const h          = sb.h;
+  const pts        = [];
+
+  // ── Top edge: long jagged crack across the ceiling ─────────────────
+  // One zig-zag point every ~12 px, with vertical jitter.
+  const nTop = Math.max(6, Math.floor(sb.length / 12));
+  for (let i = 0; i < nTop; i++) {
+    const t = i / (nTop - 1);
+    const x = -halfTop + t * (halfTop * 2);
+    const y = (rng() - 0.3) * 5;       // mostly above 0, occasional dip
+    pts.push([x + (rng() - 0.5) * 3, y]);
+  }
+
+  // ── Right side: 1–2 kinks down to the floor ───────────────────────
+  const rightKinks = 1 + Math.floor(rng() * 2);
+  for (let i = 1; i <= rightKinks; i++) {
+    const t = i / (rightKinks + 1);
+    const x = halfTop + t * sb.splay + (rng() - 0.5) * 4;
+    const y = t * h;
+    pts.push([x, y]);
+  }
+  pts.push([halfBottom + (rng() - 0.5) * 4, h]);
+
+  // ── Bottom edge: wide, slightly uneven ────────────────────────────
+  const nBot = Math.max(3, Math.floor(sb.length / 16));
+  for (let i = 0; i < nBot; i++) {
+    const t = (i + 1) / (nBot + 1);
+    const x = halfBottom - t * (halfBottom * 2);
+    pts.push([x + (rng() - 0.5) * 4, h + (rng() - 0.5) * 3]);
+  }
+  pts.push([-halfBottom + (rng() - 0.5) * 4, h]);
+
+  // ── Left side: kinks back up to the top ───────────────────────────
+  const leftKinks = 1 + Math.floor(rng() * 2);
+  for (let i = leftKinks; i >= 1; i--) {
+    const t = i / (leftKinks + 1);
+    const x = -halfTop - t * sb.splay + (rng() - 0.5) * 4;
+    const y = t * h;
+    pts.push([x, y]);
+  }
+  return pts;
+}
 
 /**
  * True if the style key represents the floor-1 ruins layout.
