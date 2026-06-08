@@ -9,11 +9,12 @@
  *   • 'kill' — every entrance seals, an extra wave spawns inside,
  *              clearing them all drops the key. (Original v1 puzzle.)
  *   • 'rune' — every entrance seals; four rune pedestals stand around
- *              the dais arranged as two matching pairs. Press E on a
- *              pedestal to light its rune; light two with the same rune
- *              to validate them (they turn green). Mismatches flash red
- *              and reset. Validating all four pedestals completes the
- *              puzzle and drops the key.
+ *              the dais arranged as two matching pairs. The player must
+ *              stand on the central dais to activate the runes, then hit
+ *              them with magic projectiles to light them. Hitting two
+ *              with the same rune validates them (they turn green).
+ *              Mismatches flash red and reset. Leaving the dais deactivates
+ *              the runes. Validating all four completes the puzzle.
  *
  * Both variants share the seal-on-entry behaviour, the key drop and the
  * locked-door logic. A future 'candle' variant will plug in here too.
@@ -37,6 +38,9 @@ const RUNE_COLORS = [
 const RUNE_VALIDATED = [120, 230, 140]; // verde validado
 const RUNE_MISMATCH  = [255, 90,  80];  // rojo error
 const MISMATCH_HOLD  = 0.6;             // segundos que parpadea el error
+
+/** Tiles from room centre the player must stay within to keep runes active. */
+const CENTER_RADIUS = 1.6;
 
 /** Reset the slot when the floor (re)builds. */
 export function resetKeyRoom() {
@@ -128,22 +132,18 @@ function playerSafeFromEntrances(entrances) {
   return true;
 }
 
+/** @private Is the player close enough to the room centre to activate runes? */
+function isPlayerInCenter(k) {
+  const cx = (k.room.cx + 0.5) * TILE;
+  const cy = (k.room.cy + 0.5) * TILE;
+  const p  = state.player;
+  if (!p) return false;
+  return Math.hypot(p.x - cx, p.y - cy) < TILE * CENTER_RADIUS;
+}
+
 /** @private Pedestal centre in world coords. */
 function pedestalCentre(ped) {
   return { x: (ped.tx + 0.5) * TILE, y: (ped.ty + 0.5) * TILE };
-}
-
-/** @private Index of the pedestal closest to the player within reach. */
-function nearestPedestalInRange(k) {
-  if (!k.pedestals.length) return -1;
-  const p = state.player;
-  let best = -1, bestD = TILE * 1.6;
-  for (let i = 0; i < k.pedestals.length; i++) {
-    const c = pedestalCentre(k.pedestals[i]);
-    const d = Math.hypot(p.x - c.x, p.y - c.y);
-    if (d < bestD) { bestD = d; best = i; }
-  }
-  return best;
 }
 
 /* ─────────────────────────── shared transitions ─────────────────────────── */
@@ -228,6 +228,27 @@ export function updateKeyRoom(dt, toast) {
   if (k.state !== 'active') return;
 
   if (k.variant === 'rune') {
+    // If the player leaves the centre dais, drop any unvalidated picks.
+    if (!isPlayerInCenter(k)) {
+      if (k.pickedIdx >= 0) {
+        const ped = k.pedestals[k.pickedIdx];
+        ped.picked = false;
+        k.pickedIdx = -1;
+      }
+      // Also cancel mismatch animation early — the runes go quiet.
+      if (k.mismatchTimer > 0) {
+        k.mismatchTimer = 0;
+        if (k.mismatchA >= 0) {
+          k.pedestals[k.mismatchA].picked = false;
+          k.pedestals[k.mismatchA].mismatch = false;
+        }
+        if (k.mismatchB >= 0) {
+          k.pedestals[k.mismatchB].picked = false;
+          k.pedestals[k.mismatchB].mismatch = false;
+        }
+        k.mismatchA = -1; k.mismatchB = -1;
+      }
+    }
     if (k.mismatchTimer > 0) {
       k.mismatchTimer = Math.max(0, k.mismatchTimer - dt);
       if (k.mismatchTimer === 0) {
@@ -253,20 +274,22 @@ export function updateKeyRoom(dt, toast) {
   if (!stillAlive) completePuzzle(k, toast);
 }
 
-/* ─────────────────────────── E-handler ─────────────────────────── */
+/* ─────────────────────────── projectile handler ─────────────────────────── */
 
 /**
- * Player E-handler hook. If the player is standing next to a rune
- * pedestal while the puzzle is active, light it (and resolve pair
- * matches). Returns true when the press was consumed.
+ * Called when a friendly projectile lands on tile (tx, ty). If that tile
+ * holds an unvalidated rune pedestal and the player is on the centre dais,
+ * light it (and resolve pair matches). Returns true when the hit was
+ * consumed.
  */
-export function tryActivateKeyPedestal() {
+export function hitRunePedestal(tx, ty) {
   const k = state.keyRoom;
   if (!k || k.variant !== 'rune') return false;
   if (k.state !== 'active') return false;
   if (k.mismatchTimer > 0) return false;
+  if (!isPlayerInCenter(k)) return false;
 
-  const idx = nearestPedestalInRange(k);
+  const idx = k.pedestals.findIndex(p => p.tx === tx && p.ty === ty);
   if (idx < 0) return false;
   const ped = k.pedestals[idx];
   if (ped.validated || ped.picked) return false;
@@ -309,34 +332,59 @@ export function drawKeyPedestals(ctx) {
   const k = state.keyRoom;
   if (!k || k.variant !== 'rune') return;
   const t = state.time || 0;
-  for (const ped of k.pedestals) {
-    drawRunePedestal(ctx, ped, t);
+
+  const playerInCenter = isPlayerInCenter(k);
+
+  // Draw a subtle glowing ring on the centre dais.
+  if (k.state === 'active') {
+    const cx = (k.room.cx + 0.5) * TILE - state.cameraX;
+    const cy = (k.room.cy + 0.5) * TILE - state.cameraY;
+    const pulse = 0.15 + 0.1 * Math.sin(t * 2);
+    ctx.save();
+    ctx.globalAlpha = playerInCenter ? 1 : 0.35;
+    const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, TILE * CENTER_RADIUS);
+    grad.addColorStop(0, `rgba(180, 140, 255, ${pulse})`);
+    grad.addColorStop(1, 'rgba(180, 140, 255, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, TILE * CENTER_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
-  if (k.state === 'active' && k.mismatchTimer === 0) {
-    const idx = nearestPedestalInRange(k);
-    if (idx >= 0 && !k.pedestals[idx].validated && !k.pedestals[idx].picked) {
-      const ped = k.pedestals[idx];
-      const c   = pedestalCentre(ped);
-      const sx  = c.x - state.cameraX;
-      const sy  = c.y - state.cameraY;
-      const pulse = 0.6 + 0.4 * Math.sin(t * 5);
-      ctx.save();
+
+  // Draw pedestals, dimmed when player is away from centre.
+  for (const ped of k.pedestals) {
+    drawRunePedestal(ctx, ped, t, playerInCenter && k.state === 'active');
+  }
+
+  // Context-sensitive hint text above the dais.
+  if (k.state === 'active') {
+    const cx = (k.room.cx + 0.5) * TILE - state.cameraX;
+    const sy = (k.room.cy - 0.5) * TILE - state.cameraY;
+    const pulse = 0.6 + 0.4 * Math.sin(t * 3);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur  = 4;
+    if (!playerInCenter) {
       ctx.fillStyle = `rgba(255, 220, 160, ${pulse})`;
       ctx.font      = 'bold 12px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0,0,0,0.85)';
-      ctx.shadowBlur  = 4;
-      ctx.fillText('[E]', sx, sy - 22);
-      ctx.restore();
+      ctx.fillText('Párate en el centro para activar las runas', cx, sy - 14);
+    } else if (k.mismatchTimer === 0 && k.pedestals.some(p => !p.validated)) {
+      ctx.fillStyle = `rgba(180, 200, 255, ${pulse})`;
+      ctx.font      = 'bold 12px sans-serif';
+      ctx.fillText('Dispara a las runas para emparejarlas', cx, sy - 14);
     }
+    ctx.restore();
   }
 }
 
 /** @private Pick the colour the pedestal should currently glow with. */
-function pedestalGlowColor(ped, time) {
+function pedestalGlowColor(ped, time, active) {
   if (ped.validated) return RUNE_VALIDATED;
   if (ped.mismatch)  return RUNE_MISMATCH;
   if (ped.picked)    return RUNE_COLORS[ped.runeId].lit;
+  if (!active)       return [30, 28, 40];
   const a = 0.5 + 0.5 * Math.sin(time * 2 + ped.tx + ped.ty);
   const dim = RUNE_COLORS[ped.runeId].dim;
   const lit = RUNE_COLORS[ped.runeId].lit;
@@ -348,7 +396,7 @@ function pedestalGlowColor(ped, time) {
 }
 
 /** @private Paint one pedestal: hex base + floating rune disc on top. */
-function drawRunePedestal(ctx, ped, time) {
+function drawRunePedestal(ctx, ped, time, active) {
   const c  = pedestalCentre(ped);
   const sx = c.x - state.cameraX;
   const sy = c.y - state.cameraY;
@@ -382,12 +430,13 @@ function drawRunePedestal(ctx, ped, time) {
   ctx.ellipse(sx, sy - r * 0.18, r * 0.78, r * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  const col = pedestalGlowColor(ped, time);
+  const col = pedestalGlowColor(ped, time, active);
   const bob = Math.sin(time * 2 + ped.tx * 0.7) * 1.5;
   const ry  = sy - r * 0.55 + bob;
-  const glow = `rgba(${col[0]|0}, ${col[1]|0}, ${col[2]|0}, 0.9)`;
+  const alpha = active ? 0.9 : 0.3;
+  const glow = `rgba(${col[0]|0}, ${col[1]|0}, ${col[2]|0}, ${alpha})`;
   ctx.shadowColor = glow;
-  ctx.shadowBlur  = 14;
+  ctx.shadowBlur  = active ? 14 : 4;
   ctx.fillStyle   = glow;
   ctx.beginPath();
   ctx.arc(sx, ry, r * 0.42, 0, Math.PI * 2);

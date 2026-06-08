@@ -6,6 +6,7 @@ import { state } from './state.js';
 import { isWall } from './dungeon.js';
 import { spawnParticles } from './particles.js';
 import { breakProp } from './loot.js';
+import { hitRunePedestal } from './keyRoom.js';
 import { TILE } from './config.js';
 
 /**
@@ -45,6 +46,14 @@ export function projectileUpdate(prj, dt, hooks) {
         prj._dead = true;
         return;
       }
+    }
+    // Check rune pedestal hits (rune puzzle in Sala de la Llave).
+    const pedTx = Math.floor(prj.x / TILE);
+    const pedTy = Math.floor(prj.y / TILE);
+    if (hitRunePedestal(pedTx, pedTy)) {
+      spawnParticles(prj.x, prj.y, prj.glow, 10);
+      prj._dead = true;
+      return;
     }
   } else {
     const p = state.player;
