@@ -447,67 +447,33 @@ function isReachable(map, startRoom, stairsRoom) {
  * @private
  */
 function isDoorReachableFromStart(map, archiveRoom, startRoom) {
-  if (!archiveRoom || !archiveRoom.doorTile) return true;
-  const door = archiveRoom.doorTile;
+  if (!archiveRoom || !archiveRoom.doorTiles || archiveRoom.doorTiles.length === 0) return true;
   const ax0 = archiveRoom.x, ax1 = archiveRoom.x + archiveRoom.w;
   const ay0 = archiveRoom.y, ay1 = archiveRoom.y + archiveRoom.h;
   const inArchive = (x, y) => x >= ax0 && x < ax1 && y >= ay0 && y < ay1;
-  const approaches = [];
-  for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-    const nx = door.tx + dx, ny = door.ty + dy;
-    if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
-    if (inArchive(nx, ny)) continue;
-    if (map[ny][nx] === T_FLOOR) approaches.push({ tx: nx, ty: ny });
+
+  // Collect approach tiles (floor neighbours outside the archive) for ALL doors.
+  const allApproaches = [];
+  for (const door of archiveRoom.doorTiles) {
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nx = door.tx + dx, ny = door.ty + dy;
+      if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
+      if (inArchive(nx, ny)) continue;
+      if (map[ny][nx] === T_FLOOR) allApproaches.push({ tx: nx, ty: ny });
+    }
   }
-  if (approaches.length === 0) return false;
+  if (allApproaches.length === 0) return false;
   const seen = new Uint8Array(MAP_W * MAP_H);
   const queue = [[startRoom.cx, startRoom.cy]];
   seen[startRoom.cy * MAP_W + startRoom.cx] = 1;
   while (queue.length) {
     const [x, y] = queue.shift();
-    for (const a of approaches) if (a.tx === x && a.ty === y) return true;
+    for (const a of allApproaches) if (a.tx === x && a.ty === y) return true;
     for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
       const nx = x + dx, ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
       const idx = ny * MAP_W + nx;
       if (seen[idx]) continue;
-      if (inArchive(nx, ny)) continue;
-      const t = map[ny][nx];
-      if (t === T_WALL || t === T_DOOR_LOCKED) continue;
-      seen[idx] = 1;
-      queue.push([nx, ny]);
-    }
-  }
-  return false;
-}
-
-/**
- * Check whether the tile immediately outside an archive entrance is
- * reachable from `(sx, sy)` without crossing the archive's footprint.
- * Used to reject entrances that open onto a corridor pocket which is
- * itself isolated from the rest of the dungeon — locking such an
- * entrance would leave the chest forever inaccessible.
- * @private
- */
-function isOutsideReachable(map, archiveRoom, entrance, sx, sy) {
-  const ax0 = archiveRoom.x, ax1 = archiveRoom.x + archiveRoom.w;
-  const ay0 = archiveRoom.y, ay1 = archiveRoom.y + archiveRoom.h;
-  const inArchive = (x, y) =>
-    x >= ax0 && x < ax1 && y >= ay0 && y < ay1;
-
-  const seen = new Uint8Array(MAP_W * MAP_H);
-  const queue = [[entrance.tx, entrance.ty]];
-  seen[entrance.ty * MAP_W + entrance.tx] = 1;
-  while (queue.length) {
-    const [x, y] = queue.shift();
-    if (x === sx && y === sy) return true;
-    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-      const nx = x + dx, ny = y + dy;
-      if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
-      const idx = ny * MAP_W + nx;
-      if (seen[idx]) continue;
-      // Don't walk back into the archive itself — we want to know if
-      // the OUTSIDE of this entrance connects to the rest of the map.
       if (inArchive(nx, ny)) continue;
       const t = map[ny][nx];
       if (t === T_WALL || t === T_DOOR_LOCKED) continue;
@@ -533,15 +499,7 @@ function unlockArchive(map, archiveRoom) {
     }
   }
   if (archiveRoom) {
-    if (archiveRoom.bricked) {
-      for (const t of archiveRoom.bricked) {
-        if (map[t.ty]) map[t.ty][t.tx] = T_FLOOR;
-      }
-      archiveRoom.bricked = [];
-    }
-    archiveRoom.doorTile = null;
-    // Re-check after restoring alternates: if start→stairs now reaches,
-    // the validator's caller is happy. Nothing else to do.
+    archiveRoom.doorTiles = null;
   }
 }
 
@@ -2085,7 +2043,7 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
  *   • corridors carved by buildConnections
  *   • this placer scans the room perimeter for entrance tiles, picks
  *     one, converts it to T_DOOR_LOCKED and stores its coordinates on
- *     `room.doorTile` for the gameplay layer to consume.
+  *     `room.doorTiles` for the gameplay layer to consume.
  *
  * The legendary chest is registered as a libraryProp marker; the
  * `populateFloor` step in enemies.js reads it and pushes the actual
@@ -2124,35 +2082,14 @@ function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom) 
     if (map[y] && map[y][x1] === T_FLOOR) entrances.push({ tx: x1, ty: y });
   }
 
-  // Pick an entrance and seal it with a rune-locked door. The selected
-  // entrance MUST have its outer side reachable from the start room
-  // without crossing the archive interior — otherwise the lock would
-  // sit on a corridor pocket the player can never reach, leaving the
-  // chest forever inaccessible. The other entrances are bricked up so
-  // the puzzle can't be circumvented. If no entrance qualifies, every
-  // entrance is restored as floor and the archive is left wide open
-  // (the BFS validator at the call site will also catch any softlock
-  // edge cases).
-  room.bricked = [];
-  if (entrances.length > 0) {
-    const reachable = startRoom
-      ? entrances.filter(e =>
-          isOutsideReachable(map, room, e, startRoom.cx, startRoom.cy))
-      : entrances.slice();
-    if (reachable.length > 0) {
-      const idx = Math.floor(rng() * reachable.length);
-      const door = reachable[idx];
-      map[door.ty][door.tx] = T_DOOR_LOCKED;
-      room.doorTile = door;
-      for (const e of entrances) {
-        if (e === door) continue;
-        map[e.ty][e.tx] = T_WALL;
-        room.bricked.push(e);
-      }
-    }
-    // If no entrance is reachable from outside, leave every entrance as
-    // floor: the archive becomes a freebie. Topology is too broken on
-    // this seed to gate it fairly.
+  // Convert EVERY entrance into a rune-locked door. This way rooms
+  // adjacent to the archive stay accessible (they exit via the archive's
+  // perimeter which is now a door), and the player only needs to reach
+  // ANY one of them with the key to unlock the entire archive.
+  room.doorTiles = [];
+  for (const e of entrances) {
+    map[e.ty][e.tx] = T_DOOR_LOCKED;
+    room.doorTiles.push(e);
   }
 
   // Decorative perimeter shelves: the archive looks like an old vault.

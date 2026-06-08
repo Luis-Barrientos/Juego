@@ -74,8 +74,8 @@ export function resetKeyRoom() {
     };
   }
   const archive = state.rooms.find(r => r.isForbiddenArchive);
-  if (archive && archive.doorTile) {
-    state.archiveDoor = { tx: archive.doorTile.tx, ty: archive.doorTile.ty };
+  if (archive && archive.doorTiles && archive.doorTiles.length > 0) {
+    state.archiveDoor = archive.doorTiles.map(d => ({ tx: d.tx, ty: d.ty }));
   }
 }
 
@@ -185,19 +185,27 @@ function completePuzzle(k, toast) {
  */
 export function updateKeyRoom(dt, toast) {
   // Locked-door check runs every frame regardless of the puzzle state.
-  if (state.archiveDoor && state.hasArchiveKey) {
-    const { tx, ty } = state.archiveDoor;
-    if (state.map[ty] && state.map[ty][tx] === T_DOOR_LOCKED) {
-      const p = state.player;
+  if (state.archiveDoor && state.archiveDoor.length > 0 && state.hasArchiveKey) {
+    const p = state.player;
+    if (!p) return;
+    for (const door of state.archiveDoor) {
+      const { tx, ty } = door;
+      if (!state.map[ty] || state.map[ty][tx] !== T_DOOR_LOCKED) continue;
       const dx = (tx + 0.5) * TILE - p.x;
       const dy = (ty + 0.5) * TILE - p.y;
       if (Math.hypot(dx, dy) < TILE * 1.6) {
-        state.map[ty][tx] = T_FLOOR;
+        // Unlock ALL archive doors.
+        for (const d of state.archiveDoor) {
+          if (state.map[d.ty] && state.map[d.ty][d.tx] === T_DOOR_LOCKED) {
+            state.map[d.ty][d.tx] = T_FLOOR;
+          }
+        }
         state.hasArchiveKey = false;
         rebuildMapCache();
         spawnParticles((tx + 0.5) * TILE, (ty + 0.5) * TILE, '#ffd040', 26);
         Audio.upgrade && Audio.upgrade();
-        toast && toast('La puerta del Archivo se abre con la llave.');
+        toast && toast('¡La puerta del Archivo se abre con la llave!');
+        break;
       }
     }
   }
@@ -277,23 +285,19 @@ export function updateKeyRoom(dt, toast) {
 /* ─────────────────────────── projectile handler ─────────────────────────── */
 
 /**
- * Called when a friendly projectile impacts near (px, py). If that point
- * is close enough to an unvalidated rune pedestal and the player is on the
- * centre dais, light it (and resolve pair matches). Returns true when the
- * hit was consumed.
+ * Called when a friendly projectile lands on tile (tx, ty). If that tile
+ * holds an unvalidated rune pedestal and the player is on the centre dais,
+ * light it (and resolve pair matches). Returns true when the hit was
+ * consumed.
  */
-export function hitRunePedestal(px, py) {
+export function hitRunePedestal(tx, ty) {
   const k = state.keyRoom;
   if (!k || k.variant !== 'rune') return false;
   if (k.state !== 'active') return false;
   if (k.mismatchTimer > 0) return false;
   if (!isPlayerInCenter(k)) return false;
 
-  const idx = k.pedestals.findIndex(p => {
-    const cx = (p.tx + 0.5) * TILE;
-    const cy = (p.ty + 0.5) * TILE;
-    return Math.hypot(px - cx, py - cy) < TILE * 0.55;
-  });
+  const idx = k.pedestals.findIndex(p => p.tx === tx && p.ty === ty);
   if (idx < 0) return false;
   const ped = k.pedestals[idx];
   if (ped.validated || ped.picked) return false;
@@ -478,14 +482,24 @@ function rgb([r, g, b]) {
  * while the player is nearby and still hasn't earned the key.
  */
 export function drawArchiveDoorPrompt(ctx) {
-  if (!state.archiveDoor) return;
+  if (!state.archiveDoor || state.archiveDoor.length === 0) return;
   if (state.hasArchiveKey) return;
-  const { tx, ty } = state.archiveDoor;
-  if (!state.map || state.map[ty]?.[tx] !== T_DOOR_LOCKED) return;
   const p = state.player;
+  if (!p) return;
+  // Find the nearest still-locked door.
+  let best = null, bestD = TILE * 2.4;
+  for (const door of state.archiveDoor) {
+    const { tx, ty } = door;
+    if (!state.map || state.map[ty]?.[tx] !== T_DOOR_LOCKED) continue;
+    const cx = (tx + 0.5) * TILE;
+    const cy = (ty + 0.5) * TILE;
+    const d = Math.hypot(p.x - cx, p.y - cy);
+    if (d < bestD) { bestD = d; best = door; }
+  }
+  if (!best) return;
+  const { tx, ty } = best;
   const cx = (tx + 0.5) * TILE;
   const cy = (ty + 0.5) * TILE;
-  if (Math.hypot(p.x - cx, p.y - cy) > TILE * 2.4) return;
   const sx = cx - state.cameraX;
   const sy = cy - state.cameraY;
   const pulse = 0.7 + 0.3 * Math.sin(state.time * 4);

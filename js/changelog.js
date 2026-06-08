@@ -15,6 +15,15 @@
 
 export const CHANGELOG = [
   {
+    version: '0.9.0',
+    date: '2026-06-08',
+    title: 'Archivo Prohibido: todas las entradas son puertas',
+    items: [
+      'El Archivo Prohibido ya no tapiá sus entradas alternativas. Ahora todas las puertas que conectan con la sala se cierran con la runa dorada. Al abrir una con la llave, se abren todas a la vez.',
+      'Esto soluciona el problema de que las salas vecinas al Archivo quedasen inaccesibles al tapar sus pasillos con muros.',
+    ],
+  },
+  {
     version: '0.8.9',
     date: '2026-06-08',
     title: 'Optimización del rendimiento en la Biblioteca',
