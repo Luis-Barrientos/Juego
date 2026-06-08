@@ -2009,11 +2009,11 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
   // is a random permutation of [0..4].
   if (variant === 'candle') {
     const slots = [
-      { tx: room.cx - 2, ty: room.cy - 3 },
-      { tx: room.cx + 2, ty: room.cy - 3 },
-      { tx: room.cx - 3, ty: room.cy      },
-      { tx: room.cx - 2, ty: room.cy + 2 },
+      { tx: room.cx,     ty: room.cy - 3 },
+      { tx: room.cx + 2, ty: room.cy - 2 },
       { tx: room.cx + 2, ty: room.cy + 2 },
+      { tx: room.cx - 2, ty: room.cy + 2 },
+      { tx: room.cx - 2, ty: room.cy - 2 },
     ];
     const seq = [0, 1, 2, 3, 4];
     for (let i = seq.length - 1; i > 0; i--) {
