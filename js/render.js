@@ -8,7 +8,7 @@
 
 import { state } from './state.js';
 import {
-  TILE, MAP_W, MAP_H, VIEW_W, VIEW_H, T_FLOOR, T_STAIR, T_DOOR_LOCKED,
+  TILE, MAP_W, MAP_H, VIEW_W, VIEW_H, T_FLOOR, T_STAIR, T_DOOR_LOCKED, T_FLOOR_DARK,
 } from './config.js';
 import { mulberry32 } from './utils.js';
 
@@ -41,13 +41,13 @@ export function rebuildMapCache() {
       const px = x * TILE;
       const py = y * TILE;
 
-      if (t === T_FLOOR || t === T_STAIR) {
-        drawFloorTile(ctx, px, py, x, y, biome);
-        if (decorRng() < biome.decorChance) {
+      if (t === T_FLOOR || t === T_STAIR || t === T_FLOOR_DARK) {
+        drawFloorTile(ctx, px, py, x, y, biome, t === T_FLOOR_DARK);
+        if (decorRng() < biome.decorChance && t !== T_FLOOR_DARK) {
           drawDecoration(ctx, px, py, biome, decorRng);
         }
       } else if (t === T_DOOR_LOCKED) {
-        drawFloorTile(ctx, px, py, x, y, biome);
+        drawFloorTile(ctx, px, py, x, y, biome, false);
         drawLockedDoor(ctx, px, py);
       } else {
         drawWallTile(ctx, px, py, x, y, biome);
@@ -793,6 +793,7 @@ function drawLibraryProp(ctx, p) {
   ctx.fillRect(px, py, w, h);
 
   if (p.kind === 'shelf')         drawShelf(ctx, px, py, w, h, p);
+  else if (p.kind === 'archiveShelf') drawArchiveShelf(ctx, px, py, w, h, p);
   else if (p.kind === 'table')        drawTable(ctx, px, py, w, h, p, false);
   else if (p.kind === 'tableBroken')  drawTable(ctx, px, py, w, h, p, true);
   else if (p.kind === 'tomePedestal') drawTomePedestal(ctx, px, py, w, h, p);
@@ -1455,11 +1456,11 @@ function drawArchivePedestal(ctx, px, py, w, h, p) {
   ctx.fillStyle = 'rgba(255, 200, 130, 0.18)';
   ctx.fillRect(cx - size / 2, cy - size / 2, size, 2);
 
-  // Rune ring around the slab — warm orange.
-  ctx.strokeStyle = 'rgba(255, 180, 90, 0.7)';
+  // Rune ring around the slab — blood-red for a forbidden vault.
+  ctx.strokeStyle = 'rgba(200, 40, 40, 0.7)';
   ctx.lineWidth = 1.4;
   ctx.beginPath(); ctx.arc(cx, cy, size * 0.78, 0, Math.PI * 2); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255, 220, 150, 0.45)';
+  ctx.strokeStyle = 'rgba(180, 60, 50, 0.45)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.arc(cx, cy, size * 0.95, 0, Math.PI * 2); ctx.stroke();
 }
@@ -1592,6 +1593,51 @@ function drawShelf(ctx, px, py, w, h, p) {
   ctx.strokeStyle = 'rgba(140, 90, 40, 0.45)';
   ctx.lineWidth = 1;
   ctx.strokeRect(px + 1.5, py + 1.5, w - 3, h - 3);
+}
+
+/** Dark archive shelf — same shape as a regular shelf but with dark
+ *  wood and muted, shadowy books to match the forbidden vault mood. */
+function drawArchiveShelf(ctx, px, py, w, h, p) {
+  // Drop shadow.
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(px + 2, py + 3, w - 2, h - 2);
+  // Dark wood frame.
+  ctx.fillStyle = '#1a0e08';
+  ctx.fillRect(px + 1, py + 1, w - 2, h - 2);
+  // Inner cavity.
+  ctx.fillStyle = '#0a0504';
+  const ix = px + 3, iy = py + 3, iw = w - 6, ih = h - 6;
+  ctx.fillRect(ix, iy, iw, ih);
+  // Wood top highlight (dim).
+  ctx.fillStyle = '#2a1808';
+  ctx.fillRect(px + 1, py + 1, w - 2, 2);
+  ctx.fillStyle = '#0c0704';
+  ctx.fillRect(px + 1, py + h - 3, w - 2, 2);
+
+  // Dark, muted books — dark reds, deep purples, near-black.
+  const colors = ['#2a0808', '#1a0820', '#0a2010', '#1a1008', '#200818', '#0a1020'];
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+
+  // Only horizontal shelves used by the archive.
+  const rows = Math.max(1, Math.floor(ih / 14));
+  const rowH = ih / rows;
+  for (let r = 0; r < rows; r++) {
+    const ry = iy + r * rowH;
+    let x = ix + 1;
+    while (x < ix + iw - 1) {
+      const bw = 3 + Math.floor(rnd() * 3);
+      const bh = rowH - 2 - Math.floor(rnd() * 3);
+      ctx.fillStyle = colors[Math.floor(rnd() * colors.length)];
+      ctx.fillRect(x, ry + (rowH - bh) - 1, bw, bh);
+      // No page edge — the books are too dark to show one.
+      x += bw + 1;
+    }
+    if (r < rows - 1) {
+      ctx.fillStyle = '#1a0c04';
+      ctx.fillRect(ix, ry + rowH - 1, iw, 1);
+    }
+  }
 }
 
 /** Reading table — intact or toppled. Wood top with carved edge. */
@@ -1923,7 +1969,18 @@ function drawCeilingCrack(ctx, sb) {
  * checker variant and occasional crack.
  * @private
  */
-function drawFloorTile(ctx, px, py, x, y, biome) {
+function drawFloorTile(ctx, px, py, x, y, biome, dark) {
+  if (dark) {
+    ctx.fillStyle = '#181412';
+    ctx.fillRect(px, py, TILE, TILE);
+    // Subtle unevenness so it doesn't look like a solid black void.
+    const hash = (x * 7 + y * 13 + 3) % 7;
+    if (hash < 3) {
+      ctx.fillStyle = hash === 0 ? '#201c18' : '#141210';
+      ctx.fillRect(px + (hash * 5) % 12, py + (hash * 7) % 12, 8, 1);
+    }
+    return;
+  }
   const checker = (x + y) & 1;
   const [r, g, b] = checker ? biome.floor.alt : biome.floor.base;
   ctx.fillStyle = `rgb(${r},${g},${b})`;

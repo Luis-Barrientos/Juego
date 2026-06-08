@@ -115,6 +115,7 @@ function startGame() {
   state.archiveDoor  = null;
   state.hasArchiveKey = false;
   state.soulSpawners = [];
+  state.archiveMistSpawners = [];
   state.leafSpawners = [];
   state._whisperTimer = 6;
   state._creakTimer   = 12;
@@ -141,6 +142,7 @@ function buildFloor(floor) {
   state.decorations = d.decorations || [];
   state.sarcophagi  = d.sarcophagi  || [];
   state.libraryProps = d.libraryProps || [];
+  state.archiveMistSpawners = [];
   state.librarySetPiece = d.librarySetPiece || null;
   state.grandTome       = d.grandTome       || null;
   state.soulSpawners = d.soulSpawners || [];
@@ -486,6 +488,23 @@ function updateAmbient(dt) {
         maxLife: 3.3,
         r: 1.8 + Math.random() * 1.2,
         color: 'rgba(160,200,240,1)',
+        seed: Math.random() * Math.PI * 2,
+      });
+    }
+    for (const s of state.archiveMistSpawners) {
+      s.timer -= dt;
+      if (s.timer > 0) continue;
+      s.timer = 0.8 + Math.random() * 0.6;
+      state.particles.push({
+        kind: 'smoke',
+        x: s.x + (Math.random() - 0.5) * 14,
+        y: s.y + (Math.random() - 0.5) * 10,
+        vx: (Math.random() - 0.5) * 4,
+        vy: -6 - Math.random() * 4,
+        life: 1.8 + Math.random() * 0.8,
+        maxLife: 2.6,
+        r: 2 + Math.random() * 2,
+        color: 'rgba(30, 10, 10, 0.6)',
         seed: Math.random() * Math.PI * 2,
       });
     }

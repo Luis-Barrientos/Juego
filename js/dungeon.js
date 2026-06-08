@@ -8,7 +8,7 @@
  */
 
 import {
-  TILE, MAP_W, MAP_H, T_WALL, T_FLOOR, T_STAIR, T_DOOR_LOCKED, MAX_FLOOR,
+  TILE, MAP_W, MAP_H, T_WALL, T_FLOOR, T_STAIR, T_DOOR_LOCKED, T_FLOOR_DARK, MAX_FLOOR,
 } from './config.js';
 import { mulberry32 } from './utils.js';
 
@@ -2052,6 +2052,72 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
       });
     }
   }
+
+  // Ambient decorations: book piles at inner corners (all variants) and
+  // braziers at NW/SE corners (rune/kill only). Adds a lived-in feel.
+  const corners = [
+    { tx: room.x + 1,                ty: room.y + 1 },
+    { tx: room.x + room.w - 2,       ty: room.y + room.h - 2 },
+  ];
+  for (const c of corners) {
+    if (map[c.ty] && map[c.ty][c.tx] === T_FLOOR) {
+      libraryProps.push({
+        kind: 'tomeBookPile',
+        tx: c.tx, ty: c.ty, w: 1, h: 1,
+        seed: Math.floor(rng() * 1e9),
+      });
+    }
+  }
+
+  if (variant !== 'candle') {
+    // Two braziers at NW and SE interior corners.
+    const brazierPos = [
+      { tx: room.x + 1,                ty: room.y + room.h - 3 },
+      { tx: room.x + room.w - 2,       ty: room.y + 1 },
+    ];
+    for (const bp of brazierPos) {
+      if (!map[bp.ty] || map[bp.ty][bp.tx] !== T_FLOOR) continue;
+      if (isNearDoor(map, bp.tx, bp.ty, room)) continue;
+      map[bp.ty][bp.tx] = T_WALL;
+      libraryProps.push({
+        kind: 'tomeBrazier',
+        tx: bp.tx, ty: bp.ty, w: 1, h: 1,
+        seed: Math.floor(rng() * 1e9),
+      });
+      lights.push({
+        type:    'magicFlame',
+        ax: bp.tx * TILE + TILE / 2,
+        ay: bp.ty * TILE + 6,
+        bx: bp.tx * TILE + TILE / 2,
+        by: bp.ty * TILE + 6,
+        x:  bp.tx * TILE + TILE / 2,
+        y:  bp.ty * TILE + 6,
+        phase:   rng() * Math.PI * 2,
+        speed:   0.25 + rng() * 0.15,
+        wobble:  rng() * Math.PI * 2,
+        color:   variant === 'rune' ? [180, 140, 255] : [120, 180, 255],
+        r:       70,
+        flicker: rng() * Math.PI * 2,
+      });
+    }
+  }
+
+  // Rune marks near the flanking lights (rune/kill variants).
+  if (variant !== 'candle') {
+    const markPos = [
+      { tx: room.cx - 2, ty: room.cy },
+      { tx: room.cx + 2, ty: room.cy },
+    ];
+    for (const mp of markPos) {
+      if (!map[mp.ty] || map[mp.ty][mp.tx] !== T_FLOOR) continue;
+      if (libraryProps.some(p => p.tx === mp.tx && p.ty === mp.ty)) continue;
+      libraryProps.push({
+        kind: 'libraryRuneMark',
+        tx: mp.tx, ty: mp.ty, w: 1, h: 1,
+        seed: Math.floor(rng() * 1e9),
+      });
+    }
+  }
 }
 
 /**
@@ -2116,21 +2182,21 @@ function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom) 
   }
 
   // Decorative perimeter shelves: the archive looks like an old vault.
+  // Keep only the back wall (top) shelves — the rest stay bare for an
+  // oppressive feel.
   for (let xx = room.x + 1; xx <= room.x + room.w - 2; xx++) {
-    for (const ty of [room.y, room.y + room.h - 1]) {
-      if (!map[ty] || map[ty][xx] !== T_FLOOR) continue;
-      if (isNearDoor(map, xx, ty, room)) continue;
-      // Don't seal too tightly: keep some gaps for visual rhythm.
-      if (rng() < 0.45) continue;
-      map[ty][xx] = T_WALL;
-      libraryProps.push({
-        kind: 'shelf',
-        tx: xx, ty, w: 1, h: 1,
-        orient: 'h',
-        face:   ty === room.y ? 'S' : 'N',
-        seed:   Math.floor(rng() * 1e9),
-      });
-    }
+    const ty = room.y;  // back wall only
+    if (!map[ty] || map[ty][xx] !== T_FLOOR) continue;
+    if (isNearDoor(map, xx, ty, room)) continue;
+    if (rng() < 0.45) continue;
+    map[ty][xx] = T_WALL;
+    libraryProps.push({
+      kind: 'archiveShelf',
+      tx: xx, ty, w: 1, h: 1,
+      orient: 'h',
+      face:   'S',
+      seed:   Math.floor(rng() * 1e9),
+    });
   }
 
   // Central pedestal-with-chest marker. The actual loot.chest entity is
@@ -2145,28 +2211,39 @@ function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom) 
     seed: Math.floor(rng() * 1e9),
   });
 
-  // Two warm orange lights flanking the pedestal — feels like a
-  // forbidden vault rather than a library wing.
-  if (lights) {
-    const offs = [{ dx: -2, dy: 0 }, { dx: 2, dy: 0 }];
-    for (const o of offs) {
-      const tx = room.cx + o.dx;
-      const ty = room.cy + o.dy;
-      if (!map[ty] || map[ty][tx] !== T_FLOOR) continue;
-      lights.push({
-        type:    'magicFlame',
-        ax: tx * TILE + TILE / 2,  ay: ty * TILE + TILE / 2,
-        bx: tx * TILE + TILE / 2,  by: ty * TILE + TILE / 2,
-        x:  tx * TILE + TILE / 2,  y:  ty * TILE + TILE / 2,
-        phase:   rng() * Math.PI * 2,
-        speed:   0.18,
-        wobble:  rng() * Math.PI * 2,
-        color:   [255, 170, 90],
-        r:       95,
-        flicker: rng() * Math.PI * 2,
-      });
+  // Darken the entire archive floor so it reads as a forbidden vault.
+  for (let y = room.y; y < room.y + room.h; y++) {
+    for (let x = room.x; x < room.x + room.w; x++) {
+      if (map[y][x] === T_FLOOR) map[y][x] = T_FLOOR_DARK;
     }
   }
+
+  // A single dim blood-red light at the centre — oppressive, not cosy.
+  // No flanking flames; the red glow is enough to see the chest by.
+  if (lights) {
+    const cx = room.cx * TILE + TILE / 2;
+    const cy = room.cy * TILE + TILE / 2;
+    lights.push({
+      type:    'magicFlame',
+      ax: cx,  ay: cy,
+      bx: cx,  by: cy,
+      x:  cx,  y:  cy,
+      phase:   0,
+      speed:   0.08,
+      wobble:  0,
+      color:   [180, 20, 30],
+      r:       55,
+      flicker: 0,
+    });
+  }
+
+  // Dark mist spawner — particles slowly rise from the pedestal.
+  if (!state.archiveMistSpawners) state.archiveMistSpawners = [];
+  state.archiveMistSpawners.push({
+    x: (room.cx + 0.5) * TILE,
+    y: (room.cy + 0.5) * TILE,
+    timer: 0,
+  });
 }
 
 function placeSarcophagi(rooms, map, rng, sarcophagi, lights) {

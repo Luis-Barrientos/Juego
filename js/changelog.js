@@ -15,6 +15,18 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.12',
+    date: '2026-06-08',
+    title: 'Archivo Prohibido: una bóveda oscura y opresiva',
+    items: [
+      'El Archivo Prohibido ya no parece una sala de biblioteca más. El suelo se oscurece hasta casi el negro, con una única luz roja y tenue en el centro que apenas deja ver el pedestal.',
+      'Las estanterías ahora solo están en la pared del fondo, con libros aún más oscuros que el resto de la biblioteca, como sellos de advertencia.',
+      'Del pedestal central asciende una niebla oscura y lenta que da sensación de lugar prohibido.',
+      'Los anillos del pedestal cambian del naranja cálido al rojo-sangre para reforzar la atmósfera.',
+      'La Sala de la Llave también gana ambiente: libros apilados en las esquinas, braseros de piedra con llama mágica y marcas de runa en el suelo junto a las luces flanqueantes.',
+    ],
+  },
+  {
     version: '0.8.11',
     date: '2026-06-08',
     title: 'Nuevo puzzle: enciende las velas en orden',

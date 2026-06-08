@@ -27,6 +27,8 @@ export const T_DOOR  = 2;
 export const T_STAIR = 3;
 /** Sealed rune door blocking the Archivo Prohibido until the key is picked up. */
 export const T_DOOR_LOCKED = 4;
+/** Dark floor used by the Archivo Prohibido to feel like a forbidden vault. */
+export const T_FLOOR_DARK = 5;
 
 // ── High-level game states ────────────────────────────────────
 export const STATE_MENU    = 'menu';
