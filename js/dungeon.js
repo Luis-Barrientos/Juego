@@ -391,7 +391,7 @@ export function generateDungeon(floor, seed, biome) {
     if (keyRoomRoom && archiveRoom) {
       if (forceKeyVariant) keyRoomRoom.keyVariant = forceKeyVariant;
       placeKeyRoom(keyRoomRoom, map, rng, libraryProps, lights);
-      placeForbiddenArchive(archiveRoom, map, rng, libraryProps, lights, startRoom, archiveMistSpawners);
+      placeForbiddenArchive(archiveRoom, map, rng, libraryProps, lights, startRoom, archiveMistSpawners, decorations);
       // Two safety nets after the lock is placed:
       //  1) The locked door must NOT cut the start→stairs path.
       //  2) The locked door tile itself must be reachable from start
@@ -2141,7 +2141,7 @@ function placeKeyRoom(room, map, rng, libraryProps, lights) {
  *
  * @private
  */
-function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom, archiveMistSpawners) {
+function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom, archiveMistSpawners, decorations) {
   if (!room) return;
   room.isForbiddenArchive = true;
 
@@ -2244,6 +2244,36 @@ function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom, 
     y: (room.cy + 0.5) * TILE,
     timer: 0,
   });
+
+  // Floor rune marks left and right of the pedestal, adding visual
+  // interest to the dark floor.
+  for (const off of [{ dx: -1, dy: 0 }, { dx: 1, dy: 0 }, { dx: 0, dy: -1 }]) {
+    const tx = room.cx + off.dx, ty = room.cy + off.dy;
+    if (map[ty] && map[ty][tx] === T_FLOOR_DARK) {
+      libraryProps.push({
+        kind: 'libraryRuneMark',
+        tx, ty, w: 1, h: 1,
+        seed: Math.floor(rng() * 1e9),
+      });
+    }
+  }
+
+  // A couple of dark wall decorations on the side walls to break up
+  // the bare walls — rune symbols and a dark portrait.
+  if (decorations) {
+    for (let y = room.y + 1; y < room.y + room.h - 1; y++) {
+      for (const x of [room.x - 1, room.x + room.w]) {
+        if (x < 0 || x >= MAP_W) continue;
+        if (map[y] && map[y][x] === T_WALL && rng() < 0.3) {
+          decorations.push({
+            kind:  rng() < 0.5 ? 'runeSymbol' : 'darkPortrait',
+            tx: x, ty: y,
+            seed:  Math.floor(rng() * 1e9),
+          });
+        }
+      }
+    }
+  }
 }
 
 function placeSarcophagi(rooms, map, rng, sarcophagi, lights) {

@@ -247,15 +247,14 @@ function placePlayerInRoom(room) {
  * @private
  */
 function findNearestFloor(map, cx, cy, maxRadius = 6) {
-  const T_FLOOR_ = 1;
-  if (map[cy] && map[cy][cx] === T_FLOOR_) return { tx: cx, ty: cy };
+  const FLOOR_TILES = new Set([1, 5]); // T_FLOOR, T_FLOOR_DARK
+  if (map[cy] && FLOOR_TILES.has(map[cy][cx])) return { tx: cx, ty: cy };
   for (let r = 1; r <= maxRadius; r++) {
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
-        // Only the ring border at this radius.
         if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
         const x = cx + dx, y = cy + dy;
-        if (map[y] && map[y][x] === T_FLOOR_) return { tx: x, ty: y };
+        if (map[y] && FLOOR_TILES.has(map[y][x])) return { tx: x, ty: y };
       }
     }
   }

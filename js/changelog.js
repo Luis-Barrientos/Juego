@@ -15,6 +15,15 @@
 
 export const CHANGELOG = [
   {
+    version: '0.8.13',
+    date: '2026-06-08',
+    title: 'Archivo Prohibido: más detalles oscuros',
+    items: [
+      'Marcas de runa en el suelo alrededor del pedestal del Archivo, y decoraciones de muro (símbolos runicos y retratos oscuros) en las paredes laterales.',
+      'Corregido el teletransporte del panel de debug a salas con suelo oscuro.',
+    ],
+  },
+  {
     version: '0.8.12',
     date: '2026-06-08',
     title: 'Archivo Prohibido: una bóveda oscura y opresiva',
