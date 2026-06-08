@@ -21,7 +21,9 @@ export const CHANGELOG = [
     items: [
       'La Sala de la Llave tiene una tercera variante: cinco velas repartidas por la sala. Pulsa E sobre cada una en el orden correcto para liberar la sala y obtener la llave rúnica.',
       'Si te equivocas de vela, todas se apagan y tienes que volver a empezar desde la primera. La secuencia cambia en cada partida.',
+      'Las velas están sobre pequeños pedestales de piedra para que se vean bien, no se confunden con la decoración del suelo.',
       'Las otras variantes (oleada y runas) siguen saliendo con la misma probabilidad — ahora hay un 33 % para cada una.',
+      'Corregido: en la variante de velas ya no aparecen enemigos dentro de la sala mientras resuelves el puzzle.',
     ],
   },
   {

@@ -611,31 +611,57 @@ function drawOneCandle(ctx, c, time, mistakeFlash) {
 
   ctx.save();
 
+  // Small stone pedestal under the candle.
+  const pedR = 10;
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + pedR * 0.5, pedR, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const grad = ctx.createLinearGradient(cx, cy, cx, cy + pedR);
+  grad.addColorStop(0, '#6a5a4a');
+  grad.addColorStop(0.5, '#4a3a2a');
+  grad.addColorStop(1, '#2a1f14');
+  ctx.fillStyle = grad;
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+    const px = cx + Math.cos(a) * pedR;
+    const py = cy + Math.sin(a) * pedR * 0.45;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
   // Candle body.
   const bodyH = 10;
   const bodyW = 4;
+  const candleY = cy - pedR * 0.35;
   if (lit) {
     // Lit: warm glow around the candle.
     const pulse = 0.5 + 0.3 * Math.sin(time * 4 + c.tx + c.ty);
-    const grad = ctx.createRadialGradient(cx, cy - bodyH * 0.5, 2, cx, cy - bodyH * 0.5, 14);
+    const grad = ctx.createRadialGradient(cx, candleY - bodyH * 0.5, 2, cx, candleY - bodyH * 0.5, 16);
     grad.addColorStop(0, `rgba(255, 200, 100, ${pulse})`);
     grad.addColorStop(1, 'rgba(255, 200, 100, 0)');
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(cx, cy - bodyH * 0.5, 14, 0, Math.PI * 2);
+    ctx.arc(cx, candleY - bodyH * 0.5, 16, 0, Math.PI * 2);
     ctx.fill();
   }
 
   // Wax body.
   ctx.fillStyle = mistakeFlash ? '#ff6060' : (lit ? '#e8d8b8' : '#c8b898');
-  ctx.fillRect(cx - bodyW / 2, cy - bodyH, bodyW, bodyH);
+  ctx.fillRect(cx - bodyW / 2, candleY - bodyH, bodyW, bodyH);
 
   // Wick.
   ctx.strokeStyle = '#222';
   ctx.lineWidth = 0.8;
   ctx.beginPath();
-  ctx.moveTo(cx, cy - bodyH);
-  ctx.lineTo(cx, cy - bodyH - 2);
+  ctx.moveTo(cx, candleY - bodyH);
+  ctx.lineTo(cx, candleY - bodyH - 2);
   ctx.stroke();
 
   // Flame (only if lit).
@@ -643,14 +669,14 @@ function drawOneCandle(ctx, c, time, mistakeFlash) {
     const fl = 2 + Math.sin(time * 6 + c.tx) * 0.5;
     ctx.fillStyle = '#ffd080';
     ctx.shadowColor = '#ffa040';
-    ctx.shadowBlur = 8;
+    ctx.shadowBlur = 10;
     ctx.beginPath();
-    ctx.ellipse(cx, cy - bodyH - fl, 1.5, 3 + fl * 0.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, candleY - bodyH - fl, 1.5, 3 + fl * 0.5, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#fff';
     ctx.shadowBlur = 4;
     ctx.beginPath();
-    ctx.ellipse(cx, cy - bodyH - fl - 0.5, 0.8, 1.6, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, candleY - bodyH - fl - 0.5, 0.8, 1.6, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 

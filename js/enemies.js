@@ -797,7 +797,7 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     // rune-pair puzzle is a mechanical room — spawning enemies in it
     // would block the pedestals and turn the puzzle into a brawl.
     const isKeyRoom = !!r.isKeyRoom;
-    if (isKeyRoom && r.keyVariant === 'rune') continue;
+    if (isKeyRoom && (r.keyVariant === 'rune' || r.keyVariant === 'candle')) continue;
     if (isKeyRoom) n += 3;
     for (let i = 0; i < n; i++) {
       let ex, ey, safety = 12;
