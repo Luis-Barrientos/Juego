@@ -22,6 +22,9 @@ export const state = {
   grandTome:       null,  // library Sala del Gran Tomo (Simon-Says) state
   keyRoom:         null,  // library Sala de la Llave (kill-all puzzle) state
   archiveDoor:     null,  // [{tx, ty}, ...] locked doors of the Archivo Prohibido
+  archiveRoom:     null,  // active Forbidden Archive room object
+  _archiveEntered: false, // true once the player has entered for the first time
+  archiveVignetteAlpha: 0, // dynamic alpha (0-1) for screen overlay vignette
   hasArchiveKey:   false, // true once the player picks up the rune key
   challenge: null,        // crypta challenge state (see challenge.js)
   soulSpawners: [],       // catacombs ambient soul anchors (see main.js)

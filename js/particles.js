@@ -81,6 +81,18 @@ export function updateParticles(dt) {
       // Expanding shockwave ring: radius grows from r to maxR over life.
       const t = 1 - (p.life / p.maxLife);
       p.r = 6 + (p.maxR - 6) * t;
+    } else if (p.kind === 'archiveMist') {
+      // Mist: expand radius over lifetime, decelerate quickly
+      const ageRatio = 1 - (p.life / p.maxLife);
+      p.r = p.baseR * (1 + ageRatio * 1.6);
+      p.vx *= 0.95;
+      p.vy *= 0.95;
+    } else if (p.kind === 'ritualEmber') {
+      // Embers: drift upward with high-frequency wobble, slight drag
+      p.phase = (p.phase || 0) + dt;
+      p.x += Math.sin(p.phase * 5.8 + (p.seed || 0)) * 16 * dt;
+      p.vx *= 0.97;
+      p.vy *= 0.97;
     } else {
       p.vx *= 0.92;
       p.vy *= 0.92;
@@ -103,6 +115,35 @@ export function drawParticles(ctx) {
     const a = Math.max(0, p.life / p.maxLife);
     const x = p.x - state.cameraX;
     const y = p.y - state.cameraY;
+    if (p.kind === 'archiveMist') {
+      // Soft crimson-purple mist cloud
+      ctx.save();
+      ctx.globalAlpha = a * 0.35;
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, p.r);
+      grad.addColorStop(0, 'rgba(65, 10, 28, 0.9)');
+      grad.addColorStop(0.5, 'rgba(40, 5, 18, 0.45)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
+    if (p.kind === 'ritualEmber') {
+      // Glow-in-the-dark additive spark
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color || '#ff3333';
+      ctx.shadowColor = p.color || '#ff3333';
+      ctx.shadowBlur = 5;
+      ctx.beginPath();
+      ctx.arc(x, y, p.r * a, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
     if (p.kind === 'soul') {
       // Soul: outer halo + bright core.
       ctx.save();

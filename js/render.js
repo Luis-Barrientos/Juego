@@ -2964,6 +2964,130 @@ export function drawObservatoryFog(ctx) {
 }
 
 /**
+ * Draw the atmospheric vignette, floor rune glows, and central pedestal rune circle
+ * for the Forbidden Archive.
+ */
+export function drawArchiveAtmosphere(ctx) {
+  const room = state.archiveRoom;
+  if (!room) return;
+
+  const rx = room.x * TILE - state.cameraX;
+  const ry = room.y * TILE - state.cameraY;
+  const rw = room.w * TILE;
+  const rh = room.h * TILE;
+  if (rx + rw < 0 || rx > VIEW_W || ry + rh < 0 || ry > VIEW_H) return;
+
+  const t = state.time;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(rx, ry, rw, rh);
+  ctx.clip();
+
+  // 1. Dynamic darkness/vignette overlay inside the archive
+  if (state.archiveVignetteAlpha > 0.01) {
+    const ccx = rx + rw / 2;
+    const ccy = ry + rh / 2;
+
+    // Ambient dark layer
+    ctx.fillStyle = `rgba(8, 4, 14, ${0.45 * state.archiveVignetteAlpha})`;
+    ctx.fillRect(rx, ry, rw, rh);
+
+    // Radial shadow vignette centered on the pedestal
+    const vignette = ctx.createRadialGradient(ccx, ccy, TILE * 1.5, ccx, ccy, Math.max(rw, rh) * 0.78);
+    vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vignette.addColorStop(0.5, `rgba(6, 2, 12, ${0.65 * state.archiveVignetteAlpha})`);
+    vignette.addColorStop(1, `rgba(3, 0, 8, ${0.98 * state.archiveVignetteAlpha})`);
+    ctx.fillStyle = vignette;
+    ctx.fillRect(rx, ry, rw, rh);
+  }
+
+  // 2. Dynamic glowing runes on the floor (where libraryRuneMark elements are)
+  const runeMarks = state.libraryProps.filter(
+    p => p.kind === 'libraryRuneMark' &&
+         p.tx >= room.x && p.tx < room.x + room.w &&
+         p.ty >= room.y && p.ty < room.y + room.h
+  );
+
+  if (runeMarks.length > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const runePulse = 0.4 + 0.3 * Math.sin(t * 3.2);
+
+    for (const p of runeMarks) {
+      const px = p.tx * TILE - state.cameraX;
+      const py = p.ty * TILE - state.cameraY;
+      const cx = px + TILE / 2;
+      const cy = py + TILE / 2;
+      const r = TILE * 0.36;
+
+      // Draw an extra glowing circle on top
+      const grad = ctx.createRadialGradient(cx, cy, 1, cx, cy, r * 1.5);
+      grad.addColorStop(0, `rgba(255, 60, 60, ${0.35 * runePulse})`);
+      grad.addColorStop(0.6, `rgba(180, 20, 40, ${0.15 * runePulse})`);
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // 3. Dynamic rotating and pulsing runic ring around the pedestal slab
+  const cx = (room.cx + 0.5) * TILE - state.cameraX;
+  const cy = (room.cy + 0.5) * TILE - state.cameraY;
+  const size = TILE * 0.78;
+  const pulse = 0.6 + 0.4 * Math.sin(t * 2.5);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  // Outer glowing pulse ring
+  ctx.strokeStyle = `rgba(220, 40, 50, ${0.4 + 0.35 * pulse})`;
+  ctx.shadowColor = 'rgba(255, 30, 40, 0.95)';
+  ctx.shadowBlur = 8 + pulse * 6;
+  ctx.lineWidth = 1.6 + pulse * 0.8;
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.82, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Rotating rune segments
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(t * 0.15); // slow rotate
+  ctx.strokeStyle = `rgba(255, 80, 80, ${0.35 + 0.25 * pulse})`;
+  ctx.shadowBlur = 4;
+  ctx.lineWidth = 1.2;
+
+  // Draw small lines/ticks representing runes
+  const segments = 12;
+  for (let i = 0; i < segments; i++) {
+    const angle = (i * Math.PI * 2) / segments;
+    const rStart = size * 0.88;
+    const rEnd = size * 1.02;
+
+    // Draw tick segment
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * rStart, Math.sin(angle) * rStart);
+    ctx.lineTo(Math.cos(angle + 0.08) * rEnd, Math.sin(angle + 0.08) * rEnd);
+    ctx.stroke();
+
+    // Draw tiny dot
+    if (i % 3 === 0) {
+      ctx.fillStyle = `rgba(255, 120, 100, ${0.4 + 0.3 * pulse})`;
+      ctx.beginPath();
+      ctx.arc(Math.cos(angle + 0.2) * (rStart - 3), Math.sin(angle + 0.2) * (rStart - 3), 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+/**
  * Draw an animated specular shimmer on each puddle. The highlight strength
  * scales with proximity to the nearest warm light, the player aura, or any
  * sunbeam covering the tile — so puddles only "wake up" when there is light

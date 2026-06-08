@@ -45,7 +45,7 @@ import {
   updateLoot, drawLoot, spawnChest, openChest,
 }                                         from './loot.js';
 import {
-  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawObservatoryFog, drawPuddles, drawSarcophagiOverlay, drawLibrarySetPiece, drawMinimap,
+  rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawObservatoryFog, drawArchiveAtmosphere, drawPuddles, drawSarcophagiOverlay, drawLibrarySetPiece, drawMinimap,
 }                                         from './render.js';
 import {
   updateHUD, showToast, hideAllOverlays, showMenu, showPause, hidePause,
@@ -149,6 +149,9 @@ function buildFloor(floor) {
   state.leafSpawners = d.leafSpawners || [];
   state.observatoryRoom = d.rooms.find(r => r.isObservatory) || null;
   state._observatoryEntered = false;
+  state.archiveRoom = d.rooms.find(r => r.isForbiddenArchive) || null;
+  state._archiveEntered = false;
+  state.archiveVignetteAlpha = 0;
   state._whisperTimer = 6 + Math.random() * 6;
   state._creakTimer   = 8 + Math.random() * 14;
 
@@ -421,6 +424,53 @@ function applyObservatoryBuff(dt) {
 }
 
 /**
+ * Handle player entry and vignette transition for the Archivo Prohibido.
+ */
+function updateArchiveRoom(dt) {
+  const room = state.archiveRoom;
+  const p    = state.player;
+  if (!room || !p) {
+    state.archiveVignetteAlpha = lerp(state.archiveVignetteAlpha, 0, 4 * dt);
+    return;
+  }
+  const tx = Math.floor(p.x / TILE);
+  const ty = Math.floor(p.y / TILE);
+  const inside =
+    tx >= room.x && tx < room.x + room.w &&
+    ty >= room.y && ty < room.y + room.h;
+
+  if (inside) {
+    state.archiveVignetteAlpha = lerp(state.archiveVignetteAlpha, 1, 3.5 * dt);
+    if (!state._archiveEntered) {
+      state._archiveEntered = true;
+      showToast('Un aire gélido te oprime. Este archivo no debió ser abierto.');
+      state.shake = Math.max(state.shake || 0, 10);
+      if (Audio.whisper) Audio.whisper();
+      
+      // Spawn ritual embers burst around player
+      for (let i = 0; i < 20; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const sp  = rand(30, 95);
+        state.particles.push({
+          kind: 'ritualEmber',
+          x: p.x,
+          y: p.y,
+          vx: Math.cos(ang) * sp,
+          vy: Math.sin(ang) * sp - 15,
+          life: rand(0.6, 1.2),
+          maxLife: 1.2,
+          r: rand(0.9, 1.8),
+          color: Math.random() < 0.35 ? '#ff6633' : '#ff1111',
+          seed: Math.random() * Math.PI * 2,
+        });
+      }
+    }
+  } else {
+    state.archiveVignetteAlpha = lerp(state.archiveVignetteAlpha, 0, 3.5 * dt);
+  }
+}
+
+/**
  * Sunbeam regen: while the player stands inside one of the wide ceiling
  * cracks (floor-1 ruins), the sunlight slowly heals HP. Excludes the
  * thin moonbeams (crypts) and the observatory starlight column, which
@@ -494,19 +544,37 @@ function updateAmbient(dt) {
     for (const s of state.archiveMistSpawners) {
       s.timer -= dt;
       if (s.timer > 0) continue;
-      s.timer = 0.8 + Math.random() * 0.6;
-      state.particles.push({
-        kind: 'smoke',
-        x: s.x + (Math.random() - 0.5) * 14,
-        y: s.y + (Math.random() - 0.5) * 10,
-        vx: (Math.random() - 0.5) * 4,
-        vy: -6 - Math.random() * 4,
-        life: 1.8 + Math.random() * 0.8,
-        maxLife: 2.6,
-        r: 2 + Math.random() * 2,
-        color: 'rgba(30, 10, 10, 0.6)',
-        seed: Math.random() * Math.PI * 2,
-      });
+      s.timer = 0.35 + Math.random() * 0.35;
+      if (Math.random() < 0.45) {
+        // Spawn ritual ember
+        state.particles.push({
+          kind: 'ritualEmber',
+          x: s.x + (Math.random() - 0.5) * 20,
+          y: s.y + (Math.random() - 0.5) * 12,
+          vx: (Math.random() - 0.5) * 8,
+          vy: -20 - Math.random() * 16,
+          life: 0.9 + Math.random() * 0.7,
+          maxLife: 1.6,
+          r: 0.8 + Math.random() * 0.8,
+          color: Math.random() < 0.3 ? '#ff6633' : '#ff1111',
+          seed: Math.random() * Math.PI * 2,
+        });
+      } else {
+        // Spawn archive mist
+        state.particles.push({
+          kind: 'archiveMist',
+          x: s.x + (Math.random() - 0.5) * 16,
+          y: s.y + (Math.random() - 0.5) * 12,
+          vx: (Math.random() - 0.5) * 5,
+          vy: -6 - Math.random() * 5,
+          life: 1.9 + Math.random() * 0.8,
+          maxLife: 2.7,
+          baseR: 5 + Math.random() * 4,
+          r: 5 + Math.random() * 4,
+          color: 'rgba(50, 8, 24, 0.35)',
+          seed: Math.random() * Math.PI * 2,
+        });
+      }
     }
 
     state._whisperTimer -= dt;
@@ -557,6 +625,7 @@ function update(dt) {
   playerUpdate(state.player, dt, playerHooks);
   applyBiomeModifiers(dt);
   applyObservatoryBuff(dt);
+  updateArchiveRoom(dt);
   applySunbeamRegen(dt);
   state.currentRoom = getRoomAt(state.rooms, state.player);
 
@@ -617,6 +686,7 @@ function render() {
   drawSunbeams(ctx);
   drawLighting(ctx);
   drawObservatoryFog(ctx);
+  drawArchiveAtmosphere(ctx);
 
   // Boss banner
   for (const e of state.enemies) {
