@@ -15,6 +15,17 @@
 
 export const CHANGELOG = [
   {
+    version: '0.10.0',
+    date: '2026-06-09',
+    title: 'Refactor Guarida del Alfa — arena con dais, pilares y spawn fijo',
+    items: [
+      'La Guarida del Alfa ahora es una arena dedicada: dais central de losas oscuras 3×3, 4 pilares rotos en las esquinas interiores y 2 hogueras en los laterales.',
+      'Los enemigos (Alfa + 3 lobos) ya no spawnan al entrar: se generan durante la creación del piso en posiciones fijas alrededor del dais. Esto evita bugs de doble spawn y hace el encuentro más predecible.',
+      'Añadido flag de debug forceAlphaLair para forzar la sala desde el panel.',
+      'Nuevo documento de diseño PLAN_PISO1.md con la planificación completa del Piso 1 (Ruinas).',
+    ],
+  },
+  {
     version: '0.9.0',
     date: '2026-06-08',
     title: 'Piso 1 (Ruinas): Minimap Fog of War + Guarida del Alfa',
