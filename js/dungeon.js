@@ -2965,13 +2965,33 @@ function placeAlphaLair(room, map, rng, lights, props) {
     }
   }
 
-  // 6. Fixed spawn positions (consumed by populateFloor in enemies.js)
-  room.alphaLairSpawns = [
+  // 6. Spawn positions validated against final map (avoid pillars/rubble)
+  room.alphaLairSpawns = [];
+  const desiredSpawns = [
     { type: 'alphaWolf', tx: cx,     ty: cy },
     { type: 'wolf',      tx: cx - 2, ty: cy },
     { type: 'wolf',      tx: cx + 2, ty: cy },
     { type: 'wolf',      tx: cx,     ty: cy - 2 },
   ];
+  for (const s of desiredSpawns) {
+    if (map[s.ty] && map[s.ty][s.tx] === T_FLOOR) {
+      room.alphaLairSpawns.push(s);
+      continue;
+    }
+    // Fallback: nearest free floor inside room
+    let placed = false;
+    for (let dx = -3; !placed && dx <= 3; dx++) {
+      for (let dy = -3; !placed && dy <= 3; dy++) {
+        const nx = s.tx + dx, ny = s.ty + dy;
+        if (nx < room.x || nx >= room.x + room.w) continue;
+        if (ny < room.y || ny >= room.y + room.h) continue;
+        if (map[ny] && map[ny][nx] === T_FLOOR) {
+          room.alphaLairSpawns.push({ type: s.type, tx: nx, ty: ny });
+          placed = true;
+        }
+      }
+    }
+  }
 }
 
 export function tryMove(map, entity, dx, dy) {
