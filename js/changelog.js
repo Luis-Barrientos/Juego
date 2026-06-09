@@ -19,11 +19,12 @@ export const CHANGELOG = [
     date: '2026-06-09',
     title: 'Guarida del Alfa: arena oscura, lobos rediseñados y más mejoras',
     items: [
-      'La Guarida del Alfa se ha convertido en una madriguera: camas de paja (la del Alfa en el centro, más pequeñas para la manada), escombros, pilares rotos, marcas de garras, armaduras antiguas y huesos esparcidos.',
-      'Los lobos se han redibujado con patas, hocico, orejas y cola.',
-      'Corregido el alcance del Alfa: ahora pega a distancia de espada, no antes.',
-      'Corregido el comportamiento territorial: Alfa y lobos dejan de perseguirte si sales de la sala.',
-      'Corregido: la Guarida ya no aparece en la sala de escaleras ni de inicio.',
+      'La Guarida del Alfa renovada como madriguera: camas de paja (la del Alfa en el centro con textura densa, y otras pequeñas alrededor), marcas de garras, restos de armaduras antiguas y huesos esparcidos.',
+      'Escombros en las esquinas, cuatro pilares rotos para cubrirte y hogueras a los lados.',
+      'Los lobos se han redibujado desde cero: ahora tienen patas, hocico, orejas puntiagudas y cola.',
+      'El Alfa Lobo tiene el rango de ataque cuerpo a cuerpo ajustado para que no pegue antes que la espada.',
+      'Los lobos de la Guarida ya no te persiguen si sales de la sala (territoriales).',
+      'Corregido: la Guarida ya no puede aparecer en la sala de las escaleras ni de inicio.',
     ],
   },
   {
