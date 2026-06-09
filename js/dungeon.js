@@ -8,7 +8,7 @@
  */
 
 import {
-  TILE, MAP_W, MAP_H, T_WALL, T_FLOOR, T_STAIR, T_DOOR_LOCKED, T_FLOOR_DARK, MAX_FLOOR,
+  TILE, MAP_W, MAP_H, T_WALL, T_FLOOR, T_STAIR, T_DOOR_LOCKED, T_FLOOR, MAX_FLOOR,
 } from './config.js';
 import { mulberry32 } from './utils.js';
 
@@ -2223,7 +2223,7 @@ function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom, 
   // Darken the entire archive floor so it reads as a forbidden vault.
   for (let y = room.y; y < room.y + room.h; y++) {
     for (let x = room.x; x < room.x + room.w; x++) {
-      if (map[y][x] === T_FLOOR) map[y][x] = T_FLOOR_DARK;
+      if (map[y][x] === T_FLOOR) map[y][x] = T_FLOOR;
     }
   }
 
@@ -2257,7 +2257,7 @@ function placeForbiddenArchive(room, map, rng, libraryProps, lights, startRoom, 
   // interest to the dark floor.
   for (const off of [{ dx: -1, dy: 0 }, { dx: 1, dy: 0 }, { dx: 0, dy: -1 }]) {
     const tx = room.cx + off.dx, ty = room.cy + off.dy;
-    if (map[ty] && map[ty][tx] === T_FLOOR_DARK) {
+    if (map[ty] && map[ty][tx] === T_FLOOR) {
       libraryProps.push({
         kind: 'libraryRuneMark',
         tx, ty, w: 1, h: 1,
@@ -2836,14 +2836,7 @@ function placeAlphaLair(room, map, rng, lights, props) {
   const rx = room.x, ry = room.y, rw = room.w, rh = room.h;
   const seed = Math.floor(rng() * 1e9);
 
-  // 1. Darken the entire room floor to create a lair atmosphere
-  for (let y = ry; y < ry + rh; y++) {
-    for (let x = rx; x < rx + rw; x++) {
-      if (map[y][x] === T_FLOOR) map[y][x] = T_FLOOR_DARK;
-    }
-  }
-
-  // 2. Four rubble piles at room corners (solid, marks arena boundary)
+  // 1. Four rubble piles at room corners (solid, marks arena boundary)
   const rubblePos = [
     { tx: rx + 1,          ty: ry + 1 },
     { tx: rx + rw - 2, ty: ry + 1 },
@@ -2851,7 +2844,7 @@ function placeAlphaLair(room, map, rng, lights, props) {
     { tx: rx + rw - 2, ty: ry + rh - 2 },
   ];
   for (const rp of rubblePos) {
-    if (map[rp.ty] && map[rp.ty][rp.tx] === T_FLOOR_DARK) {
+    if (map[rp.ty] && map[rp.ty][rp.tx] === T_FLOOR) {
       map[rp.ty][rp.tx] = T_WALL;
     }
   }
@@ -2864,7 +2857,7 @@ function placeAlphaLair(room, map, rng, lights, props) {
     { tx: cx,          ty: ry + rh - 3 },
   ];
   for (const p of pillarPos) {
-    if (map[p.ty] && map[p.ty][p.tx] === T_FLOOR_DARK &&
+    if (map[p.ty] && map[p.ty][p.tx] === T_FLOOR &&
         !isNearDoor(map, p.tx, p.ty, room)) {
       map[p.ty][p.tx] = T_WALL;
     }
@@ -2876,7 +2869,7 @@ function placeAlphaLair(room, map, rng, lights, props) {
     { tx: rx + rw - 2, ty: cy },
   ];
   for (const bp of brazierPos) {
-    if (map[bp.ty] && map[bp.ty][bp.tx] === T_FLOOR_DARK &&
+    if (map[bp.ty] && map[bp.ty][bp.tx] === T_FLOOR &&
         !isNearDoor(map, bp.tx, bp.ty, room)) {
       lights.push({
         type: 'campfire',
@@ -2908,7 +2901,7 @@ function placeAlphaLair(room, map, rng, lights, props) {
     ];
     for (let i = 0; i < smallBeds.length; i++) {
       const b = smallBeds[i];
-      if (map[b.ty] && map[b.ty][b.tx] === T_FLOOR_DARK) {
+      if (map[b.ty] && map[b.ty][b.tx] === T_FLOOR) {
         props.push({
           kind: 'strawBed',
           tx: b.tx, ty: b.ty, w: b.w, h: b.h,
@@ -2927,7 +2920,7 @@ function placeAlphaLair(room, map, rng, lights, props) {
     ];
     for (let i = 0; i < clawPos.length; i++) {
       const c = clawPos[i];
-      if (map[c.ty] && map[c.ty][c.tx] === T_FLOOR_DARK) {
+      if (map[c.ty] && map[c.ty][c.tx] === T_FLOOR) {
         props.push({
           kind: 'clawMark',
           tx: c.tx, ty: c.ty, w: 1, h: 1,
@@ -2944,7 +2937,7 @@ function placeAlphaLair(room, map, rng, lights, props) {
     ];
     for (let i = 0; i < armorPos.length; i++) {
       const a = armorPos[i];
-      if (map[a.ty] && map[a.ty][a.tx] === T_FLOOR_DARK) {
+      if (map[a.ty] && map[a.ty][a.tx] === T_FLOOR) {
         props.push({
           kind: 'armor',
           tx: a.tx, ty: a.ty, w: 2, h: 1,
@@ -2962,7 +2955,7 @@ function placeAlphaLair(room, map, rng, lights, props) {
     ];
     for (let i = 0; i < bonePos.length; i++) {
       const b = bonePos[i];
-      if (map[b.ty] && map[b.ty][b.tx] === T_FLOOR_DARK) {
+      if (map[b.ty] && map[b.ty][b.tx] === T_FLOOR) {
         props.push({
           kind: 'bones',
           tx: b.tx, ty: b.ty, w: 1, h: 1,
