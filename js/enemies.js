@@ -978,6 +978,8 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     const isKeyRoom = !!r.isKeyRoom;
     if (isKeyRoom && (r.keyVariant === 'rune' || r.keyVariant === 'candle')) continue;
     if (isKeyRoom) n += 3;
+    // Guarida del Alfa: enemies are pre-placed via alphaLairSpawns
+    if (r.isAlphaLair) continue;
     for (let i = 0; i < n; i++) {
       let ex, ey, safety = 12;
       do {
@@ -1009,6 +1011,8 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     if (r.isKeyRoom) continue;
     // Archivo Prohibido: hand-placed legendary chest below.
     if (r.isForbiddenArchive) continue;
+    // Guarida del Alfa: legendary chest drops from the encounter, not here.
+    if (r.isAlphaLair) continue;
     // Star rooms get two small chests grouped near the centre instead of
     // a single one — feels more rewarding to clear.
     if (r.isLarge) {
@@ -1039,12 +1043,29 @@ export function populateFloor(floor, maxFloor, spawnChest) {
     });
   }
 
+  // Guarida del Alfa: spawn pre-placed alpha pack from alphaLairSpawns.
+  // These enemies are already positioned in the arena; they are tagged
+  // with fromAlphaLair so updateAlphaLair can track victory.
+  for (const r of state.rooms) {
+    if (!r.isAlphaLair || !r.alphaLairSpawns) continue;
+    for (const spawn of r.alphaLairSpawns) {
+      const ex = spawn.tx * TILE + TILE / 2;
+      const ey = spawn.ty * TILE + TILE / 2;
+      const e = createEnemy(spawn.type, ex, ey, state.floor);
+      e.room = r;
+      e.fromAlphaLair = true;
+      state.enemies.push(e);
+      r.enemies.push(e);
+    }
+  }
+
   // Breakable props scattered through non-start rooms.
   for (const r of state.rooms) {
     if (r.isStartRoom) continue;
     if (r.isObservatory) continue;
     if (r.isKeyRoom) continue;          // arena must stay clear
     if (r.isForbiddenArchive) continue; // sealed vault, no clutter
+    if (r.isAlphaLair) continue;        // lair has its own set-dressing
     placeProps(r, floor);
   }
 }

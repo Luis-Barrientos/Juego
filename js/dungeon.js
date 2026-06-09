@@ -93,6 +93,7 @@ export function generateDungeon(floor, seed, biome) {
   const forceGreatLib    = !!FORCE.greatLibrary;
   const forceKeyPair     = !!FORCE.keyRoom || !!FORCE.keyRoomKill || !!FORCE.keyRoomRune || !!FORCE.keyRoomCandle || !!FORCE.archive;
   const forceKeyVariant  = FORCE.keyRoomRune ? 'rune' : FORCE.keyRoomKill ? 'kill' : FORCE.keyRoomCandle ? 'candle' : null;
+  const forceAlphaLair   = !!FORCE.alphaLair;
 
   // Sala del Gran Tomo first: it's smaller (11×9) and easier to fit, so
   // reserving it before the Great Library guarantees it never gets
@@ -347,7 +348,7 @@ export function generateDungeon(floor, seed, biome) {
     placePuddles(map, rooms, rng, puddles);
     placeRoomWallDecorations(map, rooms, rng, decorations, lights,
       ['plaque', 'crack', 'sconceBroken']);
-    if (rng() < 0.55) {
+    if (forceAlphaLair || rng() < 0.55) {
       const starRooms = rooms.filter(r => r.isLarge);
       if (starRooms.length) {
         const lairRoom = starRooms[Math.floor(rng() * starRooms.length)];
@@ -2819,18 +2820,51 @@ export function isBlocked(map, x, y, r) {
 /**
  * Ruins biome: Alpha Wolf Lair. A star room sealed on entry, hosting the
  * Alpha Wolf mini-boss and his pack. Clearing it drops a legendary chest.
+ *
+ * Layout (applied to an expanded star room):
+ *   • 3×3 dark floor dais at centre (walkable)
+ *   • 4 broken pillars at inner corners (solid cover)
+ *   • 2 campfire braziers at mid-left / mid-right
+ *   • Fixed spawn positions for Alpha + 3 wolves on the room object
  * @private
  */
 function placeAlphaLair(room, map, rng, lights) {
   if (!room) return;
   room.isAlphaLair = true;
 
-  const brazierPos = [
-    { tx: room.x + 2, ty: room.y + 2 },
+  const cx = room.cx, cy = room.cy;
+
+  // 1. Dark floor dais at centre (3×3 walkable platform)
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const tx = cx + dx, ty = cy + dy;
+      if (map[ty] && map[ty][tx] === T_FLOOR) {
+        map[ty][tx] = T_FLOOR_DARK;
+      }
+    }
+  }
+
+  // 2. Four broken pillars at inner corners (solid cover)
+  const pillarPos = [
+    { tx: room.x + 2,          ty: room.y + 2 },
+    { tx: room.x + room.w - 3, ty: room.y + 2 },
+    { tx: room.x + 2,          ty: room.y + room.h - 3 },
     { tx: room.x + room.w - 3, ty: room.y + room.h - 3 },
   ];
+  for (const p of pillarPos) {
+    if (map[p.ty] && map[p.ty][p.tx] === T_FLOOR) {
+      map[p.ty][p.tx] = T_WALL;
+    }
+  }
+
+  // 3. Two campfire braziers at mid-left / mid-right
+  const brazierPos = [
+    { tx: room.x + 1, ty: cy },
+    { tx: room.x + room.w - 2, ty: cy },
+  ];
   for (const bp of brazierPos) {
-    if (map[bp.ty] && map[bp.ty][bp.tx] === T_FLOOR) {
+    if (map[bp.ty] && map[bp.ty][bp.tx] === T_FLOOR &&
+        !isNearDoor(map, bp.tx, bp.ty, room)) {
       lights.push({
         type: 'campfire',
         x: bp.tx * TILE + TILE / 2,
@@ -2840,6 +2874,14 @@ function placeAlphaLair(room, map, rng, lights) {
       });
     }
   }
+
+  // 4. Fixed spawn positions (consumed by populateFloor in enemies.js)
+  room.alphaLairSpawns = [
+    { type: 'alphaWolf', tx: cx,     ty: cy },
+    { type: 'wolf',      tx: cx - 2, ty: cy },
+    { type: 'wolf',      tx: cx + 2, ty: cy },
+    { type: 'wolf',      tx: cx,     ty: cy - 2 },
+  ];
 }
 
 export function tryMove(map, entity, dx, dy) {

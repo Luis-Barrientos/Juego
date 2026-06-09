@@ -4,11 +4,13 @@
  * Ruins floor "Alpha Wolf Lair" set-piece.
  *
  * Flow:
- *   1. Player enters the star room marked as isAlphaLair.
- *   2. Room seals (entrances become walls), Alpha Wolf + 2 wolves spawn.
- *   3. Territorial: if player leaves room, Alpha heals to full and disengages.
- *   4. Alpha enrages at <50% HP: projectile fan + nova ring.
- *   5. Once all enemies (Alpha + spawned wolves) are dead, seals drop
+ *   1. Enemies (Alpha + 3 wolves) are pre-spawned at build time via
+ *      alphaLairSpawns on the room object (populateFloor in enemies.js).
+ *   2. Player enters the star room marked as isAlphaLair.
+ *   3. Room seals (entrances become walls).
+ *   4. Territorial: if player leaves room, Alpha heals to full and disengages.
+ *   5. Alpha enrages at <50% HP: projectile fan + nova ring.
+ *   6. Once all enemies (Alpha + spawned wolves) are dead, seals drop
  *      and a legendary chest appears at room center.
  */
 
@@ -17,7 +19,6 @@ import { TILE, T_WALL, T_FLOOR } from './config.js';
 import { rebuildMapCache }    from './render.js';
 import { Audio }              from './audio.js';
 import { spawnParticles }     from './particles.js';
-import { createEnemy }        from './enemies.js';
 
 /** Reset the slot when the floor (re)builds. */
 export function resetAlphaLair() {
@@ -83,36 +84,6 @@ function playerSafeFromEntrances(entrances) {
   return true;
 }
 
-/** Spawn Alpha Wolf + initial pack at room center. */
-function spawnAlphaPack(a) {
-  const cx = a.room.cx * TILE + TILE / 2;
-  const cy = a.room.cy * TILE + TILE / 2;
-
-  // Alpha Wolf at center
-  const alpha = createEnemy('alphaWolf', cx, cy, state.floor);
-  alpha.room = a.room;
-  alpha.fromAlphaLair = true;
-  state.enemies.push(alpha);
-
-  // 2-3 initial wolves around
-  const n = 2 + Math.floor(Math.random() * 2);
-  for (let i = 0; i < n; i++) {
-    const ang = Math.random() * Math.PI * 2;
-    const dist = 50 + Math.random() * 30;
-    const wx = cx + Math.cos(ang) * dist;
-    const wy = cy + Math.sin(ang) * dist;
-    const tx = Math.floor(wx / TILE), ty = Math.floor(wy / TILE);
-    if (!state.map[ty] || state.map[ty][tx] !== T_WALL) {
-      const wolf = createEnemy('wolf', wx, wy, state.floor);
-      wolf.room = a.room;
-      wolf.fromAlphaLair = true;
-      state.enemies.push(wolf);
-    }
-  }
-
-  spawnParticles(cx, cy, '#a08050', 24);
-}
-
 /** Drop legendary chest at room center (idempotent). */
 function dropChest(a, toast) {
   if (a.chestSpawned) return;
@@ -165,9 +136,6 @@ export function updateAlphaLair(dt, toast) {
     for (const t of a.sealedTiles) state.map[t.ty][t.tx] = T_WALL;
     a.state = 'active';
     rebuildMapCache();
-
-    // Spawn Alpha + initial pack
-    spawnAlphaPack(a);
 
     state.shake = Math.max(state.shake || 0, 6);
     spawnParticles(state.player.x, state.player.y - 6, '#a08050', 16);
