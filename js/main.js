@@ -753,7 +753,6 @@ function render() {
   drawCirclePrompt(ctx);
   drawTomePrompt(ctx);
   drawArchiveDoorPrompt(ctx);
-  drawTreePrompt(ctx);
   drawSunbeams(ctx);
   drawLighting(ctx);
   drawObservatoryFog(ctx);
