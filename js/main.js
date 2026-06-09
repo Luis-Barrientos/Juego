@@ -46,6 +46,7 @@ import {
 }                                         from './loot.js';
 import {
   rebuildMapCache, drawMap, drawLighting, drawSunbeams, drawObservatoryFog, drawArchiveAtmosphere, drawPuddles, drawSarcophagiOverlay, drawLibrarySetPiece, drawMinimap,
+  drawTreeTrunkBackPass, drawTreeCanopyFrontPass,
 }                                         from './render.js';
 import {
   updateHUD, showToast, hideAllOverlays, showMenu, showPause, hidePause,
@@ -736,6 +737,7 @@ function render() {
 
   drawMap(ctx);
   drawLoot(ctx);
+  drawTreeTrunkBackPass(ctx);
   for (const e of state.enemies)     drawEnemy(ctx, e);
   if (state.player)                  drawPlayer(ctx, state.player);
   for (const prj of state.projectiles) drawProjectile(ctx, prj);
@@ -744,6 +746,7 @@ function render() {
   drawPuddles(ctx);
   drawSarcophagiOverlay(ctx);
   drawLibrarySetPiece(ctx);
+  drawTreeCanopyFrontPass(ctx);
   drawGrandTome(ctx);
   drawKeyPedestals(ctx);
   drawAltarPrompt(ctx);

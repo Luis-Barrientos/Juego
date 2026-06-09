@@ -780,7 +780,7 @@ function drawLibraryProp(ctx, p) {
   if (p.kind === 'clawMark')     { drawClawMark(ctx, px, py, w, h, p);     return; }
   if (p.kind === 'armor')        { drawArmor(ctx, px, py, w, h, p);        return; }
   if (p.kind === 'bones')        { drawBones(ctx, px, py, w, h, p);        return; }
-  if (p.kind === 'tree')         { drawTree(ctx, px, py, w, h, p);         return; }
+  if (p.kind === 'tree')         return;
   if (p.kind === 'treeRoot')     { drawTreeRoot(ctx, px, py, w, h, p);     return; }
   if (p.kind === 'constellationRing') { drawConstellationRing(ctx, px, py, w, h, p); return; }
   // Key dais and archive pedestal are floor decorations — same early
@@ -1250,8 +1250,8 @@ function drawBones(ctx, px, py, w, h, p) {
   ctx.restore();
 }
 
-/** 5×5 tree for the Claro Solar — trunk is T_WALL on the map. */
-function drawTree(ctx, px, py, w, h, p) {
+/** 5×5 tree (back layer) — trunk, branches, shadow. Drawn BEFORE player. */
+function drawTreeTrunkBack(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
   const cy = py + h - 2;  // Bottom of the tree (ground level)
   const trunkH = h * 0.65;  // Tall trunk
@@ -1349,15 +1349,28 @@ function drawTree(ctx, px, py, w, h, p) {
     }
   }
 
-  // ===== FOLIAGE CANOPY (LAYERED FOR DEPTH) =====
-  // Multi-layered foliage clusters positioned higher (above trunk)
+  ctx.restore();
+}
+
+/** 5×5 tree canopy (front layer) — foliage only. Drawn AFTER player. */
+function drawTreeCanopyFront(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h - 2;
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  const t = (typeof state !== 'undefined' ? state.time : 0) || 0;
+
+  ctx.save();
+
+  const trunkH = h * 0.65;
+  const canopyR = Math.min(w, h) * 0.32;
   const leafDark = '#3d7a2f';
   const leafMid = '#4a8c3a';
   const leafBright = '#6ec050';
   const leafAccent = '#8dd968';
-  const canopyTop = cy - trunkH - canopyR * 0.3;  // Canopy starts at top of trunk
-  
-  // Outer foliage layer (darker, larger patches)
+  const canopyTop = cy - trunkH - canopyR * 0.3;
+
+  // Foliage clusters (semi-transparent so player shows through)
   ctx.globalAlpha = 0.60;
   const patches1 = 5 + Math.floor(rnd() * 3);
   for (let i = 0; i < patches1; i++) {
@@ -1371,8 +1384,7 @@ function drawTree(ctx, px, py, w, h, p) {
     ctx.arc(lx, ly, r, 0, Math.PI * 2);
     ctx.fill();
   }
-  
-  // Middle foliage layer (mixed colours)
+
   ctx.globalAlpha = 0.72;
   const patches2 = 4 + Math.floor(rnd() * 3);
   for (let i = 0; i < patches2; i++) {
@@ -1390,8 +1402,7 @@ function drawTree(ctx, px, py, w, h, p) {
     ctx.arc(lx, ly, r, 0, Math.PI * 2);
     ctx.fill();
   }
-  
-  // Top highlights (bright sunlit foliage, crown of the tree)
+
   ctx.globalAlpha = 0.55;
   const patches3 = 3 + Math.floor(rnd() * 2);
   for (let i = 0; i < patches3; i++) {
@@ -1405,9 +1416,37 @@ function drawTree(ctx, px, py, w, h, p) {
     ctx.arc(lx, ly, r, 0, Math.PI * 2);
     ctx.fill();
   }
-  
+
   ctx.globalAlpha = 1;
   ctx.restore();
+}
+
+/**
+ * Paint the back layer (trunk, branches, shadow) of every tree prop.
+ * Must be called BEFORE drawPlayer so the player walks in front of the trunk.
+ */
+export function drawTreeTrunkBackPass(ctx) {
+  if (!state.libraryProps) return;
+  for (const p of state.libraryProps) {
+    if (p.kind !== 'tree') continue;
+    const px = p.tx * TILE;
+    const py = p.ty * TILE;
+    drawTreeTrunkBack(ctx, px, py, p.w * TILE, p.h * TILE, p);
+  }
+}
+
+/**
+ * Paint the front layer (foliage canopy) of every tree prop.
+ * Must be called AFTER drawPlayer so the player appears behind the leaves.
+ */
+export function drawTreeCanopyFrontPass(ctx) {
+  if (!state.libraryProps) return;
+  for (const p of state.libraryProps) {
+    if (p.kind !== 'tree') continue;
+    const px = p.tx * TILE;
+    const py = p.ty * TILE;
+    drawTreeCanopyFront(ctx, px, py, p.w * TILE, p.h * TILE, p);
+  }
 }
 
 /**
