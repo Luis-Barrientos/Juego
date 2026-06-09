@@ -1253,9 +1253,9 @@ function drawBones(ctx, px, py, w, h, p) {
 /** 7×7 tree (back layer) — trunk, branches, shadow. Drawn BEFORE player. */
 function drawTreeTrunkBack(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
-  const cy = py + h - 2;  // Bottom of the tree (ground level)
-  const trunkH = h * 0.7;  // Very tall trunk (70% of height)
-  const canopyR = Math.min(w, h) * 0.55;  // Much larger canopy
+  const cy = py + h - 2;
+  const trunkH = h * 0.85;
+  const canopyR = Math.min(w, h) * 0.60;
   let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
 
@@ -1268,52 +1268,119 @@ function drawTreeTrunkBack(ctx, px, py, w, h, p) {
   ctx.ellipse(cx + 1, cy + 2, canopyR * 0.9, canopyR * 0.3, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // ===== MASSIVE THICK TRUNK (30px base, ancient) =====
-  // Main trunk body — VERY thick and tapered, going up from ground
+  // ===== MASSIVE TRUNK (60px base, 28px top) =====
   ctx.fillStyle = '#3a2818';
   ctx.beginPath();
-  ctx.moveTo(cx - 15, cy);     // Base: 30px wide
-  ctx.lineTo(cx + 15, cy);
-  ctx.lineTo(cx + 4, cy - trunkH);   // Top: ~8px wide
-  ctx.lineTo(cx - 4, cy - trunkH);
+  ctx.moveTo(cx - 30, cy);
+  ctx.lineTo(cx + 30, cy);
+  ctx.lineTo(cx + 14, cy - trunkH);
+  ctx.lineTo(cx - 14, cy - trunkH);
   ctx.closePath();
   ctx.fill();
-  
+
   // Trunk highlight (lighter side for dimension)
   ctx.fillStyle = '#5a3e28';
   ctx.beginPath();
-  ctx.moveTo(cx - 6, cy);
-  ctx.lineTo(cx + 10, cy);
-  ctx.lineTo(cx + 2, cy - trunkH);
-  ctx.lineTo(cx - 2, cy - trunkH);
+  ctx.moveTo(cx - 10, cy);
+  ctx.lineTo(cx + 18, cy);
+  ctx.lineTo(cx + 10, cy - trunkH);
+  ctx.lineTo(cx - 4, cy - trunkH);
   ctx.closePath();
   ctx.fill();
-  
-  // Bark texture — thick vertical streaks running up the trunk
-  ctx.strokeStyle = 'rgba(25, 14, 8, 0.55)';
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 8; i++) {
-    const bx = cx - 12 + i * 3.5 + rnd() * 0.5;
-    const by1 = cy - trunkH + rnd() * 8;
-    const by2 = cy - rnd() * 3;
+
+  // Bark texture — 16 thick dark streaks
+  ctx.strokeStyle = 'rgba(25, 14, 8, 0.6)';
+  for (let i = 0; i < 16; i++) {
+    const bx = cx - 26 + i * 3.5 + rnd() * 1.5;
+    const by1 = cy - trunkH + rnd() * 12;
+    const by2 = cy - rnd() * 5;
+    ctx.lineWidth = 1.5 + rnd() * 1.5;
     ctx.beginPath();
     ctx.moveTo(bx, by1);
-    const cp = (by1 + by2) / 2 + rnd() * 8 - 4;
-    ctx.quadraticCurveTo(bx + rnd() * 3 - 1.5, cp, bx + rnd() * 1 - 0.5, by2);
+    const cp = (by1 + by2) / 2 + rnd() * 10 - 5;
+    ctx.quadraticCurveTo(bx + rnd() * 4 - 2, cp, bx + rnd() * 1.5 - 0.75, by2);
     ctx.stroke();
   }
 
+  // ===== ROOT BULGES — 6 large protrusions at base =====
+  ctx.fillStyle = '#3a2818';
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI - Math.PI * 0.5;
+    const rx = cx + Math.cos(angle) * 26 + rnd() * 3;
+    const ry = cy + Math.sin(angle) * 4 + rnd() * 2;
+    const rw = 10 + rnd() * 6;
+    const rh = 6 + rnd() * 4;
+    ctx.beginPath();
+    ctx.ellipse(rx, ry, rw, rh, angle * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ===== HOLLOW KNOTS =====
+  for (const side of [-1, 1]) {
+    const kx = cx + side * (20 + rnd() * 4);
+    const ky = cy - trunkH * (0.35 + rnd() * 0.25);
+    const kw = 5 + rnd() * 3;
+    const kh = 3 + rnd() * 2;
+    ctx.fillStyle = '#1a0a04';
+    ctx.beginPath();
+    ctx.ellipse(kx, ky, kw, kh, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#5a4a3a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(kx, ky, kw + 1.5, kh + 1.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // ===== CRACKS WITH GOLDEN SAP =====
+  for (let i = 0; i < 4; i++) {
+    const cx2 = cx - 18 + i * 12 + rnd() * 3;
+    const cy1 = cy - trunkH * (0.2 + rnd() * 0.5);
+    const cy2 = cy1 + 10 + rnd() * 15;
+    ctx.strokeStyle = 'rgba(25, 14, 8, 0.8)';
+    ctx.lineWidth = 1.5 + rnd() * 1;
+    ctx.beginPath();
+    ctx.moveTo(cx2, cy1);
+    ctx.lineTo(cx2 + rnd() * 2 - 1, cy2);
+    ctx.stroke();
+    // Golden sap drip
+    if (rnd() < 0.6) {
+      ctx.save();
+      ctx.shadowColor = '#c8943a';
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = '#c8943a';
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.arc(cx2 + rnd() * 1.5 - 0.75, cy2 - rnd() * 3, 1.5 + rnd() * 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // ===== MOSS / LICHEN ON TRUNK =====
+  ctx.fillStyle = '#5a7a4a';
+  ctx.globalAlpha = 0.45;
+  for (let i = 0; i < 5; i++) {
+    const mx = cx + (rnd() < 0.5 ? -1 : 1) * (26 + rnd() * 6);
+    const my = cy - trunkH * (0.1 + rnd() * 0.6);
+    const mr = 4 + rnd() * 6;
+    ctx.beginPath();
+    ctx.arc(mx, my, mr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
   // ===== BRANCHES (FROM UPPER TRUNK) =====
-  // Main branches radiating outward and slightly upward
   ctx.strokeStyle = '#5a4234';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 5;
   const branchStarts = [
-    { y: cy - trunkH * 0.15, angle: -2.3, dist: 12 },
-    { y: cy - trunkH * 0.35, angle: -1.7, dist: 14 },
-    { y: cy - trunkH * 0.55, angle: 0.1, dist: 15 },
-    { y: cy - trunkH * 0.40, angle: 0.8, dist: 13 },
+    { y: cy - trunkH * 0.10, angle: -2.4, dist: 14 },
+    { y: cy - trunkH * 0.30, angle: -1.6, dist: 18 },
+    { y: cy - trunkH * 0.50, angle: 0.05, dist: 20 },
+    { y: cy - trunkH * 0.35, angle: 0.9, dist: 16 },
+    { y: cy - trunkH * 0.20, angle: -0.3, dist: 12 },
   ];
-  
+
   for (const bs of branchStarts) {
     const angle = bs.angle;
     const dist = bs.dist;
@@ -1323,36 +1390,46 @@ function drawTreeTrunkBack(ctx, px, py, w, h, p) {
     ctx.moveTo(cx, bs.y);
     ctx.lineTo(bx, by);
     ctx.stroke();
-    
-    // Sub-branches off main branches
+
+    // Sub-branches
     for (let j = 0; j < 2; j++) {
-      const sbx = bx + (j === 0 ? -5 : 3.5) + rnd() * 2;
-      const sby = by + rnd() * 3.5 - 1;
-      ctx.lineWidth = 1.8;
+      const sbx = bx + (j === 0 ? -6 : 4) + rnd() * 2.5;
+      const sby = by + rnd() * 4 - 1.5;
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
       ctx.moveTo(bx, by);
       ctx.lineTo(sbx, sby);
       ctx.stroke();
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 5;
     }
   }
+
+  // ===== BACK AURA (MYSTICAL GLOW BEHIND TREE) =====
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const grd = ctx.createRadialGradient(cx, cy - trunkH * 0.5, 2, cx, cy - trunkH * 0.5, canopyR);
+  grd.addColorStop(0, 'rgba(200, 180, 100, 0.08)');
+  grd.addColorStop(1, 'rgba(200, 180, 100, 0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(cx - canopyR, cy - trunkH - canopyR, canopyR * 2, canopyR * 2 + trunkH);
+  ctx.restore();
 
   ctx.restore();
 }
 
-/** 5×5 tree canopy (front layer) — foliage only. Drawn AFTER player. */
 /** 7×7 tree canopy (front layer) — massive foliage. Drawn AFTER player. */
 function drawTreeCanopyFront(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
   const cy = py + h - 2;
   let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  const now = (typeof state !== 'undefined' ? state.time : 0) || 0;
 
   ctx.save();
 
-  const trunkH = h * 0.7;
-  const canopyR = Math.min(w, h) * 0.55;  // Much larger
-  const leafDark = '#2a5a1f';   // Darker green
+  const trunkH = h * 0.85;
+  const canopyR = Math.min(w, h) * 0.60;
+  const leafDark = '#2a5a1f';
   const leafMid = '#3a7a28';
   const leafBright = '#5ec040';
   const leafAccent = '#7ed858';
@@ -1361,13 +1438,13 @@ function drawTreeCanopyFront(ctx, px, py, w, h, p) {
   // ===== LARGE FOLIAGE CLUSTERS =====
   // Outer layer (darker, largest patches)
   ctx.globalAlpha = 0.65;
-  const patches1 = 8 + Math.floor(rnd() * 4);
+  const patches1 = 10 + Math.floor(rnd() * 5);
   for (let i = 0; i < patches1; i++) {
     const a = rnd() * Math.PI * 2;
     const d = rnd() * canopyR * 0.90;
     const lx = cx + Math.cos(a) * d;
     const ly = canopyTop + Math.sin(a) * d * 0.60;
-    const r = 12 + rnd() * 16;
+    const r = 14 + rnd() * 18;
     ctx.fillStyle = rnd() < 0.2 ? leafMid : leafDark;
     ctx.beginPath();
     ctx.arc(lx, ly, r, 0, Math.PI * 2);
@@ -1376,13 +1453,13 @@ function drawTreeCanopyFront(ctx, px, py, w, h, p) {
 
   // Middle layer (mixed colours)
   ctx.globalAlpha = 0.75;
-  const patches2 = 7 + Math.floor(rnd() * 4);
+  const patches2 = 8 + Math.floor(rnd() * 4);
   for (let i = 0; i < patches2; i++) {
     const a = rnd() * Math.PI * 2;
     const d = rnd() * canopyR * 0.60;
     const lx = cx + Math.cos(a) * d;
     const ly = canopyTop + Math.sin(a) * d * 0.55;
-    const r = 9 + rnd() * 13;
+    const r = 10 + rnd() * 14;
     const col = rnd();
     if (col < 0.35) ctx.fillStyle = leafDark;
     else if (col < 0.65) ctx.fillStyle = leafMid;
@@ -1395,18 +1472,112 @@ function drawTreeCanopyFront(ctx, px, py, w, h, p) {
 
   // Top highlights (bright sunlit foliage, crown of the tree)
   ctx.globalAlpha = 0.60;
-  const patches3 = 5 + Math.floor(rnd() * 3);
+  const patches3 = 6 + Math.floor(rnd() * 3);
   for (let i = 0; i < patches3; i++) {
     const a = rnd() * Math.PI * 2;
     const d = rnd() * canopyR * 0.45;
     const lx = cx + Math.cos(a) * d;
     const ly = canopyTop - canopyR * 0.20 + Math.sin(a) * d * 0.45;
-    const r = 6 + rnd() * 10;
+    const r = 7 + rnd() * 11;
     ctx.fillStyle = rnd() < 0.5 ? leafBright : leafAccent;
     ctx.beginPath();
     ctx.arc(lx, ly, r, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  ctx.globalAlpha = 1;
+
+  // ===== HANGING VINES / LIANAS =====
+  ctx.strokeStyle = '#3a5a2a';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 4; i++) {
+    const va = rnd() * Math.PI * 2;
+    const vd = rnd() * canopyR * 0.55;
+    const vx = cx + Math.cos(va) * vd;
+    const vy = canopyTop + Math.sin(va) * vd * 0.55;
+    const vineLen = 20 + rnd() * 30;
+    ctx.beginPath();
+    ctx.moveTo(vx, vy + 4 + rnd() * 5);
+    for (let j = 0; j < vineLen; j += 4) {
+      const sway = Math.sin(j * 0.08 + now * 1.5 + i * 2) * 1.5;
+      ctx.lineTo(vx + sway + rnd() * 0.5, vy + 4 + j);
+    }
+    ctx.stroke();
+    // Small leaves along vine
+    ctx.fillStyle = '#4a7a3a';
+    for (let j = 6; j < vineLen; j += 8) {
+      const lx2 = vx + Math.sin(j * 0.08 + now * 1.5 + i * 2) * 1.5;
+      const ly2 = vy + 4 + j;
+      ctx.beginPath();
+      ctx.ellipse(lx2 + rnd() * 2 - 1, ly2, 3, 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ===== DEAD BROKEN BRANCH =====
+  ctx.strokeStyle = '#6a5a4a';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  const da = -1.8 + rnd() * 0.3;
+  const dd = 10 + rnd() * 5;
+  const dx = cx + Math.cos(da) * dd;
+  const dy = cy - trunkH * 0.7 + Math.sin(da) * dd * 0.25;
+  ctx.moveTo(cx + 8, cy - trunkH * 0.75);
+  ctx.lineTo(dx, dy);
+  ctx.stroke();
+  // Jagged broken tip
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#7a6a5a';
+  ctx.beginPath();
+  ctx.moveTo(dx, dy);
+  ctx.lineTo(dx + rnd() * 4 - 2, dy + rnd() * 4 - 2);
+  ctx.stroke();
+
+  // ===== MUSHROOMS AT BASE =====
+  for (let i = 0; i < 5; i++) {
+    const mx = cx - 26 + rnd() * 52;
+    const my = cy - 1 - rnd() * 3;
+    const ms = 2.5 + rnd() * 2.5;
+    // Stem
+    ctx.fillStyle = '#d4c8b0';
+    ctx.beginPath();
+    ctx.ellipse(mx, my, ms * 0.4, ms * 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Cap
+    ctx.fillStyle = '#8a6a4a';
+    ctx.beginPath();
+    ctx.arc(mx, my - ms * 0.6, ms, Math.PI, 0);
+    ctx.fill();
+    // Spots
+    ctx.fillStyle = '#f0e0c0';
+    ctx.globalAlpha = 0.7;
+    ctx.beginPath();
+    ctx.arc(mx - ms * 0.3, my - ms * 0.8, ms * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(mx + ms * 0.25, my - ms * 0.6, ms * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // ===== FIREFLIES / GLOWING DUST =====
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 10; i++) {
+    const phase = i * 1.2566;
+    const orbitR = 30 + rnd() * 70;
+    const orbitAngle = now * (0.3 + rnd() * 0.2) + phase;
+    const fx = cx + Math.cos(orbitAngle) * orbitR;
+    const fy = cy - trunkH * 0.5 + Math.sin(orbitAngle * 0.7 + phase) * orbitR * 0.4;
+    const pulse = 0.5 + Math.sin(now * 2 + phase) * 0.5;
+    ctx.fillStyle = `rgba(255, 232, 120, ${0.4 + pulse * 0.4})`;
+    ctx.shadowColor = '#ffe878';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(fx, fy, 1.5 + pulse * 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 
   ctx.globalAlpha = 1;
   ctx.restore();
@@ -1460,19 +1631,19 @@ function drawTreeRoot(ctx, px, py, w, h, p) {
   const rootHi = '#5a4838';
   const rootShadow = '#2a1810';
 
-  // Drop shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  // Drop shadow (bigger)
+  ctx.fillStyle = 'rgba(0,0,0,0.40)';
   ctx.beginPath();
-  ctx.ellipse(cx, cy + 2.5, 5, 2, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy + 3, 9, 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Main root body — knobbly, irregular shape (not a perfect circle)
+  // Main root body — larger, knobbly
   ctx.fillStyle = rootColor;
   ctx.beginPath();
-  const bumps = 6;
+  const bumps = 8;
   for (let i = 0; i < bumps; i++) {
     const a = (i / bumps) * Math.PI * 2;
-    const r = 4.5 + Math.sin(a * 2.7 + (p.seed || 0) * 0.001) * 1.8;
+    const r = 8 + Math.sin(a * 2.7 + (p.seed || 0) * 0.001) * 3.5;
     const x = cx + Math.cos(a) * r;
     const y = cy + Math.sin(a) * r * 0.65;
     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
@@ -1480,31 +1651,39 @@ function drawTreeRoot(ctx, px, py, w, h, p) {
   ctx.closePath();
   ctx.fill();
 
-  // Highlight stripe on one side (shows dimension)
+  // Highlight stripe on one side
   ctx.fillStyle = rootHi;
   ctx.beginPath();
-  ctx.ellipse(cx - 1.5, cy - 1.5, 3.5, 2.5, -0.3, 0, Math.PI * 2);
+  ctx.ellipse(cx - 3, cy - 2.5, 6, 4.5, -0.3, 0, Math.PI * 2);
   ctx.fill();
 
-  // Shadow ridge on the opposite side (depth)
+  // Shadow ridge on the opposite side
   ctx.fillStyle = rootShadow;
   ctx.beginPath();
-  ctx.ellipse(cx + 1.5, cy + 1.5, 2.5, 1.5, 0.3, 0, Math.PI * 2);
+  ctx.ellipse(cx + 3, cy + 2.5, 4.5, 3, 0.3, 0, Math.PI * 2);
   ctx.fill();
 
-  // Rough wood texture — tiny cracks and growth rings
-  ctx.strokeStyle = 'rgba(40, 20, 10, 0.4)';
-  ctx.lineWidth = 0.6;
-  for (let i = 0; i < 3; i++) {
+  // Rough wood texture — cracks
+  ctx.strokeStyle = 'rgba(40, 20, 10, 0.5)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
     const startA = rnd() * Math.PI * 2;
     const endA = startA + (rnd() * 0.8 + 0.4);
-    const startR = rnd() * 3 + 1;
-    const endR = rnd() * 3 + 1;
+    const startR = rnd() * 5 + 2;
+    const endR = rnd() * 5 + 2;
     ctx.beginPath();
     ctx.moveTo(cx + Math.cos(startA) * startR, cy + Math.sin(startA) * startR * 0.65);
     ctx.lineTo(cx + Math.cos(endA) * endR, cy + Math.sin(endA) * endR * 0.65);
     ctx.stroke();
   }
+
+  // Moss patch on root
+  ctx.fillStyle = '#5a7a4a';
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  ctx.ellipse(cx + rnd() * 4 - 2, cy + rnd() * 3 - 1.5, 4 + rnd() * 3, 2.5 + rnd() * 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
 
   ctx.restore();
 }
