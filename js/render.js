@@ -1262,6 +1262,17 @@ function drawTreeTrunkBack(ctx, px, py, w, h, p) {
   ctx.save();
   ctx.shadowBlur = 0;
 
+  // Dark ground patch covering the full 7×7 footprint to hide wall tiles
+  const patchRx = w * 0.72, patchRy = h * 0.72;
+  ctx.fillStyle = 'rgba(30, 20, 14, 0.5)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, patchRx, patchRy, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1e140e';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, w * 0.50, h * 0.44, 0, 0, Math.PI * 2);
+  ctx.fill();
+
   // Drop shadow under canopy
   ctx.fillStyle = 'rgba(0,0,0,0.40)';
   ctx.beginPath();
