@@ -247,8 +247,6 @@ function drawTreePrompt(ctx) {
   const sx = trunkX - state.cameraX;
   const sy = trunkY - state.cameraY;
   if (sx < -40 || sx > VIEW_W + 40 || sy < -40 || sy > VIEW_H + 40) return;
-  const p = state.player;
-  if (!p) return;
   if (Math.hypot(p.x - trunkX, p.y - trunkY) > TILE * 2.5) return;
 
   const pulse = 0.7 + 0.3 * Math.sin(state.time * 3);
