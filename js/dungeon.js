@@ -2864,11 +2864,14 @@ function placeClaroSolar(room, map, rng, sunbeams, props) {
   sb.crack = buildCrackPath(sb, rng);
   sunbeams.push(sb);
 
-  // Large tree at the center of the room — trunk blocks movement (3 tiles tall)
+  // Large tree at the center of the room — entire 5×5 trunk blocks movement
   if (props) {
-    for (let dy = -1; dy <= 1; dy++) {
-      const ty = cy + dy;
-      if (map[ty] && map[ty][cx] === T_FLOOR) map[ty][cx] = T_WALL;
+    // Mark the entire 5×5 tree footprint as T_WALL (solid collision)
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dy = -2; dy <= 2; dy++) {
+        const tx = cx + dx, ty = cy + dy;
+        if (map[ty] && map[ty][tx] === T_FLOOR) map[ty][tx] = T_WALL;
+      }
     }
     props.push({
       kind: 'tree',
