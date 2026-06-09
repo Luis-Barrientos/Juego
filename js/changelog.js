@@ -15,7 +15,7 @@
 
 export const CHANGELOG = [
   {
-    version: '0.10.0',
+    version: '0.9.1',
     date: '2026-06-09',
     title: 'Refactor Guarida del Alfa — arena con dais, pilares y spawn fijo',
     items: [
