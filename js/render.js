@@ -1258,8 +1258,7 @@ function drawTreeTrunkBack(ctx, px, py, w, h, p) {
   const canopyR = Math.min(w, h) * 0.32;  // Smaller, more proportional canopy
   let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
-  const t = (typeof state !== 'undefined' ? state.time : 0) || 0;
-  
+
   ctx.save();
   ctx.shadowBlur = 0;
 
@@ -1358,7 +1357,6 @@ function drawTreeCanopyFront(ctx, px, py, w, h, p) {
   const cy = py + h - 2;
   let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
-  const t = (typeof state !== 'undefined' ? state.time : 0) || 0;
 
   ctx.save();
 
@@ -1427,10 +1425,11 @@ function drawTreeCanopyFront(ctx, px, py, w, h, p) {
  */
 export function drawTreeTrunkBackPass(ctx) {
   if (!state.libraryProps) return;
+  const cx = state.cameraX, cy = state.cameraY;
   for (const p of state.libraryProps) {
     if (p.kind !== 'tree') continue;
-    const px = p.tx * TILE;
-    const py = p.ty * TILE;
+    const px = p.tx * TILE - cx;
+    const py = p.ty * TILE - cy;
     drawTreeTrunkBack(ctx, px, py, p.w * TILE, p.h * TILE, p);
   }
 }
@@ -1441,10 +1440,11 @@ export function drawTreeTrunkBackPass(ctx) {
  */
 export function drawTreeCanopyFrontPass(ctx) {
   if (!state.libraryProps) return;
+  const cx = state.cameraX, cy = state.cameraY;
   for (const p of state.libraryProps) {
     if (p.kind !== 'tree') continue;
-    const px = p.tx * TILE;
-    const py = p.ty * TILE;
+    const px = p.tx * TILE - cx;
+    const py = p.ty * TILE - cy;
     drawTreeCanopyFront(ctx, px, py, p.w * TILE, p.h * TILE, p);
   }
 }
