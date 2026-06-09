@@ -2864,18 +2864,18 @@ function placeClaroSolar(room, map, rng, sunbeams, props) {
   sb.crack = buildCrackPath(sb, rng);
   sunbeams.push(sb);
 
-  // Large tree at the center of the room — entire 5×5 trunk blocks movement
+  // Large tree at the center of the room — entire 7×7 trunk blocks movement
   if (props) {
-    // Mark the entire 5×5 tree footprint as T_WALL (solid collision)
-    for (let dx = -2; dx <= 2; dx++) {
-      for (let dy = -2; dy <= 2; dy++) {
+    // Mark the entire 7×7 tree footprint as T_WALL (solid collision)
+    for (let dx = -3; dx <= 3; dx++) {
+      for (let dy = -3; dy <= 3; dy++) {
         const tx = cx + dx, ty = cy + dy;
         if (map[ty] && map[ty][tx] === T_FLOOR) map[ty][tx] = T_WALL;
       }
     }
     props.push({
       kind: 'tree',
-      tx: cx - 2, ty: cy - 2, w: 5, h: 5,
+      tx: cx - 3, ty: cy - 3, w: 7, h: 7,
       seed: Math.floor(rng() * 1e9),
     });
 
@@ -2883,7 +2883,7 @@ function placeClaroSolar(room, map, rng, sunbeams, props) {
     // gnarled bumps that will be interactive for the puzzle.
     // Place 6-8 roots in a rough circle around the tree at medium distance.
     const ROOT_COUNT = 6 + Math.floor(rng() * 3);
-    const ROOT_RADIUS = 4.5;
+    const ROOT_RADIUS = 5.5;  // Increased from 4.5 to account for larger 7x7 tree
     for (let i = 0; i < ROOT_COUNT; i++) {
       const angle = (i / ROOT_COUNT) * Math.PI * 2 + rng() * 0.5;
       const dist = ROOT_RADIUS + rng() * 1.5;
@@ -2894,9 +2894,9 @@ function placeClaroSolar(room, map, rng, sunbeams, props) {
       if (rtx < rx || rtx >= rx + rw || rty < ry || rty >= ry + rh) continue;
       if (!map[rty] || map[rty][rtx] !== T_FLOOR) continue;
       
-      // Check no collision with tree 5x5 footprint
-      const treeLeft = cx - 2, treeRight = cx + 2;
-      const treeTop = cy - 2, treeBot = cy + 2;
+      // Check no collision with tree 7x7 footprint
+      const treeLeft = cx - 3, treeRight = cx + 3;
+      const treeTop = cy - 3, treeBot = cy + 3;
       if (rtx >= treeLeft && rtx <= treeRight && rty >= treeTop && rty <= treeBot) continue;
       
       // Check no collision with existing roots (simple distance check)

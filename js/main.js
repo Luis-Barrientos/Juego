@@ -746,13 +746,13 @@ function render() {
   drawPuddles(ctx);
   drawSarcophagiOverlay(ctx);
   drawLibrarySetPiece(ctx);
-  drawTreeCanopyFrontPass(ctx);
   drawGrandTome(ctx);
   drawKeyPedestals(ctx);
   drawAltarPrompt(ctx);
   drawCirclePrompt(ctx);
   drawTomePrompt(ctx);
   drawArchiveDoorPrompt(ctx);
+  drawTreeCanopyFrontPass(ctx);
   drawSunbeams(ctx);
   drawLighting(ctx);
   drawObservatoryFog(ctx);
