@@ -1126,25 +1126,21 @@ function drawStrawBed(ctx, px, py, w, h, p) {
   const cy = py + h / 2;
   const rx = w * 0.42;
   const ry = h * 0.38;
-  const s = (p.seed | 0) || 1;
+  let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
   ctx.save();
-  // Dark shadow underneath
   ctx.fillStyle = 'rgba(16, 10, 4, 0.5)';
   ctx.beginPath();
   ctx.ellipse(cx, cy + 2, rx + 2, ry + 2, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Base layer (darker straw underneath)
   ctx.fillStyle = p.large ? '#8a7028' : '#7a6020';
   ctx.beginPath();
   ctx.ellipse(cx, cy + 1, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Top layer (lighter straw)
   ctx.fillStyle = p.large ? '#c8a848' : '#b09038';
   ctx.beginPath();
   ctx.ellipse(cx, cy, rx * 0.92, ry * 0.88, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Straw texture: dense criss-cross lines
   ctx.shadowBlur = 0;
   const count = p.large ? 40 : 24;
   for (let i = 0; i < count; i++) {
@@ -1181,7 +1177,7 @@ function drawStrawBed(ctx, px, py, w, h, p) {
 function drawClawMark(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
   const cy = py + h / 2;
-  const s = (p.seed | 0) || 1;
+  let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
   const ang = rnd() * Math.PI * 2;
   ctx.save();
@@ -1205,7 +1201,7 @@ function drawClawMark(ctx, px, py, w, h, p) {
 function drawArmor(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
   const cy = py + h / 2;
-  const s = (p.seed | 0) || 1;
+  let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
   ctx.save();
   // Shadow
@@ -1237,7 +1233,7 @@ function drawArmor(ctx, px, py, w, h, p) {
 function drawBones(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
   const cy = py + h / 2;
-  const s = (p.seed | 0) || 1;
+  let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
   ctx.save();
   // Shadow
