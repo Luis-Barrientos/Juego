@@ -1118,39 +1118,58 @@ function drawLibraryRuneMark(ctx, px, py, w, h, p) {
 /* ───────────────── Alpha Lair floor decorations ───────────────── */
 
 /**
- * Straw bed — a golden-brown oval on the floor. The Alpha's bed (w=3)
- * is larger and more prominent; smaller beds (w=2) dot the room.
+ * Straw bed — a thick bed of golden-brown straw on the floor. The Alpha's
+ * bed (w=3) is larger; smaller beds (w=2) dot the room.
  */
 function drawStrawBed(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
   const cy = py + h / 2;
-  const rx = w * 0.4;
-  const ry = h * 0.35;
-  ctx.save();
-  // Dark patch underneath
-  ctx.fillStyle = 'rgba(20, 14, 4, 0.6)';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 1, rx + 1, ry + 1, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Straw body
-  ctx.fillStyle = p.large ? '#b89840' : '#a08030';
-  ctx.shadowColor = '#806020'; ctx.shadowBlur = 4;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Straw texture — short lines
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = '#907020';
-  ctx.lineWidth = 0.8;
+  const rx = w * 0.42;
+  const ry = h * 0.38;
   const s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
-  const count = p.large ? 12 : 6;
+  ctx.save();
+  // Dark shadow underneath
+  ctx.fillStyle = 'rgba(16, 10, 4, 0.5)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 2, rx + 2, ry + 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Base layer (darker straw underneath)
+  ctx.fillStyle = p.large ? '#8a7028' : '#7a6020';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 1, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Top layer (lighter straw)
+  ctx.fillStyle = p.large ? '#c8a848' : '#b09038';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx * 0.92, ry * 0.88, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Straw texture: dense criss-cross lines
+  ctx.shadowBlur = 0;
+  const count = p.large ? 40 : 24;
   for (let i = 0; i < count; i++) {
-    const ax = cx + (rnd() - 0.5) * rx * 1.2;
+    const ax = cx + (rnd() - 0.5) * rx * 1.6;
+    const ay = cy + (rnd() - 0.5) * ry * 1.6;
+    if (Math.hypot(ax - cx, ay - cy) > rx * 0.85) continue;
+    // Alternate between golden and darker strokes
+    ctx.strokeStyle = rnd() < 0.5 ? '#d0b050' : '#a08028';
+    ctx.lineWidth = 0.6 + rnd() * 1.0;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    const dx2 = (rnd() - 0.5) * 6;
+    const dy2 = (rnd() - 0.5) * 4;
+    ctx.lineTo(ax + dx2, ay + dy2);
+    ctx.stroke();
+  }
+  // A few longer stray strands
+  ctx.strokeStyle = '#b89838';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < 6; i++) {
+    const ax = cx + (rnd() - 0.5) * rx * 1.4;
     const ay = cy + (rnd() - 0.5) * ry * 1.2;
     ctx.beginPath();
     ctx.moveTo(ax, ay);
-    ctx.lineTo(ax + (rnd() - 0.5) * 4, ay + (rnd() - 0.5) * 3);
+    ctx.quadraticCurveTo(ax + (rnd() - 0.5) * 10, ay + (rnd() - 0.5) * 8, ax + (rnd() - 0.5) * 8, ay + (rnd() - 0.5) * 6);
     ctx.stroke();
   }
   ctx.restore();
@@ -1186,26 +1205,34 @@ function drawClawMark(ctx, px, py, w, h, p) {
 function drawArmor(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
   const cy = py + h / 2;
+  const s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
   ctx.save();
-  ctx.shadowBlur = 0;
-  // Base shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.fillRect(cx - 5, cy - 3, 10, 6);
-  // Armour body
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(cx - 7, cy - 4, 14, 9);
+  // Random rotation based on seed
+  ctx.translate(cx, cy);
+  ctx.rotate((rnd() - 0.5) * 0.4);
+  // Breastplate body
+  ctx.fillStyle = '#5a5a6a';
+  ctx.fillRect(-5, -3, 10, 6);
+  // Metallic highlight
+  ctx.fillStyle = '#8088a0';
+  ctx.fillRect(-4, -2, 4, 2);
+  ctx.fillRect(-1, 0, 3, 2);
+  // Dark edges
+  ctx.fillStyle = '#2a2a3a';
+  ctx.fillRect(-6, -3, 1, 7);
+  ctx.fillRect(5, -3, 1, 7);
+  // Centre ridge
   ctx.fillStyle = '#6a6a7a';
-  ctx.fillRect(cx - 4, cy - 2, 8, 4);
-  // Highlight
-  ctx.fillStyle = '#8888a0';
-  ctx.fillRect(cx - 3, cy - 1, 3, 2);
-  ctx.fillRect(cx + 1, cy - 1, 2, 2);
-  // Dark trim
-  ctx.fillStyle = '#3a3a4a';
-  ctx.fillRect(cx - 4, cy - 2, 8, 1);
+  ctx.fillRect(-1, -3, 2, 6);
   ctx.restore();
 }
 
 /**
- * Animal bones — small white/grey bone shapes on the floor.
+ * Scattered animal bones — small white/grey bone shapes on the floor.
  */
 function drawBones(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
@@ -1213,19 +1240,32 @@ function drawBones(ctx, px, py, w, h, p) {
   const s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
   ctx.save();
-  ctx.shadowBlur = 0;
   // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.fillRect(cx - 4, cy - 2, 8, 4);
-  // Bone
-  ctx.fillStyle = '#c8c0b0';
-  const ang = rnd() * Math.PI * 2;
-  ctx.translate(cx, cy);
-  ctx.rotate(ang);
-  ctx.fillRect(-3, -1, 6, 2);
-  // Bone knobs at ends
-  ctx.fillRect(-4, -2, 2, 4);
-  ctx.fillRect(2, -2, 2, 4);
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(cx - 6, cy - 3, 12, 6);
+  // Draw 2-3 bones stacked
+  const count = 2 + Math.floor(rnd() * 2);
+  for (let i = 0; i < count; i++) {
+    const ang = rnd() * Math.PI * 2;
+    const offX = (rnd() - 0.5) * 4;
+    const offY = (rnd() - 0.5) * 3;
+    ctx.fillStyle = '#d0c8b8';
+    ctx.translate(cx + offX, cy + offY);
+    ctx.rotate(ang);
+    // Bone shaft
+    ctx.fillRect(-4, -1, 8, 2);
+    // Bone knobs
+    ctx.fillRect(-5, -2.5, 2.5, 5);
+    ctx.fillRect(2.5, -2.5, 2.5, 5);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+  // Highlight on top bone
+  ctx.fillStyle = '#e8e0d0';
+  const topAng = rnd() * Math.PI * 2;
+  ctx.translate(cx + (rnd() - 0.5) * 2, cy + (rnd() - 0.5) * 2);
+  ctx.rotate(topAng);
+  ctx.fillRect(-3, -0.5, 6, 1);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.restore();
 }
 

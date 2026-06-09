@@ -56,7 +56,7 @@ export const ENEMY_TYPES = {
     hp: 220, dmg: 24, speed: 80, r: 16,
     color: '#3a2a1a', glow: '#a08050',
     score: 280, gold: [50, 90],
-    range: 48, attackCool: 0.7, behavior: 'alphaWolf',
+    range: 26, attackCool: 0.8, behavior: 'alphaWolf',
     /** Howl summon cooldown (seconds). */
     howlCool: 8.0,
     /** Min HP fraction to trigger enrage. */
@@ -282,6 +282,10 @@ export function enemyUpdate(e, dt, hooks) {
   }
 
   if (e.behavior === 'melee') {
+    // Territorial: alpha lair enemies stop chasing outside their room
+    if ((e.fromAlphaLair || e.fromAlpha) && e.room && e.room !== state.currentRoom) {
+      if (d > 300) return;
+    }
     if (d > e.range + p.r) {
       const sp = e.speed;
       tryMove(state.map, e, (dx / d) * sp * dt, (dy / d) * sp * dt);
@@ -427,9 +431,9 @@ function alphaWolfAI(e, dt, dx, dy, d, hooks) {
   // Territorial: if player leaves the room, alpha heals to full and disengages.
   if (e.room && e.room !== state.currentRoom) {
     if (e.hp < e.maxHp) {
-      e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.5 * dt); // fast heal outside room
+      e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.5 * dt);
     }
-    if (d > 400) return; // stop chasing far away
+    return; // stop chasing immediately when outside room
   }
 
   // Howl summon: periodically spawn 2-3 wolves nearby.
