@@ -781,6 +781,7 @@ function drawLibraryProp(ctx, p) {
   if (p.kind === 'armor')        { drawArmor(ctx, px, py, w, h, p);        return; }
   if (p.kind === 'bones')        { drawBones(ctx, px, py, w, h, p);        return; }
   if (p.kind === 'tree')         { drawTree(ctx, px, py, w, h, p);         return; }
+  if (p.kind === 'treeRoot')     { drawTreeRoot(ctx, px, py, w, h, p);     return; }
   if (p.kind === 'constellationRing') { drawConstellationRing(ctx, px, py, w, h, p); return; }
   // Key dais and archive pedestal are floor decorations — same early
   // return as the constellation ring so the underlying floor texture
@@ -1256,49 +1257,198 @@ function drawTree(ctx, px, py, w, h, p) {
   const canopyR = Math.min(w, h) * 0.45;
   let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  const t = (typeof state !== 'undefined' ? state.time : 0) || 0;
+  
   ctx.save();
   ctx.shadowBlur = 0;
 
-  // Shadow under canopy
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  // Drop shadow under canopy
+  ctx.fillStyle = 'rgba(0,0,0,0.30)';
   ctx.beginPath();
-  ctx.ellipse(cx + 2, cy + 4, canopyR * 0.9, canopyR * 0.25, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 2, cy + 4, canopyR * 0.95, canopyR * 0.28, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Trunk (visible part above the wall tile)
-  ctx.fillStyle = '#5a3e28';
-  ctx.fillRect(cx - 3, cy - 4, 6, 14);
-
-  // Branches
-  ctx.strokeStyle = '#5a3e28';
-  ctx.lineWidth = 2;
-  const branchDir = [ -0.4, -0.3, 0.3, 0.5 ];
-  for (let i = 0; i < branchDir.length; i++) {
-    const bx = cx + branchDir[i] * 10 + rnd() * 4 - 2;
-    const by = cy - 4 + rnd() * 6;
+  // ===== TRUNK =====
+  // Main trunk body — tapered and textured
+  ctx.fillStyle = '#4a3222';
+  ctx.beginPath();
+  ctx.moveTo(cx - 4, cy + 8);
+  ctx.lineTo(cx + 4, cy + 8);
+  ctx.lineTo(cx + 2.5, cy - 6);
+  ctx.lineTo(cx - 2.5, cy - 6);
+  ctx.closePath();
+  ctx.fill();
+  // Trunk highlight (lighter side)
+  ctx.fillStyle = '#6a5434';
+  ctx.beginPath();
+  ctx.moveTo(cx - 2, cy + 8);
+  ctx.lineTo(cx + 1, cy + 8);
+  ctx.lineTo(cx + 0.5, cy - 5);
+  ctx.lineTo(cx - 1, cy - 5);
+  ctx.closePath();
+  ctx.fill();
+  // Bark texture — small vertical streaks
+  ctx.strokeStyle = 'rgba(80, 50, 30, 0.4)';
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < 4; i++) {
+    const bx = cx - 3 + i * 2 + rnd() * 0.5;
+    const by1 = cy - 5;
+    const by2 = cy + 7;
     ctx.beginPath();
-    ctx.moveTo(cx, cy - 2);
-    ctx.lineTo(bx, by);
+    ctx.moveTo(bx, by1);
+    ctx.lineTo(bx + rnd() * 0.4 - 0.2, by2);
     ctx.stroke();
   }
 
-  // Foliage canopy — layered translucent circles
-  const leafColor = '#4a8c3a';
+  // ===== BRANCHES =====
+  // Main branches radiating outward and upward
+  ctx.strokeStyle = '#5a4234';
+  ctx.lineWidth = 2.2;
+  const branchAngles = [-2.4, -1.8, -0.6, 0.4];
+  const branchDists = [8, 9, 10, 11];
+  for (let i = 0; i < branchAngles.length; i++) {
+    const angle = branchAngles[i];
+    const dist = branchDists[i];
+    const bx = cx + Math.cos(angle) * dist;
+    const by = cy - 3 + Math.sin(angle) * dist * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(cx - 0.5, cy - 3);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+    // Sub-branches off main branches
+    for (let j = 0; j < 2; j++) {
+      const sbx = bx + (j === 0 ? -3 : 2) + rnd() * 2;
+      const sby = by + rnd() * 3 - 1;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(sbx, sby);
+      ctx.stroke();
+    }
+  }
+
+  // ===== FOLIAGE CANOPY =====
+  // Multi-layered foliage clusters for depth
+  const leafDark = '#3d7a2f';
+  const leafMid = '#4a8c3a';
   const leafBright = '#6ec050';
-  const patches = 8 + Math.floor(rnd() * 5);
-  for (let i = 0; i < patches; i++) {
+  const leafAccent = '#8dd968';
+  
+  // Outer foliage layer (darker, larger patches)
+  ctx.globalAlpha = 0.60;
+  const patches1 = 6 + Math.floor(rnd() * 4);
+  for (let i = 0; i < patches1; i++) {
     const a = rnd() * Math.PI * 2;
-    const d = rnd() * canopyR * 0.75;
+    const d = rnd() * canopyR * 0.85;
     const lx = cx + Math.cos(a) * d;
-    const ly = cy - 2 + Math.sin(a) * d * 0.6;
-    const r = 6 + rnd() * 10;
-    ctx.fillStyle = rnd() < 0.4 ? leafBright : leafColor;
-    ctx.globalAlpha = 0.65 + rnd() * 0.25;
+    const ly = cy - 1 + Math.sin(a) * d * 0.65;
+    const r = 8 + rnd() * 12;
+    ctx.fillStyle = rnd() < 0.3 ? leafMid : leafDark;
     ctx.beginPath();
     ctx.arc(lx, ly, r, 0, Math.PI * 2);
     ctx.fill();
   }
+  // Middle foliage layer (mixed colours)
+  ctx.globalAlpha = 0.72;
+  const patches2 = 5 + Math.floor(rnd() * 4);
+  for (let i = 0; i < patches2; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = rnd() * canopyR * 0.60;
+    const lx = cx + Math.cos(a) * d;
+    const ly = cy - 2 + Math.sin(a) * d * 0.55;
+    const r = 6 + rnd() * 10;
+    const col = rnd();
+    if (col < 0.4) ctx.fillStyle = leafDark;
+    else if (col < 0.7) ctx.fillStyle = leafMid;
+    else if (col < 0.85) ctx.fillStyle = leafBright;
+    else ctx.fillStyle = leafAccent;
+    ctx.beginPath();
+    ctx.arc(lx, ly, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Top highlights (bright sunlit foliage)
+  ctx.globalAlpha = 0.50;
+  const patches3 = 3 + Math.floor(rnd() * 3);
+  for (let i = 0; i < patches3; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = rnd() * canopyR * 0.45;
+    const lx = cx + Math.cos(a) * d;
+    const ly = cy - 4 + Math.sin(a) * d * 0.45;
+    const r = 4 + rnd() * 7;
+    ctx.fillStyle = rnd() < 0.5 ? leafBright : leafAccent;
+    ctx.beginPath();
+    ctx.arc(lx, ly, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
   ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/**
+ * Large exposed tree root for the Claro Solar puzzle — 1×1 walkable
+ * "bumps" scattered around the tree. Painted as organic, gnarled wood
+ * that rises from beneath the soil.
+ */
+function drawTreeRoot(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+
+  ctx.save();
+
+  // Root is a gnarled, organic knob rising from the ground
+  const rootColor = '#3a2818';
+  const rootHi = '#5a4838';
+  const rootShadow = '#2a1810';
+
+  // Drop shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 2.5, 5, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Main root body — knobbly, irregular shape (not a perfect circle)
+  ctx.fillStyle = rootColor;
+  ctx.beginPath();
+  const bumps = 6;
+  for (let i = 0; i < bumps; i++) {
+    const a = (i / bumps) * Math.PI * 2;
+    const r = 4.5 + Math.sin(a * 2.7 + (p.seed || 0) * 0.001) * 1.8;
+    const x = cx + Math.cos(a) * r;
+    const y = cy + Math.sin(a) * r * 0.65;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // Highlight stripe on one side (shows dimension)
+  ctx.fillStyle = rootHi;
+  ctx.beginPath();
+  ctx.ellipse(cx - 1.5, cy - 1.5, 3.5, 2.5, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Shadow ridge on the opposite side (depth)
+  ctx.fillStyle = rootShadow;
+  ctx.beginPath();
+  ctx.ellipse(cx + 1.5, cy + 1.5, 2.5, 1.5, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Rough wood texture — tiny cracks and growth rings
+  ctx.strokeStyle = 'rgba(40, 20, 10, 0.4)';
+  ctx.lineWidth = 0.6;
+  for (let i = 0; i < 3; i++) {
+    const startA = rnd() * Math.PI * 2;
+    const endA = startA + (rnd() * 0.8 + 0.4);
+    const startR = rnd() * 3 + 1;
+    const endR = rnd() * 3 + 1;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(startA) * startR, cy + Math.sin(startA) * startR * 0.65);
+    ctx.lineTo(cx + Math.cos(endA) * endR, cy + Math.sin(endA) * endR * 0.65);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 

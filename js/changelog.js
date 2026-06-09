@@ -15,7 +15,16 @@
 
 export const CHANGELOG = [
   {
-    version: '0.9.1',
+    version: '0.7.9',
+    date: '2026-06-05',
+    title: 'El Árbol del Claro Solar',
+    items: [
+      'El árbol del Claro Solar ahora es mucho más grande y detallado: tronco texturizado con corteza, ramas bien definidas, y copas de hojas en múltiples capas (oscuras en los bordes, iluminadas en la cúspide).',
+      '6-8 raíces grandes dispersas alrededor del árbol crean una zona de interacción para el próximo puzzle.',
+      'Las raíces se renderizan como gnarled wood bumps con textura de grietas, lo que las diferencia visualmente del resto de la flora.',
+    ],
+  },
+  {    version: '0.9.1',
     date: '2026-06-09',
     title: 'Guarida del Alfa: arena oscura, lobos rediseñados y más mejoras',
     items: [

@@ -2875,6 +2875,42 @@ function placeClaroSolar(room, map, rng, sunbeams, props) {
       tx: cx - 2, ty: cy - 2, w: 5, h: 5,
       seed: Math.floor(rng() * 1e9),
     });
+
+    // Scattered large tree roots around the tree — these are exposed,
+    // gnarled bumps that will be interactive for the puzzle.
+    // Place 6-8 roots in a rough circle around the tree at medium distance.
+    const ROOT_COUNT = 6 + Math.floor(rng() * 3);
+    const ROOT_RADIUS = 4.5;
+    for (let i = 0; i < ROOT_COUNT; i++) {
+      const angle = (i / ROOT_COUNT) * Math.PI * 2 + rng() * 0.5;
+      const dist = ROOT_RADIUS + rng() * 1.5;
+      const rtx = Math.round(cx + Math.cos(angle) * dist);
+      const rty = Math.round(cy + Math.sin(angle) * dist);
+      
+      // Only place root if the target tile is a floor and not already occupied
+      if (rtx < rx || rtx >= rx + rw || rty < ry || rty >= ry + rh) continue;
+      if (!map[rty] || map[rty][rtx] !== T_FLOOR) continue;
+      
+      // Check no collision with tree 5x5 footprint
+      const treeLeft = cx - 2, treeRight = cx + 2;
+      const treeTop = cy - 2, treeBot = cy + 2;
+      if (rtx >= treeLeft && rtx <= treeRight && rty >= treeTop && rty <= treeBot) continue;
+      
+      // Check no collision with existing roots (simple distance check)
+      let collision = false;
+      for (const p of props) {
+        if (p.kind !== 'treeRoot') continue;
+        const dx = p.tx - rtx, dy = p.ty - rty;
+        if (Math.hypot(dx, dy) < 2) { collision = true; break; }
+      }
+      if (collision) continue;
+
+      props.push({
+        kind: 'treeRoot',
+        tx: rtx, ty: rty, w: 1, h: 1,
+        seed: Math.floor(rng() * 1e9),
+      });
+    }
   }
 }
 
