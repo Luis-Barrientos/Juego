@@ -1269,38 +1269,49 @@ function drawTree(ctx, px, py, w, h, p) {
   ctx.ellipse(cx + 1, cy + 2, canopyR * 0.85, canopyR * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // ===== TRUNK (TALL & TAPERED) =====
-  // Main trunk body — tall and tapered, going up from ground
-  ctx.fillStyle = '#4a3222';
+  // ===== MASSIVE ANCIENT TRUNK (24px base, gnarled) =====
+  ctx.fillStyle = '#3a2818';
   ctx.beginPath();
-  ctx.moveTo(cx - 4.5, cy);
-  ctx.lineTo(cx + 4.5, cy);
-  ctx.lineTo(cx + 1.5, cy - trunkH);
-  ctx.lineTo(cx - 1.5, cy - trunkH);
+  ctx.moveTo(cx - 12, cy);
+  ctx.lineTo(cx + 12, cy);
+  ctx.lineTo(cx + 5, cy - trunkH);
+  ctx.lineTo(cx - 5, cy - trunkH);
   ctx.closePath();
   ctx.fill();
-  
-  // Trunk highlight (lighter side for dimension)
-  ctx.fillStyle = '#6a5434';
+
+  // Warm highlight side
+  ctx.fillStyle = '#5a3e28';
   ctx.beginPath();
-  ctx.moveTo(cx - 1.5, cy);
-  ctx.lineTo(cx + 2, cy);
-  ctx.lineTo(cx + 0.8, cy - trunkH);
-  ctx.lineTo(cx - 0.5, cy - trunkH);
+  ctx.moveTo(cx - 2, cy);
+  ctx.lineTo(cx + 8, cy);
+  ctx.lineTo(cx + 3.5, cy - trunkH);
+  ctx.lineTo(cx - 1, cy - trunkH);
   ctx.closePath();
   ctx.fill();
-  
-  // Bark texture — vertical streaks running up the trunk
-  ctx.strokeStyle = 'rgba(80, 50, 30, 0.45)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 5; i++) {
-    const bx = cx - 3.5 + i * 1.8 + rnd() * 0.3;
-    const by1 = cy - trunkH;
-    const by2 = cy;
+
+  // Root bulges at the base
+  ctx.fillStyle = '#3a2818';
+  for (let i = 0; i < 4; i++) {
+    const rx = cx - 10 + i * 7 + rnd() * 2;
+    const ry = cy + rnd() * 2;
+    const rw = 5 + rnd() * 7;
+    const rh = 3 + rnd() * 3;
+    ctx.beginPath();
+    ctx.ellipse(rx, ry, rw, rh, rnd() * 0.4 - 0.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Gnarled bark texture — thick dark streaks
+  ctx.strokeStyle = 'rgba(25, 14, 8, 0.55)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 10; i++) {
+    const bx = cx - 10 + i * 2.4 + rnd() * 0.5;
+    const by1 = cy - trunkH + rnd() * 6;
+    const by2 = cy - rnd() * 4;
     ctx.beginPath();
     ctx.moveTo(bx, by1);
-    const curve = rnd() * 0.6 - 0.3;
-    ctx.quadraticCurveTo(bx + curve, (by1 + by2) / 2, bx + rnd() * 0.3 - 0.15, by2);
+    const cp = (by1 + by2) / 2 + rnd() * 6 - 3;
+    ctx.quadraticCurveTo(bx + rnd() * 2 - 1, cp, bx + rnd() * 0.6 - 0.3, by2);
     ctx.stroke();
   }
 

@@ -39,7 +39,7 @@ import {
   projectileUpdate, drawProjectile,
 }                                         from './projectiles.js';
 import {
-  updateParticles, drawParticles, drawDamageTexts,
+  updateParticles, drawParticles, drawDamageTexts, spawnParticles,
 }                                         from './particles.js';
 import {
   updateLoot, drawLoot, spawnChest, openChest,
@@ -208,16 +208,56 @@ function goToNextFloor() {
 
 /** Sunbeam Shrine: on first entry, grant maxhp + reveal minimap. */
 function updateClaroSolar(toast) {
-  if (state.claroSolarEntered) return;
+  // Puzzle handled via tryTreePrayer.
+}
+
+/** Tree E-interaction: player presses E near the ancient trunk. */
+function tryTreePrayer(toast) {
+  if (state.claroSolarEntered) return false;
   const room = state.currentRoom;
-  if (!room || !room.isClaroSolar) return;
+  if (!room || !room.isClaroSolar) return false;
+  const p = state.player;
+  if (!p) return false;
+  const trunkX = room.cx * TILE + TILE / 2;
+  const trunkY = room.cy * TILE + TILE / 2;
+  if (Math.hypot(p.x - trunkX, p.y - trunkY) > TILE * 1.8) return false;
+
   state.claroSolarEntered = true;
   grantBlessing('maxhp');
   for (const r of state.rooms) {
     const id = `${r.x},${r.y},${r.w},${r.h}`;
     state.roomsVisited.add(id);
   }
-  toast && toast('La luz del sol te infunde nueva fuerza. +30 HP máximo. El mapa se ha revelado.');
+  spawnParticles(trunkX, trunkY - 20, '#c8ff80', 40);
+  spawnParticles(trunkX, trunkY - 40, '#ffd040', 20);
+  state.shake = Math.max(state.shake || 0, 4);
+  toast && toast('El árbol milenario te infunde su savia. +30 HP máximo. El mapa se ha revelado.');
+  return true;
+}
+
+/** Draw "[E] VENERAR EL ÁRBOL" near the ancient tree. */
+function drawTreePrompt(ctx) {
+  if (state.claroSolarEntered) return;
+  const room = state.currentRoom;
+  if (!room || !room.isClaroSolar) return;
+  const trunkX = room.cx * TILE + TILE / 2;
+  const trunkY = room.cy * TILE + TILE / 2;
+  const sx = trunkX - state.cameraX;
+  const sy = trunkY - state.cameraY;
+  if (sx < -40 || sx > VIEW_W + 40 || sy < -40 || sy > VIEW_H + 40) return;
+  const p = state.player;
+  if (!p) return;
+  if (Math.hypot(p.x - trunkX, p.y - trunkY) > TILE * 2.5) return;
+
+  const pulse = 0.7 + 0.3 * Math.sin(state.time * 3);
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.85)';
+  ctx.shadowBlur = 4;
+  ctx.fillStyle = `rgba(255, 255, 220, ${pulse})`;
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('[E] VENERAR EL ÁRBOL', sx, sy - 28);
+  ctx.restore();
 }
 
 /** Apply an upgrade effect to the player (no UI side-effects). */
@@ -396,6 +436,7 @@ const playerHooks = {
   onCircle:    () => tryStartLibraryEvent(showToast),
   onTome:      () => tryStartGrandTome(showToast),
   onCandle:    () => tryLightCandle(),
+  onTree:      () => tryTreePrayer(showToast),
 };
 
 /* ─────────────────────────── Update / render ─────────────────────────── */
@@ -709,6 +750,7 @@ function render() {
   drawCirclePrompt(ctx);
   drawTomePrompt(ctx);
   drawArchiveDoorPrompt(ctx);
+  drawTreePrompt(ctx);
   drawSunbeams(ctx);
   drawLighting(ctx);
   drawObservatoryFog(ctx);

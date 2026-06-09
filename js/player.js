@@ -50,7 +50,7 @@ export function createPlayer(x, y) {
  * @param {(e: object, dmg: number, crit: boolean) => void} onEnemyHit
  */
 export function playerUpdate(p, dt, hooks) {
-  const { onStairs, onChest, onEnemyHit, onAltar, onCircle, onTome, onCandle } = hooks;
+  const { onStairs, onChest, onEnemyHit, onAltar, onCircle, onTome, onCandle, onTree } = hooks;
 
   // Movement
   let mx = 0, my = 0;
@@ -141,6 +141,10 @@ export function playerUpdate(p, dt, hooks) {
     }
     // Library Sala de la Llave — candle puzzle.
     if (input.keys['KeyE'] && onCandle && onCandle()) {
+      input.keys['KeyE'] = false;
+    }
+    // Claro Solar — ancient tree interaction.
+    if (input.keys['KeyE'] && onTree && onTree()) {
       input.keys['KeyE'] = false;
     }
   }
