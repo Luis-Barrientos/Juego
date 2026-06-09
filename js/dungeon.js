@@ -8,7 +8,7 @@
  */
 
 import {
-  TILE, MAP_W, MAP_H, T_WALL, T_FLOOR, T_STAIR, T_DOOR_LOCKED, T_FLOOR, MAX_FLOOR,
+  TILE, MAP_W, MAP_H, T_WALL, T_FLOOR, T_STAIR, T_DOOR_LOCKED, MAX_FLOOR,
 } from './config.js';
 import { mulberry32 } from './utils.js';
 
