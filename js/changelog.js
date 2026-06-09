@@ -15,7 +15,7 @@
 
 export const CHANGELOG = [
   {
-    version: '0.7.9',
+    version: '0.9.2',
     date: '2026-06-05',
     title: 'El Árbol del Claro Solar',
     items: [

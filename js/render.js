@@ -1253,8 +1253,9 @@ function drawBones(ctx, px, py, w, h, p) {
 /** 5×5 tree for the Claro Solar — trunk is T_WALL on the map. */
 function drawTree(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
-  const cy = py + h * 0.55;
-  const canopyR = Math.min(w, h) * 0.45;
+  const cy = py + h - 2;  // Bottom of the tree (ground level)
+  const trunkH = h * 0.65;  // Tall trunk
+  const canopyR = Math.min(w, h) * 0.32;  // Smaller, more proportional canopy
   let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
   const t = (typeof state !== 'undefined' ? state.time : 0) || 0;
@@ -1265,98 +1266,110 @@ function drawTree(ctx, px, py, w, h, p) {
   // Drop shadow under canopy
   ctx.fillStyle = 'rgba(0,0,0,0.30)';
   ctx.beginPath();
-  ctx.ellipse(cx + 2, cy + 4, canopyR * 0.95, canopyR * 0.28, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 1, cy + 2, canopyR * 0.85, canopyR * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // ===== TRUNK =====
-  // Main trunk body — tapered and textured
+  // ===== TRUNK (TALL & TAPERED) =====
+  // Main trunk body — tall and tapered, going up from ground
   ctx.fillStyle = '#4a3222';
   ctx.beginPath();
-  ctx.moveTo(cx - 4, cy + 8);
-  ctx.lineTo(cx + 4, cy + 8);
-  ctx.lineTo(cx + 2.5, cy - 6);
-  ctx.lineTo(cx - 2.5, cy - 6);
+  ctx.moveTo(cx - 4.5, cy);
+  ctx.lineTo(cx + 4.5, cy);
+  ctx.lineTo(cx + 1.5, cy - trunkH);
+  ctx.lineTo(cx - 1.5, cy - trunkH);
   ctx.closePath();
   ctx.fill();
-  // Trunk highlight (lighter side)
+  
+  // Trunk highlight (lighter side for dimension)
   ctx.fillStyle = '#6a5434';
   ctx.beginPath();
-  ctx.moveTo(cx - 2, cy + 8);
-  ctx.lineTo(cx + 1, cy + 8);
-  ctx.lineTo(cx + 0.5, cy - 5);
-  ctx.lineTo(cx - 1, cy - 5);
+  ctx.moveTo(cx - 1.5, cy);
+  ctx.lineTo(cx + 2, cy);
+  ctx.lineTo(cx + 0.8, cy - trunkH);
+  ctx.lineTo(cx - 0.5, cy - trunkH);
   ctx.closePath();
   ctx.fill();
-  // Bark texture — small vertical streaks
-  ctx.strokeStyle = 'rgba(80, 50, 30, 0.4)';
-  ctx.lineWidth = 0.8;
-  for (let i = 0; i < 4; i++) {
-    const bx = cx - 3 + i * 2 + rnd() * 0.5;
-    const by1 = cy - 5;
-    const by2 = cy + 7;
+  
+  // Bark texture — vertical streaks running up the trunk
+  ctx.strokeStyle = 'rgba(80, 50, 30, 0.45)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const bx = cx - 3.5 + i * 1.8 + rnd() * 0.3;
+    const by1 = cy - trunkH;
+    const by2 = cy;
     ctx.beginPath();
     ctx.moveTo(bx, by1);
-    ctx.lineTo(bx + rnd() * 0.4 - 0.2, by2);
+    const curve = rnd() * 0.6 - 0.3;
+    ctx.quadraticCurveTo(bx + curve, (by1 + by2) / 2, bx + rnd() * 0.3 - 0.15, by2);
     ctx.stroke();
   }
 
-  // ===== BRANCHES =====
-  // Main branches radiating outward and upward
+  // ===== BRANCHES (FROM UPPER TRUNK) =====
+  // Main branches radiating outward and slightly upward
   ctx.strokeStyle = '#5a4234';
-  ctx.lineWidth = 2.2;
-  const branchAngles = [-2.4, -1.8, -0.6, 0.4];
-  const branchDists = [8, 9, 10, 11];
-  for (let i = 0; i < branchAngles.length; i++) {
-    const angle = branchAngles[i];
-    const dist = branchDists[i];
+  ctx.lineWidth = 2.4;
+  const branchStarts = [
+    { y: cy - trunkH * 0.2, angle: -2.2, dist: 7 },
+    { y: cy - trunkH * 0.4, angle: -1.8, dist: 8 },
+    { y: cy - trunkH * 0.5, angle: 0.2, dist: 8.5 },
+    { y: cy - trunkH * 0.35, angle: 0.7, dist: 7.5 },
+  ];
+  
+  for (const bs of branchStarts) {
+    const angle = bs.angle;
+    const dist = bs.dist;
     const bx = cx + Math.cos(angle) * dist;
-    const by = cy - 3 + Math.sin(angle) * dist * 0.3;
+    const by = bs.y + Math.sin(angle) * dist * 0.2;
     ctx.beginPath();
-    ctx.moveTo(cx - 0.5, cy - 3);
+    ctx.moveTo(cx, bs.y);
     ctx.lineTo(bx, by);
     ctx.stroke();
+    
     // Sub-branches off main branches
     for (let j = 0; j < 2; j++) {
-      const sbx = bx + (j === 0 ? -3 : 2) + rnd() * 2;
-      const sby = by + rnd() * 3 - 1;
-      ctx.lineWidth = 1.2;
+      const sbx = bx + (j === 0 ? -3.5 : 2.5) + rnd() * 1.5;
+      const sby = by + rnd() * 2.5 - 0.5;
+      ctx.lineWidth = 1.3;
       ctx.beginPath();
       ctx.moveTo(bx, by);
       ctx.lineTo(sbx, sby);
       ctx.stroke();
+      ctx.lineWidth = 2.4;
     }
   }
 
-  // ===== FOLIAGE CANOPY =====
-  // Multi-layered foliage clusters for depth
+  // ===== FOLIAGE CANOPY (LAYERED FOR DEPTH) =====
+  // Multi-layered foliage clusters positioned higher (above trunk)
   const leafDark = '#3d7a2f';
   const leafMid = '#4a8c3a';
   const leafBright = '#6ec050';
   const leafAccent = '#8dd968';
+  const canopyTop = cy - trunkH - canopyR * 0.3;  // Canopy starts at top of trunk
   
   // Outer foliage layer (darker, larger patches)
   ctx.globalAlpha = 0.60;
-  const patches1 = 6 + Math.floor(rnd() * 4);
+  const patches1 = 5 + Math.floor(rnd() * 3);
   for (let i = 0; i < patches1; i++) {
     const a = rnd() * Math.PI * 2;
-    const d = rnd() * canopyR * 0.85;
+    const d = rnd() * canopyR * 0.80;
     const lx = cx + Math.cos(a) * d;
-    const ly = cy - 1 + Math.sin(a) * d * 0.65;
-    const r = 8 + rnd() * 12;
+    const ly = canopyTop + Math.sin(a) * d * 0.55;
+    const r = 7 + rnd() * 11;
     ctx.fillStyle = rnd() < 0.3 ? leafMid : leafDark;
     ctx.beginPath();
     ctx.arc(lx, ly, r, 0, Math.PI * 2);
     ctx.fill();
   }
+  
   // Middle foliage layer (mixed colours)
   ctx.globalAlpha = 0.72;
-  const patches2 = 5 + Math.floor(rnd() * 4);
+  const patches2 = 4 + Math.floor(rnd() * 3);
   for (let i = 0; i < patches2; i++) {
     const a = rnd() * Math.PI * 2;
-    const d = rnd() * canopyR * 0.60;
+    const d = rnd() * canopyR * 0.55;
     const lx = cx + Math.cos(a) * d;
-    const ly = cy - 2 + Math.sin(a) * d * 0.55;
-    const r = 6 + rnd() * 10;
+    const ly = canopyTop + Math.sin(a) * d * 0.48;
+    const r = 5 + rnd() * 9;
     const col = rnd();
     if (col < 0.4) ctx.fillStyle = leafDark;
     else if (col < 0.7) ctx.fillStyle = leafMid;
@@ -1366,15 +1379,16 @@ function drawTree(ctx, px, py, w, h, p) {
     ctx.arc(lx, ly, r, 0, Math.PI * 2);
     ctx.fill();
   }
-  // Top highlights (bright sunlit foliage)
-  ctx.globalAlpha = 0.50;
-  const patches3 = 3 + Math.floor(rnd() * 3);
+  
+  // Top highlights (bright sunlit foliage, crown of the tree)
+  ctx.globalAlpha = 0.55;
+  const patches3 = 3 + Math.floor(rnd() * 2);
   for (let i = 0; i < patches3; i++) {
     const a = rnd() * Math.PI * 2;
-    const d = rnd() * canopyR * 0.45;
+    const d = rnd() * canopyR * 0.40;
     const lx = cx + Math.cos(a) * d;
-    const ly = cy - 4 + Math.sin(a) * d * 0.45;
-    const r = 4 + rnd() * 7;
+    const ly = canopyTop - canopyR * 0.15 + Math.sin(a) * d * 0.40;
+    const r = 3.5 + rnd() * 6;
     ctx.fillStyle = rnd() < 0.5 ? leafBright : leafAccent;
     ctx.beginPath();
     ctx.arc(lx, ly, r, 0, Math.PI * 2);
