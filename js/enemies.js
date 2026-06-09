@@ -282,8 +282,8 @@ export function enemyUpdate(e, dt, hooks) {
   }
 
   if (e.behavior === 'melee') {
-    // Territorial: wolves from the Alpha Lair stop chasing if player leaves
-    if ((e.fromAlphaLair || e.fromAlpha) && e.room && e.room !== state.currentRoom) {
+    // Territorial: wolves from the Alpha Lair only fight when encounter is active
+    if ((e.fromAlphaLair || e.fromAlpha) && (!state.alphaLair || state.alphaLair.state !== 'active')) {
       e.state = 'idle';
       return;
     }
@@ -429,11 +429,11 @@ function alphaWolfAI(e, dt, dx, dy, d, hooks) {
   const enraged = e.hp <= e.maxHp * t.enrageThreshold;
   const p = state.player;
 
-  // Territorial: if player leaves the room, alpha heals to full and disengages.
-  if (e.room && e.room !== state.currentRoom) {
-    if (e.hp < e.maxHp) {
-      e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.5 * dt);
-    }
+  // Territorial: only active when the Alpha Lair encounter is triggered.
+  // Before activation (state === 'idle') the Alpha stands still.
+  // After activation (state === 'active') it fights freely.
+  const lair = state.alphaLair;
+  if (!lair || lair.state !== 'active') {
     e.state = 'idle';
     return;
   }

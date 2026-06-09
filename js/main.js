@@ -156,6 +156,7 @@ function buildFloor(floor) {
   state._whisperTimer = 6 + Math.random() * 6;
   state._creakTimer   = 8 + Math.random() * 14;
 
+  resetAlphaLair();
   resetChallenge();
   resetLibraryEvent();
   resetGrandTome();
@@ -650,6 +651,7 @@ function update(dt) {
   updateLibraryEvent(dt, showToast, spawnLibraryRewards);
   updateGrandTome(dt, showToast, spawnGrandTomeRewards);
   updateKeyRoom(dt, showToast);
+  updateAlphaLair(dt, showToast);
   updateAmbient(dt);
   updateCamera();
   updateHUD();
