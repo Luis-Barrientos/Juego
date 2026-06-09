@@ -1126,7 +1126,7 @@ function drawStrawBed(ctx, px, py, w, h, p) {
   const cy = py + h / 2;
   const rx = w * 0.4;
   const ry = h * 0.35;
-  const s = (p.seed | 0) || 1;
+  let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
   ctx.save();
   // Shadow underneath
@@ -1181,7 +1181,7 @@ function drawStrawBed(ctx, px, py, w, h, p) {
 function drawClawMark(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
   const cy = py + h / 2;
-  const s = (p.seed | 0) || 1;
+  let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
   const ang = rnd() * Math.PI * 2;
   ctx.save();
@@ -1229,7 +1229,7 @@ function drawArmor(ctx, px, py, w, h, p) {
 function drawBones(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
   const cy = py + h / 2;
-  const s = (p.seed | 0) || 1;
+  let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
   ctx.save();
   ctx.shadowBlur = 0;
