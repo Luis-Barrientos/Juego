@@ -220,7 +220,7 @@ function tryTreePrayer(toast) {
   if (!room || !room.isClaroSolar) return false;
   const trunkX = room.cx * TILE + TILE / 2;
   const trunkY = room.cy * TILE + TILE / 2;
-  if (Math.hypot(p.x - trunkX, p.y - trunkY) > TILE * 1.8) return false;
+  if (Math.hypot(p.x - trunkX, p.y - trunkY) > TILE * 2.2) return false;
 
   state.claroSolarEntered = true;
   grantBlessing('maxhp');
@@ -238,7 +238,9 @@ function tryTreePrayer(toast) {
 /** Draw "[E] VENERAR EL ÁRBOL" near the ancient tree. */
 function drawTreePrompt(ctx) {
   if (state.claroSolarEntered) return;
-  const room = state.currentRoom;
+  const p = state.player;
+  if (!p) return;
+  const room = getRoomAt(state.rooms, p);
   if (!room || !room.isClaroSolar) return;
   const trunkX = room.cx * TILE + TILE / 2;
   const trunkY = room.cy * TILE + TILE / 2;
