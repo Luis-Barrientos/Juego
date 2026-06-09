@@ -284,7 +284,8 @@ export function enemyUpdate(e, dt, hooks) {
   if (e.behavior === 'melee') {
     // Territorial: wolves from the Alpha Lair stop chasing if player leaves
     if ((e.fromAlphaLair || e.fromAlpha) && e.room && e.room !== state.currentRoom) {
-      if (d > 300) { e.state = 'idle'; return; }
+      e.state = 'idle';
+      return;
     }
     if (d > e.range + p.r) {
       const sp = e.speed;
@@ -431,9 +432,10 @@ function alphaWolfAI(e, dt, dx, dy, d, hooks) {
   // Territorial: if player leaves the room, alpha heals to full and disengages.
   if (e.room && e.room !== state.currentRoom) {
     if (e.hp < e.maxHp) {
-      e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.5 * dt); // fast heal outside room
+      e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.5 * dt);
     }
-    if (d > 400) return; // stop chasing far away
+    e.state = 'idle';
+    return;
   }
 
   // Howl summon: periodically spawn 2-3 wolves nearby.
