@@ -349,7 +349,7 @@ export function generateDungeon(floor, seed, biome) {
     placeRoomWallDecorations(map, rooms, rng, decorations, lights,
       ['plaque', 'crack', 'sconceBroken']);
     if (forceAlphaLair || rng() < 0.55) {
-      const starRooms = rooms.filter(r => r.isLarge);
+      const starRooms = rooms.filter(r => r.isLarge && !r.isStartRoom && !r.isStairsRoom);
       if (starRooms.length) {
         const lairRoom = starRooms[Math.floor(rng() * starRooms.length)];
         placeAlphaLair(lairRoom, map, rng, lights);
@@ -2834,36 +2834,47 @@ function placeAlphaLair(room, map, rng, lights) {
 
   const cx = room.cx, cy = room.cy;
 
-  // 1. Dark floor dais at centre (3×3 walkable platform)
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const tx = cx + dx, ty = cy + dy;
-      if (map[ty] && map[ty][tx] === T_FLOOR) {
-        map[ty][tx] = T_FLOOR_DARK;
-      }
+  // 1. Darken the entire room floor to create a lair atmosphere
+  for (let y = room.y; y < room.y + room.h; y++) {
+    for (let x = room.x; x < room.x + room.w; x++) {
+      if (map[y][x] === T_FLOOR) map[y][x] = T_FLOOR_DARK;
     }
   }
 
-  // 2. Four broken pillars at inner corners (solid cover)
+  // 2. Four rubble piles at room corners (solid, marks the arena boundary)
+  const rubblePos = [
+    { tx: room.x + 1,          ty: room.y + 1 },
+    { tx: room.x + room.w - 2, ty: room.y + 1 },
+    { tx: room.x + 1,          ty: room.y + room.h - 2 },
+    { tx: room.x + room.w - 2, ty: room.y + room.h - 2 },
+  ];
+  for (const rp of rubblePos) {
+    if (map[rp.ty] && map[rp.ty][rp.tx] === T_FLOOR_DARK) {
+      map[rp.ty][rp.tx] = T_WALL;
+    }
+  }
+
+  // 3. Four broken pillars at mid-wall positions (gameplay cover)
   const pillarPos = [
-    { tx: room.x + 2,          ty: room.y + 2 },
-    { tx: room.x + room.w - 3, ty: room.y + 2 },
-    { tx: room.x + 2,          ty: room.y + room.h - 3 },
-    { tx: room.x + room.w - 3, ty: room.y + room.h - 3 },
+    { tx: room.x + 2,          ty: cy },
+    { tx: room.x + room.w - 3, ty: cy },
+    { tx: cx,                  ty: room.y + 2 },
+    { tx: cx,                  ty: room.y + room.h - 3 },
   ];
   for (const p of pillarPos) {
-    if (map[p.ty] && map[p.ty][p.tx] === T_FLOOR) {
+    if (map[p.ty] && map[p.ty][p.tx] === T_FLOOR_DARK &&
+        !isNearDoor(map, p.tx, p.ty, room)) {
       map[p.ty][p.tx] = T_WALL;
     }
   }
 
-  // 3. Two campfire braziers at mid-left / mid-right
+  // 4. Two campfire braziers at mid-left / mid-right
   const brazierPos = [
     { tx: room.x + 1, ty: cy },
     { tx: room.x + room.w - 2, ty: cy },
   ];
   for (const bp of brazierPos) {
-    if (map[bp.ty] && map[bp.ty][bp.tx] === T_FLOOR &&
+    if (map[bp.ty] && map[bp.ty][bp.tx] === T_FLOOR_DARK &&
         !isNearDoor(map, bp.tx, bp.ty, room)) {
       lights.push({
         type: 'campfire',
@@ -2875,7 +2886,7 @@ function placeAlphaLair(room, map, rng, lights) {
     }
   }
 
-  // 4. Fixed spawn positions (consumed by populateFloor in enemies.js)
+  // 5. Fixed spawn positions (consumed by populateFloor in enemies.js)
   room.alphaLairSpawns = [
     { type: 'alphaWolf', tx: cx,     ty: cy },
     { type: 'wolf',      tx: cx - 2, ty: cy },

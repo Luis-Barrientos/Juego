@@ -17,10 +17,12 @@ export const CHANGELOG = [
   {
     version: '0.9.1',
     date: '2026-06-09',
-    title: 'Guarida del Alfa renovada',
+    title: 'Guarida del Alfa: arena oscura, lobos rediseñados y más mejoras',
     items: [
-      'La Guarida del Alfa se ha rediseñado por completo: ahora es una arena con un pedestal central de piedra oscura, pilares derrumbados para cubrirte y hogueras a los lados.',
-      'El Alfa y sus lobos te esperan desde el principio colocados alrededor del pedestal, listos para el combate en cuanto entres.',
+      'La Guarida del Alfa se ha renovado por completo: ahora toda la sala tiene suelo oscuro de guarida, con escombros en las esquinas y cuatro pilares rotos para cubrirte durante el combate.',
+      'Los lobos se han redibujado desde cero: ahora tienen patas, hocico, orejas puntiagudas y cola, parecen animales de verdad.',
+      'El Alfa Lobo es más rápido y ataca más a menudo cuerpo a cuerpo. Sus ojos brillan en ámbar y se vuelven rojos cuando se enfurece.',
+      'Corregido: la Guarida ya no puede aparecer en la sala de las escaleras ni en la sala de inicio.',
     ],
   },
   {

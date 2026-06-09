@@ -53,10 +53,10 @@ export const ENEMY_TYPES = {
    * enrages at low HP with projectile fan and nova ring.
    */
   alphaWolf: {
-    hp: 220, dmg: 24, speed: 65, r: 16,
+    hp: 220, dmg: 24, speed: 80, r: 16,
     color: '#3a2a1a', glow: '#a08050',
     score: 280, gold: [50, 90],
-    range: 32, attackCool: 0.9, behavior: 'alphaWolf',
+    range: 48, attackCool: 0.7, behavior: 'alphaWolf',
     /** Howl summon cooldown (seconds). */
     howlCool: 8.0,
     /** Min HP fraction to trigger enrage. */
@@ -821,59 +821,125 @@ export function drawEnemy(ctx, e) {
     ctx.fillRect(x - 2, y - 1, 1, 1);
     ctx.fillRect(x + 1, y - 1, 1, 1);
   } else if (e.type === 'wolf') {
-    // Quadruped wolf: elongated body, pointed ears, bushy tail.
+    // Wolf: four-legged canine with pointed snout, pricked ears and bushy tail.
+    ctx.shadowColor = e.glow; ctx.shadowBlur = 8;
+    const wr = e.r;
+    // Back legs (behind body, darker)
+    ctx.fillStyle = flash ? '#ddd' : '#3a2a1a';
+    ctx.fillRect(x - wr * 0.5, y + wr * 0.1 + bob, 3, wr * 0.8);
+    ctx.fillRect(x + wr * 0.3, y + wr * 0.1 + bob, 3, wr * 0.8);
+    // Tail (bushy, curved down)
     ctx.fillStyle = flash ? '#fff' : e.color;
-    ctx.shadowColor = e.glow; ctx.shadowBlur = 10;
-    // Body
     ctx.beginPath();
-    ctx.ellipse(x, y + bob, e.r * 1.3, e.r * 0.7, 0, 0, Math.PI * 2);
+    ctx.moveTo(x - wr * 1.0, y - wr * 0.1 + bob);
+    ctx.quadraticCurveTo(x - wr * 1.8, y - wr * 0.9 + bob, x - wr * 1.2, y - wr * 0.1 + bob);
     ctx.fill();
-    // Head
+    // Body (elongated ellipse)
     ctx.beginPath();
-    ctx.ellipse(x + e.r * 1.1, y - e.r * 0.2 + bob, e.r * 0.7, e.r * 0.6, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, y + bob, wr * 1.2, wr * 0.55, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Ears
+    // Front legs (over body, darker)
+    ctx.fillStyle = flash ? '#ddd' : '#3a2a1a';
+    ctx.fillRect(x - wr * 0.8, y + wr * 0.1 + bob, 3, wr * 0.8);
+    ctx.fillRect(x + wr * 0.7, y + wr * 0.1 + bob, 3, wr * 0.8);
+    // Neck
+    ctx.fillStyle = flash ? '#fff' : e.color;
+    ctx.beginPath();
+    ctx.ellipse(x + wr * 0.8, y - wr * 0.1 + bob, wr * 0.4, wr * 0.5, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Head (pointed snout)
+    ctx.beginPath();
+    ctx.ellipse(x + wr * 1.2, y - wr * 0.15 + bob, wr * 0.65, wr * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Snout
+    ctx.beginPath();
+    ctx.ellipse(x + wr * 1.7, y + wr * 0.05 + bob, wr * 0.3, wr * 0.22, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Nose tip
+    ctx.fillStyle = '#1a0a0a';
+    ctx.fillRect(x + wr * 1.9, y + wr * 0.05 + bob, 2, 2);
+    // Ears (triangles, pricked)
     ctx.fillStyle = flash ? '#fff' : '#4a3a2a';
-    ctx.beginPath(); ctx.moveTo(x + e.r * 1.3, y - e.r * 0.7 + bob); ctx.lineTo(x + e.r * 1.5, y - e.r * 1.3 + bob); ctx.lineTo(x + e.r * 1.7, y - e.r * 0.7 + bob); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(x + e.r * 1.5, y - e.r * 0.7 + bob); ctx.lineTo(x + e.r * 1.7, y - e.r * 1.3 + bob); ctx.lineTo(x + e.r * 1.9, y - e.r * 0.7 + bob); ctx.closePath(); ctx.fill();
-    // Tail
-    ctx.beginPath(); ctx.moveTo(x - e.r * 1.2, y + bob); ctx.lineTo(x - e.r * 1.8, y - e.r * 0.5 + bob); ctx.lineTo(x - e.r * 1.5, y + e.r * 0.3 + bob); ctx.closePath(); ctx.fill();
-    // Eyes
+    ctx.beginPath(); ctx.moveTo(x + wr * 1.1, y - wr * 0.6 + bob); ctx.lineTo(x + wr * 1.3, y - wr * 1.1 + bob); ctx.lineTo(x + wr * 1.5, y - wr * 0.5 + bob); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + wr * 1.4, y - wr * 0.5 + bob); ctx.lineTo(x + wr * 1.6, y - wr * 1.0 + bob); ctx.lineTo(x + wr * 1.8, y - wr * 0.4 + bob); ctx.closePath(); ctx.fill();
+    // Eyes (yellow glow)
     ctx.fillStyle = '#ff0';
     ctx.shadowColor = '#ff0'; ctx.shadowBlur = 6;
-    ctx.fillRect(x + e.r * 1.4, y - e.r * 0.3 + bob, 1.5, 1.5);
+    ctx.fillRect(x + wr * 1.3, y - wr * 0.2 + bob, 2, 1.5);
+    ctx.fillRect(x + wr * 1.3, y + wr * 0.1 + bob, 2, 1.5);
+    // Feet
+    ctx.fillStyle = flash ? '#ddd' : '#2a1a0a';
+    ctx.fillRect(x - wr * 0.5, y + wr * 0.85 + bob, 4, 2);
+    ctx.fillRect(x + wr * 0.3, y + wr * 0.85 + bob, 4, 2);
+    ctx.fillRect(x - wr * 0.8, y + wr * 0.85 + bob, 4, 2);
+    ctx.fillRect(x + wr * 0.7, y + wr * 0.85 + bob, 4, 2);
   } else if (e.type === 'alphaWolf') {
-    // Larger, scarred alpha with glowing eyes and battle-worn fur.
+    // Alpha Wolf: larger, scarred, with a dark mane and blazing eyes.
+    ctx.shadowColor = e.glow; ctx.shadowBlur = 14;
+    const ar = e.r;
+    // Back legs
+    ctx.fillStyle = flash ? '#ccc' : '#2a1a0a';
+    ctx.fillRect(x - ar * 0.5, y + ar * 0.15 + bob, 4, ar * 0.9);
+    ctx.fillRect(x + ar * 0.4, y + ar * 0.15 + bob, 4, ar * 0.9);
+    // Tail (large bushy)
     ctx.fillStyle = flash ? '#fff' : e.color;
-    ctx.shadowColor = e.glow; ctx.shadowBlur = 16;
-    // Body (larger, more muscular)
     ctx.beginPath();
-    ctx.ellipse(x, y + bob, e.r * 1.4, e.r * 0.8, 0, 0, Math.PI * 2);
+    ctx.moveTo(x - ar * 1.1, y - ar * 0.1 + bob);
+    ctx.quadraticCurveTo(x - ar * 2.0, y - ar * 1.0 + bob, x - ar * 1.3, y - ar * 0.1 + bob);
     ctx.fill();
-    // Head
+    // Body (larger, muscular)
     ctx.beginPath();
-    ctx.ellipse(x + e.r * 1.2, y - e.r * 0.1 + bob, e.r * 0.8, e.r * 0.7, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, y + bob, ar * 1.35, ar * 0.7, 0, 0, Math.PI * 2);
     ctx.fill();
+    // Front legs
+    ctx.fillStyle = flash ? '#ccc' : '#2a1a0a';
+    ctx.fillRect(x - ar * 0.9, y + ar * 0.15 + bob, 4, ar * 0.9);
+    ctx.fillRect(x + ar * 0.8, y + ar * 0.15 + bob, 4, ar * 0.9);
+    // Neck
+    ctx.fillStyle = flash ? '#fff' : e.color;
+    ctx.beginPath();
+    ctx.ellipse(x + ar * 0.9, y - ar * 0.1 + bob, ar * 0.5, ar * 0.55, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Mane / scruff (ring around neck)
+    ctx.fillStyle = flash ? '#fff' : '#4a3a2a';
+    ctx.beginPath();
+    ctx.ellipse(x + ar * 0.5, y - ar * 0.35 + bob, ar * 0.8, ar * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Head (larger, broader)
+    ctx.fillStyle = flash ? '#fff' : e.color;
+    ctx.beginPath();
+    ctx.ellipse(x + ar * 1.3, y - ar * 0.1 + bob, ar * 0.75, ar * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Snout (thicker)
+    ctx.beginPath();
+    ctx.ellipse(x + ar * 1.9, y + ar * 0.1 + bob, ar * 0.35, ar * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Nose
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(x + ar * 2.1, y + ar * 0.1 + bob, 3, 3);
     // Ears (torn)
     ctx.fillStyle = flash ? '#fff' : '#2a1a0a';
-    ctx.beginPath(); ctx.moveTo(x + e.r * 1.4, y - e.r * 0.8 + bob); ctx.lineTo(x + e.r * 1.7, y - e.r * 1.5 + bob); ctx.lineTo(x + e.r * 2.0, y - e.r * 0.8 + bob); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(x + e.r * 1.6, y - e.r * 0.8 + bob); ctx.lineTo(x + e.r * 1.9, y - e.r * 1.5 + bob); ctx.lineTo(x + e.r * 2.2, y - e.r * 0.8 + bob); ctx.closePath(); ctx.fill();
-    // Mane / scruff
-    ctx.fillStyle = flash ? '#fff' : '#4a3a2a';
-    ctx.beginPath(); ctx.ellipse(x + e.r * 0.3, y - e.r * 0.3 + bob, e.r * 0.9, e.r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
-    // Tail (bushy)
-    ctx.beginPath(); ctx.moveTo(x - e.r * 1.3, y + bob); ctx.lineTo(x - e.r * 2.0, y - e.r * 0.6 + bob); ctx.lineTo(x - e.r * 1.6, y + e.r * 0.4 + bob); ctx.closePath(); ctx.fill();
-    // Eyes (glowing amber/red)
-    ctx.fillStyle = e.hp <= e.maxHp * 0.5 ? '#ff3030' : '#ffaa00';
-    ctx.shadowColor = e.hp <= e.maxHp * 0.5 ? '#ff3030' : '#ffaa00'; ctx.shadowBlur = 10;
-    ctx.fillRect(x + e.r * 1.5, y - e.r * 0.2 + bob, 2, 2);
-    ctx.fillRect(x + e.r * 1.5, y + e.r * 0.1 + bob, 2, 2);
-    // Scars
+    ctx.beginPath(); ctx.moveTo(x + ar * 1.2, y - ar * 0.7 + bob); ctx.lineTo(x + ar * 1.5, y - ar * 1.3 + bob); ctx.lineTo(x + ar * 1.8, y - ar * 0.6 + bob); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + ar * 1.5, y - ar * 0.6 + bob); ctx.lineTo(x + ar * 1.8, y - ar * 1.2 + bob); ctx.lineTo(x + ar * 2.1, y - ar * 0.5 + bob); ctx.closePath(); ctx.fill();
+    // Eyes (amber, turn red when enraged)
+    const enraged = e.hp <= e.maxHp * 0.5;
+    ctx.fillStyle = enraged ? '#ff3030' : '#ffaa00';
+    ctx.shadowColor = enraged ? '#ff3030' : '#ffaa00'; ctx.shadowBlur = 10;
+    ctx.fillRect(x + ar * 1.5, y - ar * 0.25 + bob, 3, 3);
+    ctx.fillRect(x + ar * 1.5, y + ar * 0.15 + bob, 3, 3);
+    // Scars on face and body
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
     ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(x + e.r * 0.8, y - e.r * 0.2 + bob); ctx.lineTo(x + e.r * 1.6, y + e.r * 0.3 + bob); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x - e.r * 0.5, y + e.r * 0.2 + bob); ctx.lineTo(x + e.r * 0.5, y + e.r * 0.6 + bob); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + ar * 0.8, y - ar * 0.2 + bob); ctx.lineTo(x + ar * 1.7, y + ar * 0.4 + bob); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - ar * 0.3, y + ar * 0.3 + bob); ctx.lineTo(x + ar * 0.6, y + ar * 0.7 + bob); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + ar * 1.3, y - ar * 0.7 + bob); ctx.lineTo(x + ar * 2.0, y - ar * 0.2 + bob); ctx.stroke();
+    // Feet
+    ctx.fillStyle = flash ? '#ccc' : '#1a0a00';
+    ctx.fillRect(x - ar * 0.5, y + ar * 0.95 + bob, 5, 3);
+    ctx.fillRect(x + ar * 0.4, y + ar * 0.95 + bob, 5, 3);
+    ctx.fillRect(x - ar * 0.9, y + ar * 0.95 + bob, 5, 3);
+    ctx.fillRect(x + ar * 0.8, y + ar * 0.95 + bob, 5, 3);
   } else if (e.type === 'boss') {
     ctx.shadowColor = e.glow; ctx.shadowBlur = 24;
     ctx.fillStyle = flash ? '#fff' : (e.phase === 2 ? '#801010' : e.color);
