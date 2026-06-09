@@ -776,6 +776,10 @@ function drawLibraryProp(ctx, p) {
   if (p.kind === 'tomeCircle')   { drawTomeCircle(ctx, px, py, w, h, p);   return; }
   if (p.kind === 'tomeBookPile') { drawTomeBookPile(ctx, px, py, w, h, p); return; }
   if (p.kind === 'libraryRuneMark') { drawLibraryRuneMark(ctx, px, py, w, h, p); return; }
+  if (p.kind === 'strawBed')     { drawStrawBed(ctx, px, py, w, h, p);     return; }
+  if (p.kind === 'clawMark')     { drawClawMark(ctx, px, py, w, h, p);     return; }
+  if (p.kind === 'armor')        { drawArmor(ctx, px, py, w, h, p);        return; }
+  if (p.kind === 'bones')        { drawBones(ctx, px, py, w, h, p);        return; }
   if (p.kind === 'constellationRing') { drawConstellationRing(ctx, px, py, w, h, p); return; }
   // Key dais and archive pedestal are floor decorations — same early
   // return as the constellation ring so the underlying floor texture
@@ -1108,6 +1112,120 @@ function drawLibraryRuneMark(ctx, px, py, w, h, p) {
     ctx.lineWidth = 1.2;
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+/* ───────────────── Alpha Lair floor decorations ───────────────── */
+
+/**
+ * Straw bed — a golden-brown oval on the floor. The Alpha's bed (w=3)
+ * is larger and more prominent; smaller beds (w=2) dot the room.
+ */
+function drawStrawBed(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  const rx = w * 0.4;
+  const ry = h * 0.35;
+  ctx.save();
+  // Dark patch underneath
+  ctx.fillStyle = 'rgba(20, 14, 4, 0.6)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 1, rx + 1, ry + 1, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Straw body
+  ctx.fillStyle = p.large ? '#b89840' : '#a08030';
+  ctx.shadowColor = '#806020'; ctx.shadowBlur = 4;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Straw texture — short lines
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#907020';
+  ctx.lineWidth = 0.8;
+  const s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  const count = p.large ? 12 : 6;
+  for (let i = 0; i < count; i++) {
+    const ax = cx + (rnd() - 0.5) * rx * 1.2;
+    const ay = cy + (rnd() - 0.5) * ry * 1.2;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax + (rnd() - 0.5) * 4, ay + (rnd() - 0.5) * 3);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Claw marks — three parallel scratches on the floor, dark reddish-brown.
+ */
+function drawClawMark(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  const s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  const ang = rnd() * Math.PI * 2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(ang);
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(60, 20, 10, 0.7)';
+  ctx.lineWidth = 1.2;
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * 2, 0);
+    ctx.quadraticCurveTo(i * 2 + 1, -4, i * 2 + 2, -8);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Scattered armour piece — a metallic grey breastplate/helmet silhouette.
+ */
+function drawArmor(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  ctx.save();
+  ctx.shadowBlur = 0;
+  // Base shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(cx - 5, cy - 3, 10, 6);
+  // Armour body
+  ctx.fillStyle = '#6a6a7a';
+  ctx.fillRect(cx - 4, cy - 2, 8, 4);
+  // Highlight
+  ctx.fillStyle = '#8888a0';
+  ctx.fillRect(cx - 3, cy - 1, 3, 2);
+  ctx.fillRect(cx + 1, cy - 1, 2, 2);
+  // Dark trim
+  ctx.fillStyle = '#3a3a4a';
+  ctx.fillRect(cx - 4, cy - 2, 8, 1);
+  ctx.restore();
+}
+
+/**
+ * Animal bones — small white/grey bone shapes on the floor.
+ */
+function drawBones(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h / 2;
+  const s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  ctx.save();
+  ctx.shadowBlur = 0;
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(cx - 4, cy - 2, 8, 4);
+  // Bone
+  ctx.fillStyle = '#c8c0b0';
+  const ang = rnd() * Math.PI * 2;
+  ctx.translate(cx, cy);
+  ctx.rotate(ang);
+  ctx.fillRect(-3, -1, 6, 2);
+  // Bone knobs at ends
+  ctx.fillRect(-4, -2, 2, 4);
+  ctx.fillRect(2, -2, 2, 4);
   ctx.restore();
 }
 

@@ -352,7 +352,7 @@ export function generateDungeon(floor, seed, biome) {
       const starRooms = rooms.filter(r => r.isLarge && !r.isStartRoom && !r.isStairsRoom);
       if (starRooms.length) {
         const lairRoom = starRooms[Math.floor(rng() * starRooms.length)];
-        placeAlphaLair(lairRoom, map, rng, lights);
+        placeAlphaLair(lairRoom, map, rng, lights, libraryProps);
       }
     }
   }
@@ -2828,25 +2828,27 @@ export function isBlocked(map, x, y, r) {
  *   • Fixed spawn positions for Alpha + 3 wolves on the room object
  * @private
  */
-function placeAlphaLair(room, map, rng, lights) {
+function placeAlphaLair(room, map, rng, lights, props) {
   if (!room) return;
   room.isAlphaLair = true;
 
   const cx = room.cx, cy = room.cy;
+  const rx = room.x, ry = room.y, rw = room.w, rh = room.h;
+  const seed = Math.floor(rng() * 1e9);
 
   // 1. Darken the entire room floor to create a lair atmosphere
-  for (let y = room.y; y < room.y + room.h; y++) {
-    for (let x = room.x; x < room.x + room.w; x++) {
+  for (let y = ry; y < ry + rh; y++) {
+    for (let x = rx; x < rx + rw; x++) {
       if (map[y][x] === T_FLOOR) map[y][x] = T_FLOOR_DARK;
     }
   }
 
-  // 2. Four rubble piles at room corners (solid, marks the arena boundary)
+  // 2. Four rubble piles at room corners (solid, marks arena boundary)
   const rubblePos = [
-    { tx: room.x + 1,          ty: room.y + 1 },
-    { tx: room.x + room.w - 2, ty: room.y + 1 },
-    { tx: room.x + 1,          ty: room.y + room.h - 2 },
-    { tx: room.x + room.w - 2, ty: room.y + room.h - 2 },
+    { tx: rx + 1,          ty: ry + 1 },
+    { tx: rx + rw - 2, ty: ry + 1 },
+    { tx: rx + 1,          ty: ry + rh - 2 },
+    { tx: rx + rw - 2, ty: ry + rh - 2 },
   ];
   for (const rp of rubblePos) {
     if (map[rp.ty] && map[rp.ty][rp.tx] === T_FLOOR_DARK) {
@@ -2856,10 +2858,10 @@ function placeAlphaLair(room, map, rng, lights) {
 
   // 3. Four broken pillars at mid-wall positions (gameplay cover)
   const pillarPos = [
-    { tx: room.x + 2,          ty: cy },
-    { tx: room.x + room.w - 3, ty: cy },
-    { tx: cx,                  ty: room.y + 2 },
-    { tx: cx,                  ty: room.y + room.h - 3 },
+    { tx: rx + 2,      ty: cy },
+    { tx: rx + rw - 3, ty: cy },
+    { tx: cx,          ty: ry + 2 },
+    { tx: cx,          ty: ry + rh - 3 },
   ];
   for (const p of pillarPos) {
     if (map[p.ty] && map[p.ty][p.tx] === T_FLOOR_DARK &&
@@ -2870,8 +2872,8 @@ function placeAlphaLair(room, map, rng, lights) {
 
   // 4. Two campfire braziers at mid-left / mid-right
   const brazierPos = [
-    { tx: room.x + 1, ty: cy },
-    { tx: room.x + room.w - 2, ty: cy },
+    { tx: rx + 1, ty: cy },
+    { tx: rx + rw - 2, ty: cy },
   ];
   for (const bp of brazierPos) {
     if (map[bp.ty] && map[bp.ty][bp.tx] === T_FLOOR_DARK &&
@@ -2886,7 +2888,91 @@ function placeAlphaLair(room, map, rng, lights) {
     }
   }
 
-  // 5. Fixed spawn positions (consumed by populateFloor in enemies.js)
+  // 5. Floor decorations — lair atmosphere (guard-room vestiges)
+  //    All are purely visual, drawn via libraryProps.
+
+  // 5a. Alpha's large straw bed at centre (3×1)
+  if (props) {
+    props.push({
+      kind: 'strawBed',
+      tx: cx - 1, ty: cy, w: 3, h: 1,
+      seed: seed + 1, large: true,
+    });
+
+    // 5b. Smaller scattered straw beds (sleeping spots for the pack)
+    const smallBeds = [
+      { tx: cx - 3, ty: cy + 2, w: 2, h: 1 },
+      { tx: cx + 2, ty: cy - 3, w: 2, h: 1 },
+      { tx: cx - 4, ty: cy - 2, w: 2, h: 1 },
+      { tx: cx + 3, ty: cy + 2, w: 2, h: 1 },
+    ];
+    for (let i = 0; i < smallBeds.length; i++) {
+      const b = smallBeds[i];
+      if (map[b.ty] && map[b.ty][b.tx] === T_FLOOR_DARK) {
+        props.push({
+          kind: 'strawBed',
+          tx: b.tx, ty: b.ty, w: b.w, h: b.h,
+          seed: seed + 10 + i, large: false,
+        });
+      }
+    }
+
+    // 5c. Claw marks on the open floor
+    const clawPos = [
+      { tx: cx - 1, ty: cy - 1 },
+      { tx: cx + 1, ty: cy + 1 },
+      { tx: cx - 3, ty: cy },
+      { tx: cx + 3, ty: cy + 1 },
+      { tx: cx - 2, ty: cy - 2 },
+    ];
+    for (let i = 0; i < clawPos.length; i++) {
+      const c = clawPos[i];
+      if (map[c.ty] && map[c.ty][c.tx] === T_FLOOR_DARK) {
+        props.push({
+          kind: 'clawMark',
+          tx: c.tx, ty: c.ty, w: 1, h: 1,
+          seed: seed + 20 + i,
+        });
+      }
+    }
+
+    // 5d. Scattered armour pieces (guard-room remnants)
+    const armorPos = [
+      { tx: rx + 3, ty: ry + 1 },
+      { tx: rx + rw - 4, ty: ry + rh - 2 },
+      { tx: cx + 2, ty: ry + 1 },
+    ];
+    for (let i = 0; i < armorPos.length; i++) {
+      const a = armorPos[i];
+      if (map[a.ty] && map[a.ty][a.tx] === T_FLOOR_DARK) {
+        props.push({
+          kind: 'armor',
+          tx: a.tx, ty: a.ty, w: 2, h: 1,
+          seed: seed + 30 + i,
+        });
+      }
+    }
+
+    // 5e. Animal bones scattered
+    const bonePos = [
+      { tx: cx - 2, ty: cy + 1 },
+      { tx: cx + 1, ty: cy + 2 },
+      { tx: rx + 4, ty: cy - 1 },
+      { tx: cx - 1, ty: ry + 2 },
+    ];
+    for (let i = 0; i < bonePos.length; i++) {
+      const b = bonePos[i];
+      if (map[b.ty] && map[b.ty][b.tx] === T_FLOOR_DARK) {
+        props.push({
+          kind: 'bones',
+          tx: b.tx, ty: b.ty, w: 1, h: 1,
+          seed: seed + 40 + i,
+        });
+      }
+    }
+  }
+
+  // 6. Fixed spawn positions (consumed by populateFloor in enemies.js)
   room.alphaLairSpawns = [
     { type: 'alphaWolf', tx: cx,     ty: cy },
     { type: 'wolf',      tx: cx - 2, ty: cy },
