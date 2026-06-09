@@ -156,6 +156,7 @@ function buildFloor(floor) {
   state._whisperTimer = 6 + Math.random() * 6;
   state._creakTimer   = 8 + Math.random() * 14;
 
+  state.claroSolarEntered = false;
   resetAlphaLair();
   resetChallenge();
   resetLibraryEvent();
@@ -203,6 +204,20 @@ function goToNextFloor() {
   } else {
     buildFloor(newFloor);
   }
+}
+
+/** Sunbeam Shrine: on first entry, grant maxhp + reveal minimap. */
+function updateClaroSolar(toast) {
+  if (state.claroSolarEntered) return;
+  const room = state.currentRoom;
+  if (!room || !room.isClaroSolar) return;
+  state.claroSolarEntered = true;
+  grantBlessing('maxhp');
+  for (const r of state.rooms) {
+    const id = `${r.x},${r.y},${r.w},${r.h}`;
+    state.roomsVisited.add(id);
+  }
+  toast && toast('La luz del sol te infunde nueva fuerza. +30 HP máximo. El mapa se ha revelado.');
 }
 
 /** Apply an upgrade effect to the player (no UI side-effects). */
@@ -493,16 +508,15 @@ function applySunbeamRegen(dt) {
   for (const sb of state.sunbeams) {
     if (sb.kind === 'thin') continue;
     if (!sb.shape) continue;
-    // Quick AABB reject so we don't run point-in-polygon every frame
-    // against every beam.
     const halfBBox = sb.length * 0.5 + sb.splay + 8;
     const dx = p.x - sb.x;
     const dy = p.y - sb.y;
     if (dx < -halfBBox || dx > halfBBox)   continue;
     if (dy < -10        || dy > sb.h + 10) continue;
     if (pointInPolygon(dx, dy, sb.shape)) {
-      p.hp = Math.min(p.maxHp, p.hp + 4 * dt);
-      return; // one beam is enough
+      const rate = sb.kind === 'shrine' ? 12 : 4;
+      p.hp = Math.min(p.maxHp, p.hp + rate * dt);
+      return;
     }
   }
 }
@@ -652,6 +666,7 @@ function update(dt) {
   updateGrandTome(dt, showToast, spawnGrandTomeRewards);
   updateKeyRoom(dt, showToast);
   updateAlphaLair(dt, showToast);
+  updateClaroSolar(showToast);
   updateAmbient(dt);
   updateCamera();
   updateHUD();

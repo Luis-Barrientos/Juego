@@ -94,6 +94,7 @@ export function generateDungeon(floor, seed, biome) {
   const forceKeyPair     = !!FORCE.keyRoom || !!FORCE.keyRoomKill || !!FORCE.keyRoomRune || !!FORCE.keyRoomCandle || !!FORCE.archive;
   const forceKeyVariant  = FORCE.keyRoomRune ? 'rune' : FORCE.keyRoomKill ? 'kill' : FORCE.keyRoomCandle ? 'candle' : null;
   const forceAlphaLair   = !!FORCE.alphaLair;
+  const forceClaroSolar  = !!FORCE.claroSolar;
 
   // Sala del Gran Tomo first: it's smaller (11×9) and easier to fit, so
   // reserving it before the Great Library guarantees it never gets
@@ -348,8 +349,16 @@ export function generateDungeon(floor, seed, biome) {
     placePuddles(map, rooms, rng, puddles);
     placeRoomWallDecorations(map, rooms, rng, decorations, lights,
       ['plaque', 'crack', 'sconceBroken']);
-    if (forceAlphaLair || rng() < 0.55) {
+    // Claro Solar: safe room with maxhp blessing + full map reveal
+    if (forceClaroSolar || rng() < 0.55) {
       const starRooms = rooms.filter(r => r.isLarge && !r.isStartRoom && !r.isStairsRoom);
+      if (starRooms.length) {
+        const shrineRoom = starRooms[Math.floor(rng() * starRooms.length)];
+        placeClaroSolar(shrineRoom, map, rng, sunbeams);
+      }
+    }
+    if (forceAlphaLair || rng() < 0.55) {
+      const starRooms = rooms.filter(r => r.isLarge && !r.isStartRoom && !r.isStairsRoom && !r.isClaroSolar);
       if (starRooms.length) {
         const lairRoom = starRooms[Math.floor(rng() * starRooms.length)];
         placeAlphaLair(lairRoom, map, rng, lights, libraryProps);
@@ -2828,6 +2837,33 @@ export function isBlocked(map, x, y, r) {
  *   • Fixed spawn positions for Alpha + 3 wolves on the room object
  * @private
  */
+function placeClaroSolar(room, map, rng, sunbeams) {
+  if (!room) return;
+  room.isClaroSolar = true;
+
+  const rx = room.x, ry = room.y, rw = room.w, rh = room.h;
+
+  // Giant sunbeam covering ~80 % of the room
+  const lengthRatio = 0.75 + rng() * 0.15;
+  const length = Math.max(4, Math.floor(rw * lengthRatio)) * TILE;
+  const slack = (rw * TILE - length) * 0.5;
+  const startX = rx * TILE + slack + (rng() - 0.5) * slack * 0.6;
+  const h = rh * TILE;
+  const sb = {
+    kind: 'shrine',
+    x: startX + length / 2,
+    y: ry * TILE,
+    h,
+    length,
+    splay: TILE * (0.8 + rng() * 0.6),
+    seed: Math.floor(rng() * 1e9),
+    wallRow: ry - 1,
+  };
+  sb.shape = buildBeamShape(sb, rng);
+  sb.crack = buildCrackPath(sb, rng);
+  sunbeams.push(sb);
+}
+
 function placeAlphaLair(room, map, rng, lights, props) {
   if (!room) return;
   room.isAlphaLair = true;

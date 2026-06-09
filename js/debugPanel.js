@@ -27,6 +27,7 @@ const ROOM_CATALOGUE = {
     { label: 'Entrada (start)',     match: r => r.isStartRoom },
     { label: 'Escalera (stairs)',   match: r => r.isStairsRoom },
     { label: 'Guarida del Alfa',    match: r => r.isAlphaLair, force: 'alphaLair' },
+    { label: 'Claro Solar',         match: r => r.isClaroSolar, force: 'claroSolar' },
     { label: 'Sala grande (rayo)',  match: r => r.isLarge && !r.isStartRoom && !r.isStairsRoom },
   ],
   library: [

@@ -31,6 +31,7 @@ export const state = {
   leafSpawners: [],       // library ambient leaf / paper-scrap anchors
   roomsVisited: new Set(), // room ids the player has entered
   alphaLair: null,        // Ruins floor Alpha Wolf lair state
+  claroSolarEntered: false, // Ruins floor Sunbeam Shrine first-entry flag
   _whisperTimer: 0,       // seconds until the next whisper sound
   _creakTimer: 0,         // seconds until the next library wood-creak sound
   cameraX: 0,

@@ -2065,13 +2065,13 @@ function drawCeilingCrack(ctx, sb) {
   const pts = sb.crack;
   if (!pts || pts.length < 2) return;
   const isThin = sb.kind === 'thin';
+  const isShrine = sb.kind === 'shrine';
   ctx.save();
 
-  // Soft glow around the crack so it reads as light leaking through.
-  ctx.shadowColor = isThin ? 'rgba(200, 220, 255, 0.45)' : 'rgba(255, 240, 180, 0.55)';
-  ctx.shadowBlur  = isThin ? 4 : 8;
-  ctx.strokeStyle = isThin ? 'rgba(220, 235, 255, 0.30)' : 'rgba(255, 245, 200, 0.35)';
-  ctx.lineWidth   = isThin ? 2 : 4;
+  ctx.shadowColor = isThin ? 'rgba(200, 220, 255, 0.45)' : isShrine ? 'rgba(255, 248, 200, 0.85)' : 'rgba(255, 240, 180, 0.55)';
+  ctx.shadowBlur  = isThin ? 4 : isShrine ? 16 : 8;
+  ctx.strokeStyle = isThin ? 'rgba(220, 235, 255, 0.30)' : isShrine ? 'rgba(255, 252, 220, 0.60)' : 'rgba(255, 245, 200, 0.35)';
+  ctx.lineWidth   = isThin ? 2 : isShrine ? 7 : 4;
   ctx.lineCap     = 'round';
   ctx.lineJoin    = 'round';
   ctx.beginPath();
@@ -2080,22 +2080,22 @@ function drawCeilingCrack(ctx, sb) {
   ctx.stroke();
   ctx.shadowBlur = 0;
 
-  // Dark fissure body (the actual gap in the stone).
   ctx.strokeStyle = 'rgba(8, 6, 4, 0.95)';
-  ctx.lineWidth   = isThin ? 1.2 : 2.2;
+  ctx.lineWidth   = isThin ? 1.2 : isShrine ? 4 : 2.2;
   ctx.beginPath();
   ctx.moveTo(pts[0][0], pts[0][1]);
   for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
   ctx.stroke();
 
-  // Bright inner highlight — sunlight breaking through.
   ctx.strokeStyle = isThin
     ? 'rgba(220, 240, 255, 0.7)'
-    : 'rgba(255, 248, 210, 0.85)';
-  ctx.lineWidth   = isThin ? 0.6 : 0.9;
+    : isShrine
+      ? 'rgba(255, 252, 230, 1.0)'
+      : 'rgba(255, 248, 210, 0.85)';
+  ctx.lineWidth   = isThin ? 0.6 : isShrine ? 1.8 : 0.9;
   ctx.beginPath();
   ctx.moveTo(pts[0][0], pts[0][1] - 0.4);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1] - 0.4);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1] - (isShrine ? 1.2 : 0.4));
   ctx.stroke();
 
   ctx.restore();
@@ -2557,10 +2557,15 @@ export function drawLighting(ctx) {
       lctx.clip();
 
       const isThin = sb.kind === 'thin';
+      const isShrine = sb.kind === 'shrine';
       const grad = lctx.createLinearGradient(0, sy, 0, sy + sb.h);
       if (isThin) {
         grad.addColorStop(0,    'rgba(255,255,255,0.45)');
         grad.addColorStop(0.6,  'rgba(255,255,255,0.20)');
+        grad.addColorStop(1,    'rgba(255,255,255,0)');
+      } else if (isShrine) {
+        grad.addColorStop(0,    'rgba(255,255,255,1.0)');
+        grad.addColorStop(0.5,  'rgba(255,255,255,0.85)');
         grad.addColorStop(1,    'rgba(255,255,255,0)');
       } else {
         grad.addColorStop(0,    'rgba(255,255,255,0.95)');
@@ -2934,12 +2939,16 @@ export function drawSunbeams(ctx) {
 
     // Main body — warm vertical gradient.
     const isThin = sb.kind === 'thin';
+    const isShrine = sb.kind === 'shrine';
     const grad = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
     if (isThin) {
-      // Cool, delicate, no god-rays or dust — just a sliver of moonlight.
       grad.addColorStop(0,    'rgba(220, 230, 255, 0.18)');
       grad.addColorStop(0.7,  'rgba(220, 230, 255, 0.06)');
       grad.addColorStop(1,    'rgba(220, 230, 255, 0)');
+    } else if (isShrine) {
+      grad.addColorStop(0,    'rgba(255, 248, 200, 0.45)');
+      grad.addColorStop(0.5,  'rgba(255, 240, 180, 0.25)');
+      grad.addColorStop(1,    'rgba(255, 220, 140, 0.00)');
     } else {
       grad.addColorStop(0,    'rgba(255, 240, 180, 0.26)');
       grad.addColorStop(0.55, 'rgba(255, 230, 160, 0.12)');
@@ -2949,16 +2958,15 @@ export function drawSunbeams(ctx) {
     ctx.fillRect(sx - halfBBox, sy, halfBBox * 2, sb.h);
 
     if (!isThin) {
-      // Parallel god-rays: 3 thin vertical bands drifting horizontally so the
-      // beam feels volumetric instead of flat.
-      const rayCount = 3;
+      const rayCount = isShrine ? 5 : 3;
       const rayHalf  = sb.length * 0.42;
       for (let k = 0; k < rayCount; k++) {
         const phase  = (sb.seed * 0.0001) + k * 1.7;
         const drift  = Math.sin(t * 0.35 + phase) * (sb.splay * 0.35);
         const baseX  = sx + ((k - (rayCount - 1) / 2) / (rayCount)) * rayHalf * 1.4 + drift;
         const width  = 6 + Math.sin(t * 0.7 + phase) * 1.5;
-        const alpha  = 0.05 + (Math.sin(t * 0.9 + phase) * 0.5 + 0.5) * 0.06;
+        const baseA  = isShrine ? 0.20 : 0.05;
+        const alpha  = baseA + (Math.sin(t * 0.9 + phase) * 0.5 + 0.5) * (isShrine ? 0.18 : 0.06);
         const rgrad  = ctx.createLinearGradient(0, sy, 0, sy + sb.h);
         rgrad.addColorStop(0,   `rgba(255, 245, 200, ${alpha * 1.3})`);
         rgrad.addColorStop(0.7, `rgba(255, 235, 170, ${alpha * 0.6})`);
@@ -2969,29 +2977,26 @@ export function drawSunbeams(ctx) {
     }
     ctx.restore();
 
-    if (isThin) continue;            // No dust on thin moonbeams.
+    if (isThin) continue;
 
-    // Dust motes — fall with gravity, twinkle, respawn at the crack.
-    // Drawn UNCLIPPED so a few escape past the floor edge for realism.
     const motesHalf = sb.length * 0.5;
-    const nMotes = Math.max(10, Math.floor(sb.length / 10));
+    const nMotes = Math.max(isShrine ? 24 : 10, Math.floor(sb.length / (isShrine ? 5 : 10)));
     for (let i = 0; i < nMotes; i++) {
       const seed   = sb.seed + i * 137;
-      const speed  = 0.05 + ((seed * 11) % 100) / 100 * 0.10;     // 0.05 - 0.15
+      const speed  = 0.05 + ((seed * 11) % 100) / 100 * 0.10;
       const phase  = ((seed % 1000) / 1000 + t * speed) % 1;
-      // Gravity-like easing — accelerates as it falls.
       const eased  = phase * phase;
       const driftX = Math.sin(t * 0.6 + seed) * 5;
       const baseX  = sx - motesHalf + ((seed * 13) % 100) / 100 * (motesHalf * 2);
       const dx = baseX + driftX;
       const dy = sy + eased * sb.h;
-      const size = 1 + ((seed >> 3) % 3) * 0.6;                   // 1 - 2.2 px
-      // Twinkle: alpha modulated by sin + occasional sparkle peak.
+      const size = 1 + ((seed >> 3) % 3) * 0.6;
       const twinkle = 0.45 + 0.55 * (Math.sin(t * 2.3 + seed) * 0.5 + 0.5);
       const isSparkle = ((seed >> 5) % 17) === 0 && phase > 0.3 && phase < 0.7;
-      const a = Math.max(0, twinkle * (1 - eased * 0.5));
+      const brightMul = isShrine ? 1.8 : 1;
+      const a = Math.max(0, Math.min(1, twinkle * (1 - eased * 0.5) * brightMul));
       if (isSparkle) {
-        ctx.fillStyle = `rgba(255, 252, 230, ${Math.min(1, a * 1.6)})`;
+        ctx.fillStyle = `rgba(255, 252, 230, ${a * 1.6})`;
         ctx.fillRect(dx - size, dy - size, size * 2, size * 2);
       } else {
         ctx.fillStyle = `rgba(255, 245, 200, ${a})`;
