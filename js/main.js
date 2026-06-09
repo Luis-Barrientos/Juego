@@ -214,10 +214,10 @@ function updateClaroSolar(toast) {
 /** Tree E-interaction: player presses E near the ancient trunk. */
 function tryTreePrayer(toast) {
   if (state.claroSolarEntered) return false;
-  const room = state.currentRoom;
-  if (!room || !room.isClaroSolar) return false;
   const p = state.player;
   if (!p) return false;
+  const room = getRoomAt(state.rooms, p);
+  if (!room || !room.isClaroSolar) return false;
   const trunkX = room.cx * TILE + TILE / 2;
   const trunkY = room.cy * TILE + TILE / 2;
   if (Math.hypot(p.x - trunkX, p.y - trunkY) > TILE * 1.8) return false;
