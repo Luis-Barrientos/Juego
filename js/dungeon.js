@@ -354,7 +354,7 @@ export function generateDungeon(floor, seed, biome) {
       const starRooms = rooms.filter(r => r.isLarge && !r.isStartRoom && !r.isStairsRoom);
       if (starRooms.length) {
         const shrineRoom = starRooms[Math.floor(rng() * starRooms.length)];
-        placeClaroSolar(shrineRoom, map, rng, sunbeams);
+        placeClaroSolar(shrineRoom, map, rng, sunbeams, libraryProps);
       }
     }
     if (forceAlphaLair || rng() < 0.55) {
@@ -2837,10 +2837,11 @@ export function isBlocked(map, x, y, r) {
  *   • Fixed spawn positions for Alpha + 3 wolves on the room object
  * @private
  */
-function placeClaroSolar(room, map, rng, sunbeams) {
+function placeClaroSolar(room, map, rng, sunbeams, props) {
   if (!room) return;
   room.isClaroSolar = true;
 
+  const cx = room.cx, cy = room.cy;
   const rx = room.x, ry = room.y, rw = room.w, rh = room.h;
 
   // Giant sunbeam covering ~80 % of the room
@@ -2862,6 +2863,19 @@ function placeClaroSolar(room, map, rng, sunbeams) {
   sb.shape = buildBeamShape(sb, rng);
   sb.crack = buildCrackPath(sb, rng);
   sunbeams.push(sb);
+
+  // Large tree at the center of the room — trunk blocks movement
+  if (props) {
+    const trunkTx = cx, trunkTy = cy;
+    if (map[trunkTy] && map[trunkTy][trunkTx] === T_FLOOR) {
+      map[trunkTy][trunkTx] = T_WALL;
+    }
+    props.push({
+      kind: 'tree',
+      tx: cx - 2, ty: cy - 2, w: 5, h: 5,
+      seed: Math.floor(rng() * 1e9),
+    });
+  }
 }
 
 function placeAlphaLair(room, map, rng, lights, props) {

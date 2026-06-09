@@ -780,6 +780,7 @@ function drawLibraryProp(ctx, p) {
   if (p.kind === 'clawMark')     { drawClawMark(ctx, px, py, w, h, p);     return; }
   if (p.kind === 'armor')        { drawArmor(ctx, px, py, w, h, p);        return; }
   if (p.kind === 'bones')        { drawBones(ctx, px, py, w, h, p);        return; }
+  if (p.kind === 'tree')         { drawTree(ctx, px, py, w, h, p);         return; }
   if (p.kind === 'constellationRing') { drawConstellationRing(ctx, px, py, w, h, p); return; }
   // Key dais and archive pedestal are floor decorations — same early
   // return as the constellation ring so the underlying floor texture
@@ -1245,6 +1246,59 @@ function drawBones(ctx, px, py, w, h, p) {
   // Bone knobs at ends
   ctx.fillRect(-4, -2, 2, 4);
   ctx.fillRect(2, -2, 2, 4);
+  ctx.restore();
+}
+
+/** 5×5 tree for the Claro Solar — trunk is T_WALL on the map. */
+function drawTree(ctx, px, py, w, h, p) {
+  const cx = px + w / 2;
+  const cy = py + h * 0.55;
+  const canopyR = Math.min(w, h) * 0.45;
+  let s = (p.seed | 0) || 1;
+  const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
+  ctx.save();
+  ctx.shadowBlur = 0;
+
+  // Shadow under canopy
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(cx + 2, cy + 4, canopyR * 0.9, canopyR * 0.25, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Trunk (visible part above the wall tile)
+  ctx.fillStyle = '#5a3e28';
+  ctx.fillRect(cx - 3, cy - 4, 6, 14);
+
+  // Branches
+  ctx.strokeStyle = '#5a3e28';
+  ctx.lineWidth = 2;
+  const branchDir = [ -0.4, -0.3, 0.3, 0.5 ];
+  for (let i = 0; i < branchDir.length; i++) {
+    const bx = cx + branchDir[i] * 10 + rnd() * 4 - 2;
+    const by = cy - 4 + rnd() * 6;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 2);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+  }
+
+  // Foliage canopy — layered translucent circles
+  const leafColor = '#4a8c3a';
+  const leafBright = '#6ec050';
+  const patches = 8 + Math.floor(rnd() * 5);
+  for (let i = 0; i < patches; i++) {
+    const a = rnd() * Math.PI * 2;
+    const d = rnd() * canopyR * 0.75;
+    const lx = cx + Math.cos(a) * d;
+    const ly = cy - 2 + Math.sin(a) * d * 0.6;
+    const r = 6 + rnd() * 10;
+    ctx.fillStyle = rnd() < 0.4 ? leafBright : leafColor;
+    ctx.globalAlpha = 0.65 + rnd() * 0.25;
+    ctx.beginPath();
+    ctx.arc(lx, ly, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
   ctx.restore();
 }
 
