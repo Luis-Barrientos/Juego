@@ -1250,12 +1250,12 @@ function drawBones(ctx, px, py, w, h, p) {
   ctx.restore();
 }
 
-/** 5×5 tree (back layer) — trunk, branches, shadow. Drawn BEFORE player. */
+/** 7×7 tree (back layer) — trunk, branches, shadow. Drawn BEFORE player. */
 function drawTreeTrunkBack(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
   const cy = py + h - 2;  // Bottom of the tree (ground level)
-  const trunkH = h * 0.65;  // Tall trunk
-  const canopyR = Math.min(w, h) * 0.32;  // Smaller, more proportional canopy
+  const trunkH = h * 0.7;  // Very tall trunk (70% of height)
+  const canopyR = Math.min(w, h) * 0.55;  // Much larger canopy
   let s = (p.seed | 0) || 1;
   const rnd = () => { s = (s * 1664525 + 1013904223) | 0; return ((s >>> 0) / 4294967296); };
 
@@ -1263,62 +1263,62 @@ function drawTreeTrunkBack(ctx, px, py, w, h, p) {
   ctx.shadowBlur = 0;
 
   // Drop shadow under canopy
-  ctx.fillStyle = 'rgba(0,0,0,0.30)';
+  ctx.fillStyle = 'rgba(0,0,0,0.40)';
   ctx.beginPath();
-  ctx.ellipse(cx + 1, cy + 2, canopyR * 0.85, canopyR * 0.22, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 1, cy + 2, canopyR * 0.9, canopyR * 0.3, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // ===== TRUNK (TALL & TAPERED) =====
-  // Main trunk body — tall and tapered, going up from ground
-  ctx.fillStyle = '#4a3222';
+  // ===== MASSIVE THICK TRUNK (30px base, ancient) =====
+  // Main trunk body — VERY thick and tapered, going up from ground
+  ctx.fillStyle = '#3a2818';
   ctx.beginPath();
-  ctx.moveTo(cx - 4.5, cy);
-  ctx.lineTo(cx + 4.5, cy);
-  ctx.lineTo(cx + 1.5, cy - trunkH);
-  ctx.lineTo(cx - 1.5, cy - trunkH);
+  ctx.moveTo(cx - 15, cy);     // Base: 30px wide
+  ctx.lineTo(cx + 15, cy);
+  ctx.lineTo(cx + 4, cy - trunkH);   // Top: ~8px wide
+  ctx.lineTo(cx - 4, cy - trunkH);
   ctx.closePath();
   ctx.fill();
   
   // Trunk highlight (lighter side for dimension)
-  ctx.fillStyle = '#6a5434';
+  ctx.fillStyle = '#5a3e28';
   ctx.beginPath();
-  ctx.moveTo(cx - 1.5, cy);
-  ctx.lineTo(cx + 2, cy);
-  ctx.lineTo(cx + 0.8, cy - trunkH);
-  ctx.lineTo(cx - 0.5, cy - trunkH);
+  ctx.moveTo(cx - 6, cy);
+  ctx.lineTo(cx + 10, cy);
+  ctx.lineTo(cx + 2, cy - trunkH);
+  ctx.lineTo(cx - 2, cy - trunkH);
   ctx.closePath();
   ctx.fill();
   
-  // Bark texture — vertical streaks running up the trunk
-  ctx.strokeStyle = 'rgba(80, 50, 30, 0.45)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 5; i++) {
-    const bx = cx - 3.5 + i * 1.8 + rnd() * 0.3;
-    const by1 = cy - trunkH;
-    const by2 = cy;
+  // Bark texture — thick vertical streaks running up the trunk
+  ctx.strokeStyle = 'rgba(25, 14, 8, 0.55)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 8; i++) {
+    const bx = cx - 12 + i * 3.5 + rnd() * 0.5;
+    const by1 = cy - trunkH + rnd() * 8;
+    const by2 = cy - rnd() * 3;
     ctx.beginPath();
     ctx.moveTo(bx, by1);
-    const curve = rnd() * 0.6 - 0.3;
-    ctx.quadraticCurveTo(bx + curve, (by1 + by2) / 2, bx + rnd() * 0.3 - 0.15, by2);
+    const cp = (by1 + by2) / 2 + rnd() * 8 - 4;
+    ctx.quadraticCurveTo(bx + rnd() * 3 - 1.5, cp, bx + rnd() * 1 - 0.5, by2);
     ctx.stroke();
   }
 
   // ===== BRANCHES (FROM UPPER TRUNK) =====
   // Main branches radiating outward and slightly upward
   ctx.strokeStyle = '#5a4234';
-  ctx.lineWidth = 2.4;
+  ctx.lineWidth = 3;
   const branchStarts = [
-    { y: cy - trunkH * 0.2, angle: -2.2, dist: 7 },
-    { y: cy - trunkH * 0.4, angle: -1.8, dist: 8 },
-    { y: cy - trunkH * 0.5, angle: 0.2, dist: 8.5 },
-    { y: cy - trunkH * 0.35, angle: 0.7, dist: 7.5 },
+    { y: cy - trunkH * 0.15, angle: -2.3, dist: 12 },
+    { y: cy - trunkH * 0.35, angle: -1.7, dist: 14 },
+    { y: cy - trunkH * 0.55, angle: 0.1, dist: 15 },
+    { y: cy - trunkH * 0.40, angle: 0.8, dist: 13 },
   ];
   
   for (const bs of branchStarts) {
     const angle = bs.angle;
     const dist = bs.dist;
     const bx = cx + Math.cos(angle) * dist;
-    const by = bs.y + Math.sin(angle) * dist * 0.2;
+    const by = bs.y + Math.sin(angle) * dist * 0.25;
     ctx.beginPath();
     ctx.moveTo(cx, bs.y);
     ctx.lineTo(bx, by);
@@ -1326,14 +1326,14 @@ function drawTreeTrunkBack(ctx, px, py, w, h, p) {
     
     // Sub-branches off main branches
     for (let j = 0; j < 2; j++) {
-      const sbx = bx + (j === 0 ? -3.5 : 2.5) + rnd() * 1.5;
-      const sby = by + rnd() * 2.5 - 0.5;
-      ctx.lineWidth = 1.3;
+      const sbx = bx + (j === 0 ? -5 : 3.5) + rnd() * 2;
+      const sby = by + rnd() * 3.5 - 1;
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.moveTo(bx, by);
       ctx.lineTo(sbx, sby);
       ctx.stroke();
-      ctx.lineWidth = 2.4;
+      ctx.lineWidth = 3;
     }
   }
 
@@ -1341,6 +1341,7 @@ function drawTreeTrunkBack(ctx, px, py, w, h, p) {
 }
 
 /** 5×5 tree canopy (front layer) — foliage only. Drawn AFTER player. */
+/** 7×7 tree canopy (front layer) — massive foliage. Drawn AFTER player. */
 function drawTreeCanopyFront(ctx, px, py, w, h, p) {
   const cx = px + w / 2;
   const cy = py + h - 2;
@@ -1349,40 +1350,42 @@ function drawTreeCanopyFront(ctx, px, py, w, h, p) {
 
   ctx.save();
 
-  const trunkH = h * 0.65;
-  const canopyR = Math.min(w, h) * 0.32;
-  const leafDark = '#3d7a2f';
-  const leafMid = '#4a8c3a';
-  const leafBright = '#6ec050';
-  const leafAccent = '#8dd968';
-  const canopyTop = cy - trunkH - canopyR * 0.3;
+  const trunkH = h * 0.7;
+  const canopyR = Math.min(w, h) * 0.55;  // Much larger
+  const leafDark = '#2a5a1f';   // Darker green
+  const leafMid = '#3a7a28';
+  const leafBright = '#5ec040';
+  const leafAccent = '#7ed858';
+  const canopyTop = cy - trunkH - canopyR * 0.4;
 
-  // Foliage clusters (semi-transparent so player shows through)
-  ctx.globalAlpha = 0.60;
-  const patches1 = 5 + Math.floor(rnd() * 3);
+  // ===== LARGE FOLIAGE CLUSTERS =====
+  // Outer layer (darker, largest patches)
+  ctx.globalAlpha = 0.65;
+  const patches1 = 8 + Math.floor(rnd() * 4);
   for (let i = 0; i < patches1; i++) {
     const a = rnd() * Math.PI * 2;
-    const d = rnd() * canopyR * 0.80;
+    const d = rnd() * canopyR * 0.90;
     const lx = cx + Math.cos(a) * d;
-    const ly = canopyTop + Math.sin(a) * d * 0.55;
-    const r = 7 + rnd() * 11;
-    ctx.fillStyle = rnd() < 0.3 ? leafMid : leafDark;
+    const ly = canopyTop + Math.sin(a) * d * 0.60;
+    const r = 12 + rnd() * 16;
+    ctx.fillStyle = rnd() < 0.2 ? leafMid : leafDark;
     ctx.beginPath();
     ctx.arc(lx, ly, r, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  ctx.globalAlpha = 0.72;
-  const patches2 = 4 + Math.floor(rnd() * 3);
+  // Middle layer (mixed colours)
+  ctx.globalAlpha = 0.75;
+  const patches2 = 7 + Math.floor(rnd() * 4);
   for (let i = 0; i < patches2; i++) {
     const a = rnd() * Math.PI * 2;
-    const d = rnd() * canopyR * 0.55;
+    const d = rnd() * canopyR * 0.60;
     const lx = cx + Math.cos(a) * d;
-    const ly = canopyTop + Math.sin(a) * d * 0.48;
-    const r = 5 + rnd() * 9;
+    const ly = canopyTop + Math.sin(a) * d * 0.55;
+    const r = 9 + rnd() * 13;
     const col = rnd();
-    if (col < 0.4) ctx.fillStyle = leafDark;
-    else if (col < 0.7) ctx.fillStyle = leafMid;
+    if (col < 0.35) ctx.fillStyle = leafDark;
+    else if (col < 0.65) ctx.fillStyle = leafMid;
     else if (col < 0.85) ctx.fillStyle = leafBright;
     else ctx.fillStyle = leafAccent;
     ctx.beginPath();
@@ -1390,14 +1393,15 @@ function drawTreeCanopyFront(ctx, px, py, w, h, p) {
     ctx.fill();
   }
 
-  ctx.globalAlpha = 0.55;
-  const patches3 = 3 + Math.floor(rnd() * 2);
+  // Top highlights (bright sunlit foliage, crown of the tree)
+  ctx.globalAlpha = 0.60;
+  const patches3 = 5 + Math.floor(rnd() * 3);
   for (let i = 0; i < patches3; i++) {
     const a = rnd() * Math.PI * 2;
-    const d = rnd() * canopyR * 0.40;
+    const d = rnd() * canopyR * 0.45;
     const lx = cx + Math.cos(a) * d;
-    const ly = canopyTop - canopyR * 0.15 + Math.sin(a) * d * 0.40;
-    const r = 3.5 + rnd() * 6;
+    const ly = canopyTop - canopyR * 0.20 + Math.sin(a) * d * 0.45;
+    const r = 6 + rnd() * 10;
     ctx.fillStyle = rnd() < 0.5 ? leafBright : leafAccent;
     ctx.beginPath();
     ctx.arc(lx, ly, r, 0, Math.PI * 2);
