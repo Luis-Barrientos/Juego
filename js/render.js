@@ -1262,21 +1262,20 @@ function drawTreeTrunkBack(ctx, px, py, w, h, p) {
   ctx.save();
   ctx.shadowBlur = 0;
 
-  // Dark ground patch covering the full 7×7 footprint to hide wall tiles
-  const patchRx = w * 0.72, patchRy = h * 0.72;
-  ctx.fillStyle = 'rgba(30, 20, 14, 0.5)';
+  // Subtle ground darkening around trunk base
+  ctx.fillStyle = 'rgba(25, 18, 12, 0.25)';
   ctx.beginPath();
-  ctx.ellipse(cx, cy, patchRx, patchRy, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, w * 0.28, h * 0.25, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#1e140e';
+  ctx.fillStyle = '#241a12';
   ctx.beginPath();
-  ctx.ellipse(cx, cy, w * 0.50, h * 0.44, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, w * 0.20, h * 0.18, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Drop shadow under canopy
-  ctx.fillStyle = 'rgba(0,0,0,0.40)';
+  // Drop shadow under canopy (subtle)
+  ctx.fillStyle = 'rgba(0,0,0,0.30)';
   ctx.beginPath();
-  ctx.ellipse(cx + 1, cy + 2, canopyR * 0.9, canopyR * 0.3, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 1, cy + 2, canopyR * 0.45, canopyR * 0.15, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // ===== MASSIVE TRUNK (60px base, 28px top) =====
